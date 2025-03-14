@@ -20,7 +20,7 @@ echo "  server:
     networks:
       - testing_net
     volumes:
-      - ./server/config/config.ini:/config.ini
+      - ./server/config.ini:/config.ini
 " >> $1
 
 # clients
@@ -38,7 +38,7 @@ do
     depends_on:
       - server
     volumes:
-      - ./client/config/config.yaml:/config.yaml
+      - ./client/config.yaml:/config.yaml
 " >> $1
 done
 
