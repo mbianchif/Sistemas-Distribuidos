@@ -8,7 +8,7 @@ HOST=$(retrieve_from_server_config "SERVER_IP")
 PORT=$(retrieve_from_server_config "SERVER_PORT")
 msg="Hello Server!"
 
-response=$(echo msg | netcat $HOST $PORT)
+response=$(docker run --rm --network=tp0_testing_net subfuzion/netcat sh -c "echo $msg | nc $HOST $PORT")
 
 if [ $response = $msg ]; then
     echo "action: test_echo_server | result: success"
