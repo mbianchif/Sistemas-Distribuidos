@@ -39,7 +39,7 @@ do
 done
 
 # networks
-echo "  networks:
+echo "networks:
   testing_net:
     ipam:
       driver: default
