@@ -6,11 +6,11 @@ retrieve_from_server_config() {
 
 HOST=$(retrieve_from_server_config "SERVER_IP")
 PORT=$(retrieve_from_server_config "SERVER_PORT")
-msg="Hello Server!"
+MSG="Hello Server!"
 
-response=$(docker run --rm --network=tp0_testing_net subfuzion/netcat sh -c "echo $msg | nc $HOST $PORT")
+RESPONSE=$(docker run --rm --network=tp0_testing_net --entrypoint sh subfuzion/netcat -c "echo \"$MSG\" | nc -w 2 $HOST $PORT")
 
-if [ $response = $msg ]; then
+if [ "$RESPONSE" = "$MSG" ]; then
     echo "action: test_echo_server | result: success"
 else
     echo "action: test_echo_server | result: fail"
