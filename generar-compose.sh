@@ -44,5 +44,4 @@ echo "networks:
     ipam:
       driver: default
       config:
-        - subnet: 172.25.125.0/24
-" >> $1
+        - subnet: 172.25.125.0/24" >> $1
