@@ -19,6 +19,8 @@ echo "  server:
       - LOGGING_LEVEL=DEBUG
     networks:
       - testing_net
+    volumes:
+      - server/config.ini:/config.ini:ro
 " >> $1
 
 # clients
@@ -35,6 +37,8 @@ do
       - testing_net
     depends_on:
       - server
+    volumes:
+      - client/config.yaml:/config.yaml:ro
 " >> $1
 done
 
