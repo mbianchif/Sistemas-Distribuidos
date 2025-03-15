@@ -52,7 +52,7 @@ class BetSockStream:
         self._skt.connect((host, port))
         return self
 
-    def peer_addr(self) -> socket._RetAddress:
+    def peer_addr(self) -> "socket._RetAddress":
         return self._skt.getpeername()
 
     def send(self, msg: Message):
@@ -94,7 +94,7 @@ class BetSockListener:
         self._skt.listen(backlog)
         return self
 
-    def accept(self) -> tuple[BetSockStream, socket._RetAddress]:
+    def accept(self) -> tuple[BetSockStream, "socket._RetAddress"]:
         """
         Blocks the calling thread until a new connection arrives
         """
