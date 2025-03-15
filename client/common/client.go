@@ -54,20 +54,6 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-func writeAll(w io.Writer, b []byte) int {
-    written := 0
-    for written < len(b) {
-        n, err := w.Write(b[written:])
-        if err != nil {
-            return written
-        }
-
-        written += n
-    }
-
-    return written
-}
-
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
     sigs := make(chan os.Signal, 1)
@@ -80,17 +66,13 @@ func (c *Client) StartClientLoop() {
 
 		c.createClientSocket()
 
-        // Write msg to client
-        data := []byte(fmt.Sprintf("[CLIENT %v] Message N°%v\n", c.config.ID, msgID))
-        writeAll(c.conn, data)
-
  		// TODO: Modify the send to avoid short-write
-// 		fmt.Fprintf(
-// 			c.conn,
-// 			"[CLIENT %v] Message N°%v\n",
-// 			c.config.ID,
-// 			msgID,
-// 		)
+ 		fmt.Fprintf(
+			c.conn,
+			"[CLIENT %v] Message N°%v\n",
+			c.config.ID,
+			msgID,
+		)
 		msg, err := bufio.NewReader(c.conn).ReadString('\n')
 		c.conn.Close()
 
