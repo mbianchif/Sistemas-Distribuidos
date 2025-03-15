@@ -3,7 +3,11 @@ package common
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/op/go-logging"
@@ -50,21 +54,43 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
+func writeAll(w io.Writer, b []byte) int {
+    written := 0
+    for written < len(b) {
+        n, err := w.Write(b[written:])
+        if err != nil {
+            return written
+        }
+
+        written += n
+    }
+
+    return written
+}
+
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-	// There is an autoincremental msgID to identify every message sent
-	// Messages if the message amount threshold has not been surpassed
+    sigs := make(chan os.Signal, 1)
+    signal.Notify(sigs, syscall.SIGTERM)
+
 	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
-		// Create the connection the server in every loop iteration. Send an
+        if _, ok := <-sigs; ok {
+            return
+        }
+
 		c.createClientSocket()
 
-		// TODO: Modify the send to avoid short-write
-		fmt.Fprintf(
-			c.conn,
-			"[CLIENT %v] Message N°%v\n",
-			c.config.ID,
-			msgID,
-		)
+        // Write msg to client
+        data := []byte(fmt.Sprintf("[CLIENT %v] Message N°%v\n", c.config.ID, msgID))
+        writeAll(c.conn, data)
+
+ 		// TODO: Modify the send to avoid short-write
+// 		fmt.Fprintf(
+// 			c.conn,
+// 			"[CLIENT %v] Message N°%v\n",
+// 			c.config.ID,
+// 			msgID,
+// 		)
 		msg, err := bufio.NewReader(c.conn).ReadString('\n')
 		c.conn.Close()
 
@@ -81,9 +107,9 @@ func (c *Client) StartClientLoop() {
 			msg,
 		)
 
-		// Wait a time between sending one message and the next one
 		time.Sleep(c.config.LoopPeriod)
 
 	}
+
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 }
