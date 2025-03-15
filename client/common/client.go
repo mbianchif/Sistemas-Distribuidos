@@ -61,7 +61,7 @@ func (c *Client) StartClientLoop() {
 
 	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
         if _, ok := <-sigs; ok {
-            return
+            break
         }
 
 		c.createClientSocket()
@@ -90,7 +90,6 @@ func (c *Client) StartClientLoop() {
 		)
 
 		time.Sleep(c.config.LoopPeriod)
-
 	}
 
 	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
