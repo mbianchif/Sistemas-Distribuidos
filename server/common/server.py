@@ -1,6 +1,6 @@
 import signal
 import logging
-from protocol import BetSockListener, BetSockStream
+from .protocol import BetSockListener, BetSockStream
 from server.common.utils import Bet, store_bets
 
 
