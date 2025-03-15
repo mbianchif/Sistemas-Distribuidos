@@ -3,7 +3,6 @@ package common
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"os/signal"
