@@ -1,5 +1,4 @@
 import socket
-from typing import Self
 
 MSG_SIZE_SIZE = 4
 
@@ -24,7 +23,7 @@ class Message:
         self._number = number
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> Self:
+    def from_bytes(cls, data: bytes):
         return cls(*data.decode().split("\n"))
 
     def encode(self) -> bytes:
@@ -45,7 +44,7 @@ class BetSockStream:
         self._skt = skt
 
     @classmethod
-    def connect(cls, host: str, port: int) -> Self:
+    def connect(cls, host: str, port: int):
         """
         Instanciates a new BetSockStream connected to the given address
         """
@@ -86,7 +85,7 @@ class BetSockListener:
         self._skt = skt
 
     @classmethod
-    def bind(cls, host: str, port: int, backlog: int = 0) -> Self:
+    def bind(cls, host: str, port: int, backlog: int = 0):
         """
         Instanciates a new BetSockListener and binds it to the given address
         """
