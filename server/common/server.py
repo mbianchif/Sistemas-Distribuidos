@@ -6,8 +6,10 @@ import logging
 class Server:
     def __init__(self, port, listen_backlog):
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._server_shutdown = False
+
         def term_handler(_signum, _stacktrace):
-            self._server_socket.close()
+            self._server_shutdown = True
 
         signal.signal(signal.SIGTERM, term_handler)
         self._server_socket.bind(('', port))
@@ -21,9 +23,11 @@ class Server:
         communication with a client. After client with communucation
         finishes, servers starts to accept new connections again
         """
-        while True:
+        while not self._server_shutdown:
             with self.__accept_new_connection() as client_sock:
                 self.__handle_client_connection(client_sock)
+
+        self._server_socket.close()
 
     def __handle_client_connection(self, client_sock):
         """

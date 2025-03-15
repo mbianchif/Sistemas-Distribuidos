@@ -55,18 +55,19 @@ func (c *Client) createClientSocket() error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-    sigs := make(chan os.Signal, 1)
-    signal.Notify(sigs, syscall.SIGTERM)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM)
 
 	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
-        if _, ok := <-sigs; ok {
-            break
-        }
+		select {
+		case _ = <-sigs:
+			break
+		default:
+			c.createClientSocket()
+		}
 
-		c.createClientSocket()
-
- 		// TODO: Modify the send to avoid short-write
- 		fmt.Fprintf(
+		// TODO: Modify the send to avoid short-write
+		fmt.Fprintf(
 			c.conn,
 			"[CLIENT %v] Message N°%v\n",
 			c.config.ID,
