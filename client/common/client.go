@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/csv"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,10 +13,11 @@ import (
 var log = logging.MustGetLogger("log")
 
 type ClientConfig struct {
-	ID            string
-	ServerAddress string
-	LoopAmount    int
-	LoopPeriod    time.Duration
+	ID             string
+	ServerAddress  string
+	LoopAmount     int
+	LoopPeriod     time.Duration
+	MaxBatchAmount int
 }
 
 type Client struct {
@@ -30,60 +32,63 @@ func NewClient(config ClientConfig) *Client {
 	return client
 }
 
-func (c *Client) createClientSocket() error {
+func (c *Client) createClientSocket() {
 	conn, err := BetSockConnect(c.config.ServerAddress)
 	if err != nil {
-		log.Criticalf(
-			"action: connect | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
+		log.Criticalf("action: connect | result: fail | client_id: %v | error: %v", c.config.ID, err)
 	}
 	c.conn = conn
-	return nil
 }
 
-func (c *Client) StartClientLoop() {
+func (c *Client) StartClientLoop(betPath string) {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM)
 
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
+	batchSize := c.config.MaxBatchAmount
+	id := c.config.ID
+
+	betFile, err := os.Open(betPath)
+	if err != nil {
+		log.Errorf("action: bet_file_open | result: fail | client_id: %v | error: %v", id, err)
+	}
+	defer betFile.Close()
+
+	betFileReader := csv.NewReader(betFile)
+	exit := false
+
+	c.createClientSocket()
+	defer c.conn.Close()
+
+	for !exit {
 		select {
 		case _ = <-sigs:
 			break
 		default:
-			c.createClientSocket()
 		}
 
-		msg := Message{
-			Agency:    c.config.ID,
-			Name:      os.Getenv("NOMBRE"),
-			Surname:   os.Getenv("APELLIDO"),
-			Id:        os.Getenv("DOCUMENTO"),
-			Birthdate: os.Getenv("NACIMIENTO"),
-			Number:    os.Getenv("NUMERO"),
+		bets := make([]Message, 0, batchSize)
+		for i := 0; i < batchSize; i++ {
+			line, err := betFileReader.Read()
+			if err != nil {
+				exit = true
+				break
+			}
+
+			bets = append(bets, Message{
+				Agency:    id,
+				Name:      line[0],
+				Surname:   line[1],
+				Id:        line[2],
+				Birthdate: line[3],
+				Number:    line[4],
+			})
 		}
 
-        c.conn.Send(msg)
-        log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", msg.Id, msg.Number)
-
-        msg, err := c.conn.Recv()
-		c.conn.Close()
+		err := c.conn.Send(bets...)
 		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
+			log.Infof("action send_batch | result: fail | client_id: %v | error: %v", id, err)
+		} else {
+			log.Infof("action send_batch | result: success | client_id: %v", id)
 		}
-
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-			c.config.ID,
-			msg,
-		)
-
-		time.Sleep(c.config.LoopPeriod)
 	}
-
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 }

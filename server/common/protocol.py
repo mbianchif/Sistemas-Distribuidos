@@ -1,8 +1,10 @@
 import socket
 
+BATCH_SIZE_SIZE = 4
 MSG_SIZE_SIZE = 4
 DELIMITER = "\n"
 TERMINATOR = ";"
+
 
 class Message:
     def __init__(
@@ -48,21 +50,31 @@ class BetSockStream:
     def peer_addr(self) -> "socket._RetAddress":
         return self._skt.getpeername()
 
-    def send(self, msg: Message):
-        self._skt.sendall(msg.encode())
+    def send(self, *msgs: Message):
+        batch_size = len(msgs)
+        data = bytearray(batch_size.to_bytes(BATCH_SIZE_SIZE, "big"))
 
-    def recv(self) -> Message:
-        data = bytearray()
+        for msg in msgs:
+            data.extend(msg.encode())
+
+        self._skt.sendall(data)
+
+    def recv(self) -> list[Message]:
         terminator_byte = TERMINATOR.encode()
 
-        while True:
-            read = self._skt.recv(1024)
-            if not read:
-                raise OSError("inner socket got unexpectedly closed")
+        def recv_msg(bufsize: int):
+            data = bytearray()
+            while not data.endswith(terminator_byte):
+                read = self._skt.recv(bufsize)
+                if not read:
+                    raise OSError("inner socket got unexpectedly closed")
 
-            data += read
-            if read.endswith(terminator_byte):
-                return Message.from_bytes(bytes(data))
+                data += read
+
+            return Message.from_bytes(bytes(data))
+
+        batch_size = int.from_bytes(self._skt.recv(BATCH_SIZE_SIZE), "big")
+        return [recv_msg(1024) for _ in range(batch_size)]
 
     def close(self):
         self._skt.close()

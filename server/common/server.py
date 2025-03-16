@@ -26,20 +26,24 @@ class Server:
 
     def _handle_client_connection(self, client_sock: BetSockStream):
         try:
-            msg = client_sock.recv()
-            bet = Bet(
-                msg._agency,
-                msg._name,
-                msg._surname,
-                msg._id,
-                msg._birthdate,
-                msg._number,
-            )
+            msgs = client_sock.recv()
+            bets = []
 
-            store_bets([bet])
-            logging.info(f"action: apuesta_almacenada | result: success | dni: {msg._id} | numero: {msg._number}")
+            for msg in msgs:
+                bet = Bet(
+                    msg._agency,
+                    msg._name,
+                    msg._surname,
+                    msg._id,
+                    msg._birthdate,
+                    msg._number,
+                )
+                bets.append(bet)
+
+            store_bets(bets)
+            logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
         except OSError as e:
-            logging.error(f"action: receive_message | result: fail | error: {e}")
+            logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}")
 
     def _accept_new_connection(self) -> BetSockStream:
         logging.info("action: accept_connections | result: in_progress")

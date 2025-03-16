@@ -2,11 +2,14 @@ package common
 
 import (
 	"bufio"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 )
 
+const BATCH_SIZE_SIZE = 4
 const MSG_SIZE_SIZE = 4
 const DELIMITER = "\n"
 const TERMINATOR = ';'
@@ -62,9 +65,17 @@ func (s BetSockStream) PeerAddr() net.Addr {
 	return s.conn.RemoteAddr()
 }
 
-func (s *BetSockStream) Send(msg Message) error {
+func (s *BetSockStream) Send(msgs... Message) error {
 	writer := bufio.NewWriter(s.conn)
-	writer.Write(msg.Encode())
+
+    // Write batch size
+    batchSizeBytes := make([]byte, BATCH_SIZE_SIZE)
+    binary.BigEndian.PutUint32(batchSizeBytes, uint32(len(msgs)))
+    writer.Write(batchSizeBytes)
+
+    for _, msg := range msgs {
+        writer.Write(msg.Encode())
+    }
 
 	err := writer.Flush()
 	if err != nil {
@@ -73,12 +84,24 @@ func (s *BetSockStream) Send(msg Message) error {
 	return nil
 }
 
-func (s *BetSockStream) Recv() (Message, error) {
-	data, err := bufio.NewReader(s.conn).ReadBytes(TERMINATOR)
-	if err != nil {
-        return Message{}, fmt.Errorf("couldn't recv message: %v", err)
-	}
-	return MsgFromBytes(data), nil
+func (s *BetSockStream) Recv() ([]Message, error) {
+    reader := bufio.NewReader(s.conn)
+
+    // Read batch size
+    batchSizeBytes := make([]byte, BATCH_SIZE_SIZE)
+    io.ReadFull(reader, batchSizeBytes)
+    batchSize := int(binary.BigEndian.Uint32(batchSizeBytes))
+
+    msgs := make([]Message, 0, batchSize)
+    for i := 0; i < batchSize; i++ {
+        data, err := reader.ReadBytes(TERMINATOR)
+        if err != nil {
+            return msgs, fmt.Errorf("batch got cut in the middle: %v", err)
+        }
+        msgs = append(msgs, MsgFromBytes(data))
+    }
+
+    return msgs, nil
 }
 
 func (s *BetSockStream) Close() {
