@@ -29,7 +29,7 @@ class Message:
             self._number,
         )
 
-        return DELIMITER.join(atts).encode() + TERMINATOR.encode()
+        return (DELIMITER.join(atts) + TERMINATOR).encode()
 
 
 class BetSockStream:
