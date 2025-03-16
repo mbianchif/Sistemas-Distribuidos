@@ -65,7 +65,7 @@ func (c *Client) StartClientLoop() {
 		}
 
         c.conn.Send(msg)
-        log.Infof("action: apuesta_enviada | result: success | dni: %s | numero: %s", msg.Id, msg.Number)
+        log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", msg.Id, msg.Number)
 
         msg, err := c.conn.Recv()
 		c.conn.Close()
