@@ -51,7 +51,7 @@ class BetSockStream:
     def send(self, msg: Message):
         self._skt.sendall(msg.encode())
 
-    def _recv_all(self) -> bytes:
+    def recv(self) -> Message:
         data = bytearray()
         terminator_byte = TERMINATOR.encode()
 
@@ -62,10 +62,7 @@ class BetSockStream:
 
             data += read
             if read.endswith(terminator_byte):
-                return bytes(data)
-
-    def recv(self) -> Message:
-        return Message.from_bytes(self._recv_all())
+                return Message.from_bytes(bytes(data))
 
     def close(self):
         self._skt.close()
