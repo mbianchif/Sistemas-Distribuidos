@@ -75,7 +75,6 @@ func (c *Client) StartClientLoop(betPath string) {
 				break
 			}
 
-            fmt.Println("line:", line)
 			bets = append(bets, Message{
 				Agency:    id,
 				Name:      line[0],
@@ -89,6 +88,7 @@ func (c *Client) StartClientLoop(betPath string) {
 		err := c.conn.Send(bets...)
 		if err != nil {
 			log.Infof("action send_batch | result: fail | client_id: %v | error: %v", id, err)
+            break
 		} else {
 			log.Infof("action send_batch | result: success | client_id: %v", id)
 		}
