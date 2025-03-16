@@ -1,3 +1,4 @@
+import io
 import socket
 
 DELIMITER = ","
@@ -58,15 +59,8 @@ class BetSockStream:
         self._skt.sendall(data)
 
     def recv(self) -> list[Message]:
-        batch_terminator = BATCH_TERMINATOR.encode()
-
-        batch = bytearray()
-        while not batch.endswith(batch_terminator):
-            read = self._skt.recv(1024)
-            if not read:
-                raise OSError("inner socket got unexpectedly closed")
-            batch += read
-
+        reader = self._skt.makefile("rb")
+        batch = reader.readline()
         terminator = TERMINATOR.encode()
         return [Message.from_bytes(bytes(data)) for data in batch.split(terminator)]
 
