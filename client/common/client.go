@@ -65,7 +65,6 @@ func (c *Client) StartClientLoop() {
 			Number:    os.Getenv("NUMERO"),
 		}
 
-        log.Infof(fmt.Sprint(msg))
         c.conn.Send(msg)
         log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", msg.Id, msg.Number)
 
