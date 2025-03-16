@@ -18,7 +18,7 @@ class Message:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        return cls(*data.decode().rstrip(TERMINATOR).split(DELIMITER))
+        return cls(*data.decode().split(DELIMITER))
 
 
 class BetSockStream:

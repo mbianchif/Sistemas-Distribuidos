@@ -32,7 +32,7 @@ func (m Message) Encode() []byte {
 		m.Number,
 	}
 
-	return []byte(strings.Join(fields, DELIMITER) + TERMINATOR)
+	return []byte(strings.Join(fields, DELIMITER))
 }
 
 type BetSockStream struct {
