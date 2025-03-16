@@ -109,8 +109,6 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-    fmt.Println("nombre:", v.GetString("NOMBRE"))
-
 	client := common.NewClient(clientConfig)
 	client.StartClientLoop()
 }

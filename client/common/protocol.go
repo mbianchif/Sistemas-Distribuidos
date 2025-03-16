@@ -1,15 +1,15 @@
 package common
 
 import (
-	"encoding/binary"
+	"bufio"
 	"fmt"
-	"io"
 	"net"
 	"strings"
 )
 
 const MSG_SIZE_SIZE = 4
-const SEPARATOR = "\n"
+const DELIMITER = "\n"
+const TERMINATOR = ';'
 
 type Message struct {
 	Agency    string
@@ -21,7 +21,7 @@ type Message struct {
 }
 
 func MsgFromBytes(data []byte) Message {
-	fields := strings.Split(string(data), SEPARATOR)
+	fields := strings.Split(string(data), DELIMITER)
 	return Message{
 		fields[0],
 		fields[1],
@@ -42,14 +42,8 @@ func (m Message) Encode() []byte {
 		m.Number,
 	}
 
-	data := make([]byte, 0)
-	for i, field := range fields {
-		data = append(data, []byte(field)...)
-		if i < len(fields)-1 {
-			data = append(data, '\n')
-		}
-	}
-	return data
+	data := []byte(strings.Join(fields, DELIMITER))
+	return append(data, TERMINATOR)
 }
 
 type BetSockStream struct {
@@ -68,60 +62,22 @@ func (s BetSockStream) PeerAddr() net.Addr {
 	return s.conn.RemoteAddr()
 }
 
-func (s *BetSockStream) sendAll(data []byte) int {
-	written := 0
-	for written < len(data) {
-		n, err := s.conn.Write(data[written:])
-		if err != nil {
-			return written
-		}
-		written += n
-	}
-	return written
-}
-
 func (s *BetSockStream) Send(msg Message) error {
-	data := msg.Encode()
+	writer := bufio.NewWriter(s.conn)
+	writer.Write(msg.Encode())
 
-	length := make([]byte, MSG_SIZE_SIZE)
-	binary.BigEndian.PutUint32(length, uint32(len(data)))
-	if len(length) != s.sendAll(length) {
-		return fmt.Errorf("couldn't send the message length")
+	err := writer.Flush()
+	if err != nil {
+		return fmt.Errorf("couldn't send message")
 	}
-
-	if len(data) != s.sendAll(data) {
-		return fmt.Errorf("couldn't send the message data")
-	}
-
 	return nil
 }
 
-func (s *BetSockStream) recvAll(n int) ([]byte, error) {
-	buff := make([]byte, n)
-	readTotal := 0
-
-	for readTotal < n {
-		read, err := s.conn.Read(buff[readTotal:])
-		if err != nil {
-            fmt.Println("error while reading:", err)
-			if err != io.EOF {
-				return nil, err
-			}
-			break
-		}
-		readTotal += read
-	}
-	return buff[:readTotal], nil
-}
-
 func (s *BetSockStream) Recv() (Message, error) {
-	sizeBytes, err := s.recvAll(MSG_SIZE_SIZE)
+	data, err := bufio.NewReader(s.conn).ReadBytes(TERMINATOR)
 	if err != nil {
-		return Message{}, err
+		return Message{}, fmt.Errorf("couldn't recv message")
 	}
-
-	size := binary.BigEndian.Uint32(sizeBytes)
-	data, err := s.recvAll(int(size))
 	return MsgFromBytes(data), nil
 }
 

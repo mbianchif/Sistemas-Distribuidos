@@ -1,7 +1,8 @@
 import socket
 
 MSG_SIZE_SIZE = 4
-SEPARATOR = "\n"
+DELIMITER = "\n"
+TERMINATOR = ";"
 
 """
                                     MESSAGE PROTOCOL
@@ -25,7 +26,7 @@ class Message:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        return cls(*data.decode().split(SEPARATOR))
+        return cls(*data.decode().split(DELIMITER))
 
     def encode(self) -> bytes:
         atts = (
@@ -36,13 +37,8 @@ class Message:
             self._birthdate,
             self._number,
         )
-        data = bytearray()
-        for i, att in enumerate(atts):
-            data.extend(att.encode())
-            if i < len(atts):
-                data.extend(SEPARATOR.encode())
 
-        return bytes(data)
+        return DELIMITER.join(atts).encode() + TERMINATOR.encode()
 
 
 class BetSockStream:
@@ -62,25 +58,22 @@ class BetSockStream:
         return self._skt.getpeername()
 
     def send(self, msg: Message):
-        data = msg.encode()
-        self._skt.sendall(len(data).to_bytes(MSG_SIZE_SIZE))
-        self._skt.sendall(data)
+        self._skt.sendall(msg.encode())
 
-    def _recv_all(self, n: int) -> bytes:
-        buff = bytearray()
-        while len(buff) < n:
-            read = self._skt.recv(n - len(buff))
+    def _recv_all(self) -> bytes:
+        data = bytearray()
+
+        while True:
+            read = self._skt.recv(1024)
             if not read:
-                raise OSError("peer socket is closed")
+                raise OSError("inner socket got unexpectedly closed")
 
-            buff.extend(read)
-
-        return bytes(buff)
+            data += read
+            if read[-1] == TERMINATOR:
+                return bytes(data)
 
     def recv(self) -> Message:
-        size = int.from_bytes(self._recv_all(MSG_SIZE_SIZE), "big")
-        data = self._recv_all(size)
-        return Message.from_bytes(data)
+        return Message.from_bytes(self._recv_all())
 
     def close(self):
         self._skt.close()
