@@ -40,6 +40,7 @@ class Server:
                 )
                 bets.append(bet)
 
+            print(f"bets_len: {len(bets)}")
             store_bets(bets)
             logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
         except OSError as e:
