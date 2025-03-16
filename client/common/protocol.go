@@ -68,7 +68,7 @@ func (s *BetSockStream) Send(msg Message) error {
 
 	err := writer.Flush()
 	if err != nil {
-		return fmt.Errorf("couldn't send message")
+        return fmt.Errorf("couldn't send message: %v", err)
 	}
 	return nil
 }
@@ -76,7 +76,7 @@ func (s *BetSockStream) Send(msg Message) error {
 func (s *BetSockStream) Recv() (Message, error) {
 	data, err := bufio.NewReader(s.conn).ReadBytes(TERMINATOR)
 	if err != nil {
-		return Message{}, fmt.Errorf("couldn't recv message")
+        return Message{}, fmt.Errorf("couldn't recv message: %v", err)
 	}
 	return MsgFromBytes(data), nil
 }
