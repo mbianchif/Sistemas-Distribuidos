@@ -21,7 +21,7 @@ echo "  server:
     volumes:
       - ./server/config.ini:/config.ini
     healthcheck:
-      test: \"sh validar-echo-server.sh\"
+      test: [\"CMD\", \"validar-echo-server.sh\"]
       interval: 2s
       timeout: 5s
       retries: 5
