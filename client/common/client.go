@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/csv"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -74,6 +75,7 @@ func (c *Client) StartClientLoop(betPath string) {
 				break
 			}
 
+            fmt.Println("line:", line)
 			bets = append(bets, Message{
 				Agency:    id,
 				Name:      line[0],
