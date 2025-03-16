@@ -72,7 +72,7 @@ class BetSockStream:
         return bytes(buff)
 
     def recv(self) -> Message:
-        size = int.from_bytes(self._recv_all(MSG_SIZE_SIZE))
+        size = int.from_bytes(self._recv_all(MSG_SIZE_SIZE), "big")
         data = self._recv_all(size)
         return Message.from_bytes(data)
 
