@@ -20,11 +20,6 @@ echo "  server:
       - testing_net
     volumes:
       - ./server/config.ini:/config.ini
-    healthcheck:
-      test: [\"CMD\", \"validar-echo-server.sh\"]
-      interval: 2s
-      timeout: 5s
-      retries: 5
 " >> $1
 
 # clients
@@ -39,8 +34,7 @@ do
     networks:
       - testing_net
     depends_on:
-      server:
-        condition: service_healthy
+      - server
     volumes:
       - ./client/config.yaml:/config.yaml
 " >> $1
