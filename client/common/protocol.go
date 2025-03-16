@@ -111,7 +111,6 @@ func (s *BetSockStream) Recv() (Message, error) {
 		return Message{}, err
 	}
 
-    fmt.Println("sizeBytes:", sizeBytes)
 	size := binary.BigEndian.Uint32(sizeBytes)
 	data, err := s.recvAll(int(size))
 	return MsgFromBytes(data), nil
