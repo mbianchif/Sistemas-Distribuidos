@@ -75,7 +75,7 @@ func (s *BetSockStream) sendAll(data []byte) int {
 func (s *BetSockStream) Send(msg Message) error {
 	data := msg.Encode()
 
-	length := make([]byte, 4)
+	length := make([]byte, MSG_SIZE_SIZE)
 	binary.BigEndian.PutUint32(length, uint32(len(data)))
 	if len(length) != s.sendAll(length) {
 		return fmt.Errorf("couldn't send the message length")
@@ -91,7 +91,7 @@ func (s *BetSockStream) Send(msg Message) error {
 func (s *BetSockStream) recvAll(n int) ([]byte, error) {
 	buff := make([]byte, n)
     readTotal := 0
-	for len(buff) < n {
+	for readTotal < n {
         read, err := s.conn.Read(buff[readTotal:])
 		if err != nil {
 			if err != io.EOF {
