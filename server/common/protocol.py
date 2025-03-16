@@ -49,6 +49,7 @@ class BetSockStream:
 
         batch_size_bytes = read_n(BATCH_SIZE_SIZE)
         batch_size = int.from_bytes(batch_size_bytes, "big")
+
         batch = read_n(batch_size)
         terminator_byte = TERMINATOR.encode()
         return [Message.from_bytes(chunk) for chunk in batch.split(terminator_byte)]

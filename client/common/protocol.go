@@ -2,7 +2,7 @@ package common
 
 import (
 	"bufio"
-    "encoding/binary"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"strings"
@@ -31,7 +31,7 @@ func (m Message) Encode() []byte {
 		m.Number,
 	}
 
-	return []byte(strings.Join(fields, DELIMITER))
+	return []byte(strings.Join(fields, DELIMITER) + TERMINATOR)
 }
 
 type BetSockStream struct {
@@ -51,18 +51,18 @@ func (s BetSockStream) PeerAddr() net.Addr {
 }
 
 func (s *BetSockStream) Send(msgs ...Message) error {
-    encoded := make([]byte, 0)
-    for _, msg := range msgs {
-        encoded = append(encoded, msg.Encode()...)
-    }
+	encoded := make([]byte, 0)
+	for _, msg := range msgs {
+		encoded = append(encoded, msg.Encode()...)
+	}
 
-    batchSize := len(encoded)
-    batchSizeBytes := make([]byte, 0, BATCH_SIZE_SIZE)
-    binary.BigEndian.PutUint32(batchSizeBytes, uint32(batchSize))
+	batchSize := len(encoded)
+	batchSizeBytes := make([]byte, BATCH_SIZE_SIZE)
+	binary.BigEndian.PutUint32(batchSizeBytes, uint32(batchSize))
 
 	writer := bufio.NewWriter(s.conn)
-    writer.Write(batchSizeBytes)
-    writer.Write(encoded)
+	writer.Write(batchSizeBytes)
+	writer.Write(encoded)
 
 	err := writer.Flush()
 	if err != nil {
@@ -74,28 +74,4 @@ func (s *BetSockStream) Send(msgs ...Message) error {
 
 func (s *BetSockStream) Close() {
 	s.conn.Close()
-}
-
-type BetSockListener struct {
-	listener net.Listener
-}
-
-func BetSockBind(host string, port int, backlog int) (*BetSockListener, error) {
-	listener, err := net.Listen("tcp", fmt.Sprintf("%v:%v", host, port))
-	if err != nil {
-		return nil, err
-	}
-	return &BetSockListener{listener}, nil
-}
-
-func (l *BetSockListener) Accept() (*BetSockStream, error) {
-	skt, err := l.listener.Accept()
-	if err != nil {
-		return nil, err
-	}
-	return &BetSockStream{skt}, nil
-}
-
-func (l *BetSockListener) Close() {
-	l.listener.Close()
 }
