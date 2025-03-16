@@ -4,15 +4,6 @@ MSG_SIZE_SIZE = 4
 DELIMITER = "\n"
 TERMINATOR = ";"
 
-"""
-                                    MESSAGE PROTOCOL
-
-The protocol has 7 fields, the first field is the size of the entire message in 4 bytes, after
-that come the agency, name, surname, id, birthdate and number. All separated by a new line character.
-
-"""
-
-
 class Message:
     def __init__(
         self, agency: str, name: str, surname: str, id: str, birthdate: str, number: str
@@ -26,7 +17,7 @@ class Message:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        return cls(*data.decode().split(DELIMITER))
+        return cls(*data.decode().rstrip(TERMINATOR).split(DELIMITER))
 
     def encode(self) -> bytes:
         atts = (
@@ -62,6 +53,7 @@ class BetSockStream:
 
     def _recv_all(self) -> bytes:
         data = bytearray()
+        terminator_byte = TERMINATOR.encode()
 
         while True:
             read = self._skt.recv(1024)
@@ -69,7 +61,7 @@ class BetSockStream:
                 raise OSError("inner socket got unexpectedly closed")
 
             data += read
-            if read[-1] == TERMINATOR:
+            if read.endswith(terminator_byte):
                 return bytes(data)
 
     def recv(self) -> Message:
