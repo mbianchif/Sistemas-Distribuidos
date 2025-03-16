@@ -42,14 +42,14 @@ func (m Message) Encode() []byte {
 		m.Number,
 	}
 
-    data := make([]byte, 0)
-    for i, field := range fields {
-        data = append(data, []byte(field)...)
-        if i < len(fields) - 1 {
-            data = append(data, '\n')
-        }
-    }
-    return data
+	data := make([]byte, 0)
+	for i, field := range fields {
+		data = append(data, []byte(field)...)
+		if i < len(fields)-1 {
+			data = append(data, '\n')
+		}
+	}
+	return data
 }
 
 type BetSockStream struct {
@@ -98,19 +98,20 @@ func (s *BetSockStream) Send(msg Message) error {
 
 func (s *BetSockStream) recvAll(n int) ([]byte, error) {
 	buff := make([]byte, n)
-    readTotal := 0
+	readTotal := 0
+
 	for readTotal < n {
-        read, err := s.conn.Read(buff[readTotal:])
+		read, err := s.conn.Read(buff[readTotal:])
 		if err != nil {
+            fmt.Println("error while reading:", err)
 			if err != io.EOF {
 				return nil, err
 			}
 			break
 		}
-        readTotal += read
-
+		readTotal += read
 	}
-    return buff[:readTotal], nil
+	return buff[:readTotal], nil
 }
 
 func (s *BetSockStream) Recv() (Message, error) {
@@ -119,7 +120,6 @@ func (s *BetSockStream) Recv() (Message, error) {
 		return Message{}, err
 	}
 
-    fmt.Println("sizeBytes:", sizeBytes)
 	size := binary.BigEndian.Uint32(sizeBytes)
 	data, err := s.recvAll(int(size))
 	return MsgFromBytes(data), nil
@@ -134,21 +134,21 @@ type BetSockListener struct {
 }
 
 func BetSockBind(host string, port int, backlog int) (*BetSockListener, error) {
-    listener, err := net.Listen("tcp", fmt.Sprintf("%v:%v", host, port))
-    if err != nil {
-        return nil, err
-    }
-    return &BetSockListener{listener}, nil
+	listener, err := net.Listen("tcp", fmt.Sprintf("%v:%v", host, port))
+	if err != nil {
+		return nil, err
+	}
+	return &BetSockListener{listener}, nil
 }
 
 func (l *BetSockListener) Accept() (*BetSockStream, error) {
-    skt, err := l.listener.Accept()
-    if err != nil {
-        return nil, err
-    }
-    return &BetSockStream{skt}, nil
+	skt, err := l.listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	return &BetSockStream{skt}, nil
 }
 
 func (l *BetSockListener) Close() {
-    l.listener.Close()
+	l.listener.Close()
 }
