@@ -45,11 +45,10 @@ func (m Message) Encode() []byte {
     data := make([]byte, 0)
     for i, field := range fields {
         data = append(data, []byte(field)...)
-        if i < len(fields) {
+        if i < len(fields) - 1 {
             data = append(data, '\n')
         }
     }
-
     return data
 }
 
@@ -120,6 +119,7 @@ func (s *BetSockStream) Recv() (Message, error) {
 		return Message{}, err
 	}
 
+    fmt.Println("sizeBytes:", sizeBytes)
 	size := binary.BigEndian.Uint32(sizeBytes)
 	data, err := s.recvAll(int(size))
 	return MsgFromBytes(data), nil
