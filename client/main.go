@@ -113,5 +113,5 @@ func main() {
 	}
 
 	client := common.NewClient(clientConfig)
-	client.StartClientLoop()
+	client.StartClientLoop("/bets.csv")
 }
