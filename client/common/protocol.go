@@ -2,6 +2,7 @@ package common
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -51,10 +52,11 @@ func (s BetSockStream) PeerAddr() net.Addr {
 }
 
 func (s *BetSockStream) Send(msgs ...Message) error {
-	encoded := make([]byte, 0)
-	for _, msg := range msgs {
-		encoded = append(encoded, msg.Encode()...)
-	}
+    encodedMsgs := make([][]byte, 0, len(msgs))
+    for _, msg := range msgs {
+        encodedMsgs = append(encodedMsgs, msg.Encode())
+    }
+    encoded := bytes.Join(encodedMsgs, []byte(TERMINATOR))
 
 	batchSize := len(encoded)
 	batchSizeBytes := make([]byte, BATCH_SIZE_SIZE)

@@ -18,7 +18,7 @@ class Message:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        return cls(*data.decode().split(DELIMITER))
+        return cls(*data.decode().rstrip(TERMINATOR).split(DELIMITER))
 
 
 class BetSockStream:
@@ -44,7 +44,8 @@ class BetSockStream:
                 read = self._skt.recv(n - len(data))
                 if not read:
                     raise OSError("connection closed unexpectedly")
-                data += read
+                data.extend(read)
+
             return bytes(data)
 
         batch_size_bytes = read_n(BATCH_SIZE_SIZE)
