@@ -16,10 +16,8 @@ class Server:
 
     def run(self):
         while not self._shutdown:
-            logging.info(f"action: new_conn | result: awaiting")
             stream = self._accept_new_connection()
             try:
-                logging.info(f"action: new_conn | result: success")
                 self._handle_client_connection(stream)
             finally:
                 stream.close()
@@ -28,7 +26,7 @@ class Server:
 
     def _handle_client_connection(self, client_sock: BetSockStream):
         try:
-            logging.info(f"action: recv | result: awaiting")
+            logging.debug(f"action: recv | result: awaiting")
             msgs = client_sock.recv()
             bets = []
 

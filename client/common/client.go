@@ -2,7 +2,6 @@ package common
 
 import (
 	"encoding/csv"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -50,7 +49,7 @@ func (c *Client) StartClientLoop(betPath string) {
 
 	betFile, err := os.Open(betPath)
 	if err != nil {
-		log.Errorf("action: bet_file_open | result: fail | client_id: %v | error: %v", id, err)
+		log.Criticalf("action: bet_file_open | result: fail | client_id: %v | error: %v", id, err)
 	}
 	defer betFile.Close()
 
