@@ -1,6 +1,7 @@
 import socket
 
 MSG_SIZE_SIZE = 4
+SEPARATOR = "\n"
 
 """
                                     MESSAGE PROTOCOL
@@ -24,7 +25,7 @@ class Message:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        return cls(*data.decode().split("\n"))
+        return cls(*data.decode().split(SEPARATOR))
 
     def encode(self) -> bytes:
         atts = (
@@ -35,8 +36,13 @@ class Message:
             self._birthdate,
             self._number,
         )
+        data = bytearray()
+        for i, att in enumerate(atts):
+            data.extend(att.encode())
+            if i < len(atts):
+                data.extend(SEPARATOR.encode())
 
-        return "\n".join(atts).encode()
+        return bytes(data)
 
 
 class BetSockStream:

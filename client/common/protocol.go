@@ -9,6 +9,7 @@ import (
 )
 
 const MSG_SIZE_SIZE = 4
+const SEPARATOR = "\n"
 
 type Message struct {
 	Agency    string
@@ -20,7 +21,7 @@ type Message struct {
 }
 
 func MsgFromBytes(data []byte) Message {
-	fields := strings.Split(string(data), "\n")
+	fields := strings.Split(string(data), SEPARATOR)
 	return Message{
 		fields[0],
 		fields[1],
@@ -41,7 +42,15 @@ func (m Message) Encode() []byte {
 		m.Number,
 	}
 
-	return []byte(strings.Join(fields, "\n"))
+    data := make([]byte, 0)
+    for i, field := range fields {
+        data = append(data, []byte(field)...)
+        if i < len(fields) {
+            data = append(data, '\n')
+        }
+    }
+
+    return data
 }
 
 type BetSockStream struct {
