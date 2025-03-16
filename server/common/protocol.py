@@ -36,33 +36,24 @@ class Message:
 
 class BetSockStream:
     def __init__(self, skt: socket.socket):
-        self._skt = skt
+        self._skt = skt.makefile("rb")
+        self._peer_addr = skt.getpeername()
 
     @classmethod
     def connect(cls, host: str, port: int):
         """
         Instanciates a new BetSockStream connected to the given address
         """
-        self = cls(socket.socket(socket.AF_INET, socket.SOCK_STREAM))
-        self._skt.connect((host, port))
-        return self
+        skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        skt.connect((host, port))
+        return cls(skt)
 
     def peer_addr(self) -> "socket._RetAddress":
-        return self._skt.getpeername()
-
-    def send(self, *msgs: Message):
-        data = bytearray()
-        for msg in msgs:
-            data.extend(msg.encode())
-
-        data.extend(BATCH_TERMINATOR.encode())
-        self._skt.sendall(data)
+        return self._peer_addr
 
     def recv(self) -> list[Message]:
-        reader = self._skt.makefile("rb")
-        batch = reader.readline()
-        terminator = TERMINATOR.encode()
-        return [Message.from_bytes(bytes(data)) for data in batch.split(terminator)]
+        batch = self._skt.readline().rstrip(BATCH_TERMINATOR.encode())
+        return [Message.from_bytes(chunk) for chunk in batch.split(TERMINATOR.encode())]
 
     def close(self):
         self._skt.close()

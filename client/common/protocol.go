@@ -79,22 +79,6 @@ func (s *BetSockStream) Send(msgs ...Message) error {
 	return nil
 }
 
-func (s *BetSockStream) Recv() ([]Message, error) {
-	data, err := bufio.NewReader(s.conn).ReadBytes(BATCH_TERMINATOR)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't recv message: %v", err)
-	}
-
-	msgChunks := bytes.Split(data, []byte{TERMINATOR})
-	msgs := make([]Message, 0)
-
-	for _, chunk := range msgChunks {
-		msgs = append(msgs, MsgFromBytes(bytes.TrimRight(chunk, string(BATCH_TERMINATOR))))
-	}
-
-	return msgs, nil
-}
-
 func (s *BetSockStream) Close() {
 	s.conn.Close()
 }

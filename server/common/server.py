@@ -40,10 +40,9 @@ class Server:
                 )
                 bets.append(bet)
 
-            print(f"bets_len: {len(bets)}")
             store_bets(bets)
             logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
-        except OSError as e:
+        except OSError as _:
             logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}")
 
     def _accept_new_connection(self) -> BetSockStream:
