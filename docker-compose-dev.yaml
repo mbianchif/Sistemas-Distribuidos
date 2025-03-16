@@ -10,6 +10,8 @@ services:
       - testing_net
     volumes:
       - ./server/config.ini:/config.ini
+    healthcheck:
+      test: ["CMD", "validar-echo-server.sh"]
 
   client1:
     container_name: client1
@@ -20,7 +22,8 @@ services:
     networks:
       - testing_net
     depends_on:
-      - server
+      server:
+        condition: service_healthy
     volumes:
       - ./client/config.yaml:/config.yaml
 
