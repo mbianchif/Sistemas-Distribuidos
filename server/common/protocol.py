@@ -67,9 +67,8 @@ class BetSockStream:
                 raise OSError("inner socket got unexpectedly closed")
             batch += read
 
-        return [
-            Message.from_bytes(bytes(data)) for data in batch.split(batch_terminator)
-        ]
+        terminator = TERMINATOR.encode()
+        return [Message.from_bytes(bytes(data)) for data in batch.split(terminator)]
 
     def close(self):
         self._skt.close()
