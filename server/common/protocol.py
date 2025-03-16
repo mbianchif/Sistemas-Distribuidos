@@ -1,9 +1,8 @@
-import io
 import socket
 
+BATCH_SIZE_SIZE = 4
 DELIMITER = ","
 TERMINATOR = ";"
-BATCH_TERMINATOR = "\n"
 
 
 class Message:
@@ -19,25 +18,12 @@ class Message:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        return cls(*data.decode().rstrip(TERMINATOR).split(DELIMITER))
-
-    def encode(self) -> bytes:
-        atts = (
-            self._agency,
-            self._name,
-            self._surname,
-            self._id,
-            self._birthdate,
-            self._number,
-        )
-
-        return (DELIMITER.join(atts) + TERMINATOR).encode()
+        return cls(*data.decode().split(DELIMITER))
 
 
 class BetSockStream:
     def __init__(self, skt: socket.socket):
-        self._skt = skt.makefile("rb")
-        self._peer_addr = skt.getpeername()
+        self._skt = skt
 
     @classmethod
     def connect(cls, host: str, port: int):
@@ -49,11 +35,23 @@ class BetSockStream:
         return cls(skt)
 
     def peer_addr(self) -> "socket._RetAddress":
-        return self._peer_addr
+        return self._skt.getpeername()
 
     def recv(self) -> list[Message]:
-        batch = self._skt.readline().rstrip(BATCH_TERMINATOR.encode())
-        return [Message.from_bytes(chunk) for chunk in batch.split(TERMINATOR.encode())]
+        def read_n(n: int) -> bytes:
+            data = bytearray()
+            while len(data) < n:
+                read = self._skt.recv(n - len(data))
+                if not read:
+                    raise OSError("connection closed unexpectedly")
+                data += read
+            return bytes(data)
+
+        batch_size_bytes = read_n(BATCH_SIZE_SIZE)
+        batch_size = int.from_bytes(batch_size_bytes, "big")
+        batch = read_n(batch_size)
+        terminator_byte = TERMINATOR.encode()
+        return [Message.from_bytes(chunk) for chunk in batch.split(terminator_byte)]
 
     def close(self):
         self._skt.close()

@@ -2,15 +2,15 @@ package common
 
 import (
 	"bufio"
-	"bytes"
+    "encoding/binary"
 	"fmt"
 	"net"
 	"strings"
 )
 
-const DELIMITER = ','
-const TERMINATOR = ';'
-const BATCH_TERMINATOR = '\n'
+const DELIMITER = ","
+const TERMINATOR = ";"
+const BATCH_SIZE_SIZE = 4
 
 type Message struct {
 	Agency    string
@@ -19,18 +19,6 @@ type Message struct {
 	Id        string
 	Birthdate string
 	Number    string
-}
-
-func MsgFromBytes(data []byte) Message {
-	fields := strings.Split(string(bytes.TrimRight(data, string(TERMINATOR))), string(DELIMITER))
-	return Message{
-		fields[0],
-		fields[1],
-		fields[2],
-		fields[3],
-		fields[4],
-		fields[5],
-	}
 }
 
 func (m Message) Encode() []byte {
@@ -43,8 +31,7 @@ func (m Message) Encode() []byte {
 		m.Number,
 	}
 
-	data := []byte(strings.Join(fields, string(DELIMITER)))
-	return append(data, TERMINATOR)
+	return []byte(strings.Join(fields, DELIMITER))
 }
 
 type BetSockStream struct {
@@ -64,12 +51,18 @@ func (s BetSockStream) PeerAddr() net.Addr {
 }
 
 func (s *BetSockStream) Send(msgs ...Message) error {
-	writer := bufio.NewWriter(s.conn)
+    encoded := make([]byte, 0)
+    for _, msg := range msgs {
+        encoded = append(encoded, msg.Encode()...)
+    }
 
-	for _, msg := range msgs {
-		writer.Write(msg.Encode())
-	}
-	writer.WriteByte(BATCH_TERMINATOR)
+    batchSize := len(encoded)
+    batchSizeBytes := make([]byte, 0, BATCH_SIZE_SIZE)
+    binary.BigEndian.PutUint32(batchSizeBytes, uint32(batchSize))
+
+	writer := bufio.NewWriter(s.conn)
+    writer.Write(batchSizeBytes)
+    writer.Write(encoded)
 
 	err := writer.Flush()
 	if err != nil {
