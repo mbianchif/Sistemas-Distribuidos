@@ -26,7 +26,6 @@ class Server:
 
     def _handle_client_connection(self, client_sock: BetSockStream):
         try:
-            logging.debug(f"action: recv | result: awaiting")
             msgs = client_sock.recv()
             bets = []
 
