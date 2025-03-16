@@ -2,17 +2,15 @@ package common
 
 import (
 	"bufio"
-	"encoding/binary"
+	"bytes"
 	"fmt"
-	"io"
 	"net"
 	"strings"
 )
 
-const BATCH_SIZE_SIZE = 4
-const MSG_SIZE_SIZE = 4
-const DELIMITER = "\n"
+const DELIMITER = ','
 const TERMINATOR = ';'
+const BATCH_TERMINATOR = '\n'
 
 type Message struct {
 	Agency    string
@@ -24,7 +22,7 @@ type Message struct {
 }
 
 func MsgFromBytes(data []byte) Message {
-	fields := strings.Split(string(data), DELIMITER)
+	fields := strings.Split(string(bytes.TrimRight(data, string(TERMINATOR))), string(DELIMITER))
 	return Message{
 		fields[0],
 		fields[1],
@@ -45,7 +43,7 @@ func (m Message) Encode() []byte {
 		m.Number,
 	}
 
-	data := []byte(strings.Join(fields, DELIMITER))
+	data := []byte(strings.Join(fields, string(DELIMITER)))
 	return append(data, TERMINATOR)
 }
 
@@ -65,43 +63,36 @@ func (s BetSockStream) PeerAddr() net.Addr {
 	return s.conn.RemoteAddr()
 }
 
-func (s *BetSockStream) Send(msgs... Message) error {
+func (s *BetSockStream) Send(msgs ...Message) error {
 	writer := bufio.NewWriter(s.conn)
 
-    // Write batch size
-    batchSizeBytes := make([]byte, BATCH_SIZE_SIZE)
-    binary.BigEndian.PutUint32(batchSizeBytes, uint32(len(msgs)))
-    writer.Write(batchSizeBytes)
-
-    for _, msg := range msgs {
-        writer.Write(msg.Encode())
-    }
+	for _, msg := range msgs {
+		writer.Write(msg.Encode())
+	}
+	writer.WriteByte(BATCH_TERMINATOR)
 
 	err := writer.Flush()
 	if err != nil {
-        return fmt.Errorf("couldn't send message: %v", err)
+		return fmt.Errorf("couldn't send message: %v", err)
 	}
+
 	return nil
 }
 
 func (s *BetSockStream) Recv() ([]Message, error) {
-    reader := bufio.NewReader(s.conn)
+	data, err := bufio.NewReader(s.conn).ReadBytes(BATCH_TERMINATOR)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't recv message: %v", err)
+	}
 
-    // Read batch size
-    batchSizeBytes := make([]byte, BATCH_SIZE_SIZE)
-    io.ReadFull(reader, batchSizeBytes)
-    batchSize := int(binary.BigEndian.Uint32(batchSizeBytes))
+	msgChunks := bytes.Split(data, []byte{TERMINATOR})
+	msgs := make([]Message, 0)
 
-    msgs := make([]Message, 0, batchSize)
-    for i := 0; i < batchSize; i++ {
-        data, err := reader.ReadBytes(TERMINATOR)
-        if err != nil {
-            return msgs, fmt.Errorf("batch got cut in the middle: %v", err)
-        }
-        msgs = append(msgs, MsgFromBytes(data))
-    }
+	for _, chunk := range msgChunks {
+		msgs = append(msgs, MsgFromBytes(bytes.TrimRight(chunk, string(BATCH_TERMINATOR))))
+	}
 
-    return msgs, nil
+	return msgs, nil
 }
 
 func (s *BetSockStream) Close() {
