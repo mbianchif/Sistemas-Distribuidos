@@ -38,26 +38,19 @@ class BetSockStream:
     def peer_addr(self) -> "socket._RetAddress":
         return self._skt.getpeername()
 
-    def _recv_n(self, n: int) -> bytes:
-        data = bytearray()
-        while len(data) < n:
-            read = self._skt.recv(n - len(data))
-            if not read:
-                raise OSError("connection closed unexpectedly")
-            data.extend(read)
-
-        return bytes(data)
+    def _recv_all(self, n: int) -> bytes:
+        return self._skt.recv(n, socket.MSG_WAITALL)
 
     def recv(self) -> list[MsgBet]:
-        nbatches_bytes = self._recv_n(BATCH_COUNT_SIZE)
+        nbatches_bytes = self._recv_all(BATCH_COUNT_SIZE)
         nbatches = int.from_bytes(nbatches_bytes, "big")
         bets = []
 
         for _ in range(nbatches):
-            batch_size_bytes = self._recv_n(BATCH_SIZE_SIZE)
+            batch_size_bytes = self._recv_all(BATCH_SIZE_SIZE)
             batch_size = int.from_bytes(batch_size_bytes, "big")
 
-            batch_bytes = self._recv_n(batch_size)
+            batch_bytes = self._recv_all(batch_size)
             for bet_bytes in batch_bytes.split(TERMINATOR.encode()):
                 bet = MsgBet.from_bytes(bet_bytes)
                 bets.append(bet)
