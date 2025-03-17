@@ -1,8 +1,7 @@
 import socket
 
-MSG_SIZE_SIZE = 4
-DELIMITER = "\n"
-TERMINATOR = ";"
+BET_SIZE_SIZE = 4
+DELIMITER = ","
 
 class MsgBet:
     def __init__(
@@ -17,7 +16,7 @@ class MsgBet:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        return cls(*data.decode().rstrip(TERMINATOR).split(DELIMITER))
+        return cls(*data.decode().split(DELIMITER))
 
     def encode(self) -> bytes:
         atts = (
@@ -29,7 +28,7 @@ class MsgBet:
             self._number,
         )
 
-        return (DELIMITER.join(atts) + TERMINATOR).encode()
+        return DELIMITER.join(atts).encode()
 
 
 class BetSockStream:
@@ -48,21 +47,23 @@ class BetSockStream:
     def peer_addr(self) -> "socket._RetAddress":
         return self._skt.getpeername()
 
-    def _recv_all(self) -> bytes:
+    def _recv_n(self, n: int) -> bytes:
         data = bytearray()
-        terminator_byte = TERMINATOR.encode()
 
-        while True:
-            read = self._skt.recv(1024)
+        while len(data) < n:
+            read = self._skt.recv(n - len(data))
             if not read:
                 raise OSError("inner socket got unexpectedly closed")
-
-            data += read
-            if read.endswith(terminator_byte):
-                return bytes(data)
+            data.extend(read)
+        
+        return bytes(data)
 
     def recv(self) -> MsgBet:
-        return MsgBet.from_bytes(self._recv_all())
+        bet_size_bytes = self._recv_n(BET_SIZE_SIZE)
+        bet_size = int.from_bytes(bet_size_bytes, "big")
+
+        bet_bytes = self._recv_n(bet_size)
+        return MsgBet.from_bytes(bet_bytes)
 
     def close(self):
         self._skt.close()

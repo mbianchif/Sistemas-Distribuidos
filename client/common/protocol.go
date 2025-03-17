@@ -2,14 +2,14 @@ package common
 
 import (
 	"bufio"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"strings"
 )
 
-const MSG_SIZE_SIZE = 4
-const DELIMITER = "\n"
-const TERMINATOR = ';'
+const BET_SIZE_SIZE = 4
+const DELIMITER = ","
 
 type Bet struct {
 	Agency    string
@@ -30,8 +30,7 @@ func (m Bet) Encode() []byte {
 		m.Number,
 	}
 
-	data := []byte(strings.Join(fields, DELIMITER))
-	return append(data, TERMINATOR)
+	return []byte(strings.Join(fields, DELIMITER))
 }
 
 type BetSockStream struct {
@@ -52,7 +51,14 @@ func (s BetSockStream) PeerAddr() net.Addr {
 
 func (s *BetSockStream) Send(bet Bet) error {
 	writer := bufio.NewWriter(s.conn)
-	writer.Write(bet.Encode())
+    betBytes := bet.Encode()
+    betSize := len(betBytes)
+
+    // Write bet size and data
+    betSizeBytes := make([]byte, BET_SIZE_SIZE)
+    binary.BigEndian.PutUint32(betSizeBytes, uint32(betSize))
+    writer.Write(betSizeBytes)
+    writer.Write(betBytes)
 
 	err := writer.Flush()
 	if err != nil {
