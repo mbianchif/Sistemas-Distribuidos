@@ -63,9 +63,10 @@ func (c *Client) StartClientLoop() {
         Number:    os.Getenv("NUMERO"),
     }
 
-    if err := c.conn.Send(msg); err == nil {
-        log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", msg.Id, msg.Number)
-    } else {
+    err := c.conn.Send(msg)
+    if err != nil {
         log.Errorf("action: apuesta_enviada | result: fail | error: %v", err)
+    } else {
+        log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", msg.Id, msg.Number)
     }
 }
