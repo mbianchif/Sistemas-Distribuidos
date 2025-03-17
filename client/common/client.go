@@ -47,13 +47,6 @@ func (c *Client) StartClientLoop() {
     c.createClientSocket()
     defer c.conn.Close()
 
-    select {
-    case _ = <-sigs:
-        return
-    default:
-        c.createClientSocket()
-    }
-
     msg := Bet{
         Agency:    c.config.ID,
         Name:      os.Getenv("NOMBRE"),
