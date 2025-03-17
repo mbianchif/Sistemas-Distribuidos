@@ -47,43 +47,26 @@ func (c *Client) StartClientLoop() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM)
 
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
-		select {
-		case _ = <-sigs:
-			break
-		default:
-			c.createClientSocket()
-		}
+    c.createClientSocket()
+    defer c.conn.Close()
 
-		msg := Message{
-			Agency:    c.config.ID,
-			Name:      os.Getenv("NOMBRE"),
-			Surname:   os.Getenv("APELLIDO"),
-			Id:        os.Getenv("DOCUMENTO"),
-			Birthdate: os.Getenv("NACIMIENTO"),
-			Number:    os.Getenv("NUMERO"),
-		}
+    select {
+    case _ = <-sigs:
+        break
+    default:
+        c.createClientSocket()
+    }
 
-        c.conn.Send(msg)
+    msg := Bet{
+        Agency:    c.config.ID,
+        Name:      os.Getenv("NOMBRE"),
+        Surname:   os.Getenv("APELLIDO"),
+        Id:        os.Getenv("DOCUMENTO"),
+        Birthdate: os.Getenv("NACIMIENTO"),
+        Number:    os.Getenv("NUMERO"),
+    }
+
+    if err := c.conn.Send(msg); err == nil {
         log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v", msg.Id, msg.Number)
-
-        msg, err := c.conn.Recv()
-		c.conn.Close()
-		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
-		}
-
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-			c.config.ID,
-			msg,
-		)
-
-		time.Sleep(c.config.LoopPeriod)
-	}
-
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+    }
 }

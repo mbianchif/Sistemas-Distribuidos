@@ -4,7 +4,7 @@ MSG_SIZE_SIZE = 4
 DELIMITER = "\n"
 TERMINATOR = ";"
 
-class Message:
+class MsgBet:
     def __init__(
         self, agency: str, name: str, surname: str, id: str, birthdate: str, number: str
     ):
@@ -48,9 +48,6 @@ class BetSockStream:
     def peer_addr(self) -> "socket._RetAddress":
         return self._skt.getpeername()
 
-    def send(self, msg: Message):
-        self._skt.sendall(msg.encode())
-
     def _recv_all(self) -> bytes:
         data = bytearray()
         terminator_byte = TERMINATOR.encode()
@@ -64,8 +61,8 @@ class BetSockStream:
             if read.endswith(terminator_byte):
                 return bytes(data)
 
-    def recv(self) -> Message:
-        return Message.from_bytes(self._recv_all())
+    def recv(self) -> MsgBet:
+        return MsgBet.from_bytes(self._recv_all())
 
     def close(self):
         self._skt.close()
