@@ -60,10 +60,10 @@ func (s *BetSockStream) Send(bet Bet) error {
     writer.Write(betSizeBytes)
     writer.Write(betBytes)
 
-	err := writer.Flush()
-	if err != nil {
+	if err := writer.Flush(); err != nil {
 		return fmt.Errorf("couldn't send message: %v", err)
-	}
+    }
+
 	return nil
 }
 

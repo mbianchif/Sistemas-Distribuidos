@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/op/go-logging"
 )
@@ -14,8 +13,6 @@ var log = logging.MustGetLogger("log")
 type ClientConfig struct {
 	ID            string
 	ServerAddress string
-	LoopAmount    int
-	LoopPeriod    time.Duration
 }
 
 type Client struct {
@@ -52,7 +49,7 @@ func (c *Client) StartClientLoop() {
 
     select {
     case _ = <-sigs:
-        break
+        return
     default:
         c.createClientSocket()
     }

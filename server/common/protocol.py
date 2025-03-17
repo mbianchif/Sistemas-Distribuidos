@@ -3,6 +3,7 @@ import socket
 BET_SIZE_SIZE = 4
 DELIMITER = ","
 
+
 class MsgBet:
     def __init__(
         self, agency: str, name: str, surname: str, id: str, birthdate: str, number: str
@@ -17,18 +18,6 @@ class MsgBet:
     @classmethod
     def from_bytes(cls, data: bytes):
         return cls(*data.decode().split(DELIMITER))
-
-    def encode(self) -> bytes:
-        atts = (
-            self._agency,
-            self._name,
-            self._surname,
-            self._id,
-            self._birthdate,
-            self._number,
-        )
-
-        return DELIMITER.join(atts).encode()
 
 
 class BetSockStream:
@@ -49,13 +38,13 @@ class BetSockStream:
 
     def _recv_n(self, n: int) -> bytes:
         data = bytearray()
-
         while len(data) < n:
             read = self._skt.recv(n - len(data))
             if not read:
+                print("_recv_n:", len(data), n)
                 raise OSError("inner socket got unexpectedly closed")
             data.extend(read)
-        
+
         return bytes(data)
 
     def recv(self) -> MsgBet:
