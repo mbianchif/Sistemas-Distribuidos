@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/op/go-logging"
 )
@@ -15,8 +14,6 @@ var log = logging.MustGetLogger("log")
 type ClientConfig struct {
 	ID             string
 	ServerAddress  string
-	LoopAmount     int
-	LoopPeriod     time.Duration
 	MaxBatchAmount int
 }
 
