@@ -1,11 +1,12 @@
 import socket
 
-BATCH_SIZE_SIZE = 4
 DELIMITER = ","
 TERMINATOR = ";"
+BATCH_SIZE_SIZE = 4
+BATCH_COUNT_SIZE = 4
 
 
-class Message:
+class MsgBet:
     def __init__(
         self, agency: str, name: str, surname: str, id: str, birthdate: str, number: str
     ):
@@ -37,23 +38,31 @@ class BetSockStream:
     def peer_addr(self) -> "socket._RetAddress":
         return self._skt.getpeername()
 
-    def recv(self) -> list[Message]:
-        def read_n(n: int) -> bytes:
-            data = bytearray()
-            while len(data) < n:
-                read = self._skt.recv(n - len(data))
-                if not read:
-                    raise OSError("connection closed unexpectedly")
-                data.extend(read)
+    def _recv_n(self, n: int) -> bytes:
+        data = bytearray()
+        while len(data) < n:
+            read = self._skt.recv(n - len(data))
+            if not read:
+                raise OSError("connection closed unexpectedly")
+            data.extend(read)
 
-            return bytes(data)
+        return bytes(data)
 
-        batch_size_bytes = read_n(BATCH_SIZE_SIZE)
-        batch_size = int.from_bytes(batch_size_bytes, "big")
+    def recv(self) -> list[MsgBet]:
+        nbatches_bytes = self._recv_n(BATCH_COUNT_SIZE)
+        nbatches = int.from_bytes(nbatches_bytes, "big")
+        bets = []
 
-        batch = read_n(batch_size)
-        terminator_byte = TERMINATOR.encode()
-        return [Message.from_bytes(chunk) for chunk in batch.split(terminator_byte)]
+        for _ in range(nbatches):
+            batch_size_bytes = self._recv_n(BATCH_SIZE_SIZE)
+            batch_size = int.from_bytes(batch_size_bytes, "big")
+
+            batch_bytes = self._recv_n(batch_size)
+            for bet_bytes in batch_bytes.split(TERMINATOR.encode()):
+                bet = MsgBet.from_bytes(bet_bytes)
+                bets.append(bet)
+
+        return bets
 
     def close(self):
         self._skt.close()

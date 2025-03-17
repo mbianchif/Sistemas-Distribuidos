@@ -43,8 +43,6 @@ func (c *Client) createClientSocket() {
 func (c *Client) StartClientLoop(betPath string) {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM)
-
-	batchSize := c.config.MaxBatchAmount
 	id := c.config.ID
 
 	betFile, err := os.Open(betPath)
@@ -53,43 +51,38 @@ func (c *Client) StartClientLoop(betPath string) {
 	}
 	defer betFile.Close()
 
-	betFileReader := csv.NewReader(betFile)
-	exit := false
-
 	c.createClientSocket()
 	defer c.conn.Close()
 
-	for !exit {
-		select {
-		case _ = <-sigs:
-			break
-		default:
-		}
+	betFileReader := csv.NewReader(betFile)
+    bets := make([]Bet, 0)
 
-		bets := make([]Message, 0, batchSize)
-		for i := 0; i < batchSize; i++ {
-			line, err := betFileReader.Read()
-			if err != nil {
-				exit = true
-				break
-			}
-
-			bets = append(bets, Message{
-				Agency:    id,
-				Name:      line[0],
-				Surname:   line[1],
-				Id:        line[2],
-				Birthdate: line[3],
-				Number:    line[4],
-			})
-		}
-
-		err := c.conn.Send(bets...)
-		if err != nil {
-			log.Infof("action send_batch | result: fail | client_id: %v | error: %v", id, err)
+    for {
+        line, err := betFileReader.Read()
+        if err != nil {
             break
-		} else {
-			log.Infof("action send_batch | result: success | client_id: %v", id)
-		}
+        }
+
+        bets = append(bets, Bet{
+            Agency:    id,
+            Name:      line[0],
+            Surname:   line[1],
+            Id:        line[2],
+            Birthdate: line[3],
+            Number:    line[4],
+        })
+    }
+
+    select {
+    case _ = <-sigs:
+        return
+    default:
+        err = c.conn.Send(bets, c.config.MaxBatchAmount)
+    }
+
+    if err != nil {
+        log.Infof("action send_batch | result: fail | client_id: %v | error: %v", id, err)
+    } else {
+        log.Infof("action send_batch | result: success | client_id: %v", id)
 	}
 }
