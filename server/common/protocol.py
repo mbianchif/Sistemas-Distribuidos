@@ -43,7 +43,9 @@ class BetSockStream:
         bet_size_bytes = self._recv_all(BET_SIZE_SIZE)
         bet_size = int.from_bytes(bet_size_bytes, "big")
 
+        print("bet_size:", bet_size)
         bet_bytes = self._recv_all(bet_size)
+        print("bet_bytes:", bet_bytes)
         return MsgBet.from_bytes(bet_bytes)
 
     def close(self):
