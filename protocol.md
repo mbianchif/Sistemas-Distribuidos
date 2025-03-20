@@ -12,8 +12,7 @@ Quise hacer algo sencillo pero a la vez elegante, por lo que implementé una cap
 +--------+---------+  
 |  SIZE  | PAYLOAD |  
 +--------+---------+  
-
-```
+``
 
 ### Campos
 
