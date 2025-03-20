@@ -7,7 +7,7 @@ BET_DELIMITER = ";"
 BATCH_SIZE_SIZE = 4
 BATCH_COUNT_SIZE = 4
 ID_SIZE = 1
-KIND_SIZE = 1
+MESSAGE_KIND_SIZE = 1
 WINNER_COUNT_SIZE = 4
 
 
@@ -68,7 +68,7 @@ class BetSockStream:
         return bets
 
     def recv(self):
-        kind_bytes = _recv_all(self._skt, KIND_SIZE)
+        kind_bytes = _recv_all(self._skt, MESSAGE_KIND_SIZE)
         kind = int.from_bytes(kind_bytes, "big")
 
         if kind == MessageKind.BATCH:

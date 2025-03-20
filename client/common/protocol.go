@@ -18,7 +18,7 @@ const (
 )
 
 const DELIMITER = ","
-const TERMINATOR = ";"
+const BET_DELIMITER = ";"
 const BATCH_SIZE_SIZE = 4
 const BATCH_COUNT_SIZE = 4
 const ID_SIZE = 1
@@ -113,7 +113,7 @@ func (s *BetSockStream) SendBets(bets []Bet, batchSize int) error {
 		for _, bet := range batch {
 			betsEncoded = append(betsEncoded, bet.Encode())
 		}
-		batchBytes := bytes.Join(betsEncoded, []byte(TERMINATOR))
+		batchBytes := bytes.Join(betsEncoded, []byte(BET_DELIMITER))
 
 		// Write batch size and data
 		batchSize := len(batchBytes)
@@ -149,7 +149,7 @@ func (s *BetSockStream) RecvWinners() (int, error) {
 
     n, err := io.ReadFull(reader, countBytes)
     if err != nil {
-        return 0, fmt.Errorf("couldn't recvc winner quantity, read %v out of %v bytes", n, WINNER_COUNT_SIZE)
+        return 0, fmt.Errorf("couldn't recv winner quantity, read %v out of %v bytes", n, WINNER_COUNT_SIZE)
     }
 
     return n, nil
