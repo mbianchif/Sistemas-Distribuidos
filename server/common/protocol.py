@@ -1,5 +1,5 @@
 import socket
-from utils import Bet
+from common.utils import Bet
 
 BET_SIZE_SIZE = 4
 
