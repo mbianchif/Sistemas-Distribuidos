@@ -10,10 +10,10 @@ STORAGE_FILEPATH = "./bets.csv"
 LOTTERY_WINNER_NUMBER = 7574
 
 
-""" A lottery bet registry. """
 
 
 class Bet:
+    """ A lottery bet registry. """
     def __init__(
         self,
         agency: str,
