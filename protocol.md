@@ -10,9 +10,11 @@ Quise hacer algo sencillo pero a la vez elegante, por lo que implementé una cap
 
 #### Mensaje
 
+```terminal
 +------------+-------+--------+-----+-----+-------+--------+
 | BATCHCOUNT | SIZE1 | BATCH1 | ... | ... | SIZEN | BATCHN |
 +------------+-------+--------+-----+-----+-------+--------+
+```
 
 - BATCHCOUNT: 4 bytes que establecen la cantidad de baches del mensaje. 
 - SIZEi: 4 bytes dedicados a establecer el largo del bache en bytes.
@@ -20,9 +22,11 @@ Quise hacer algo sencillo pero a la vez elegante, por lo que implementé una cap
 
 #### Batch
 
+```terminal
 +-------------------+
 | BET1 ; ... ; BETN |
 +-------------------+
+```
 
 - BETi: Datos de la i-ésima apuesta.
 
@@ -30,8 +34,10 @@ Las apuestas están separadas por un delimitador, elegí separarlas por `;`.
 
 #### Bet
 
+```terminal
 +---------------------------------------------------+
 | Agency , Name , Surname , Id , Birthdate , Number |
 +---------------------------------------------------+
+```
 
 Los campos de cada apuesta están separadas por un delimitador, elegí separarlos por `,`.
