@@ -8,9 +8,12 @@ El cliente implementa el lado de escritura y el servidor el de lectura, ya que g
 
 Quise hacer algo sencillo pero a la vez elegante, por lo que implementé una capa de abstracción como wrapper al socket tcp en ambas partes. Del lado del cliente implementé una estructura que modela la apuesta, mientras que del lado del servidor aproveché la ya implementada.
 
+```terminal
 +--------+---------+  
 |  SIZE  | PAYLOAD |  
 +--------+---------+  
+
+```
 
 ### Campos
 
