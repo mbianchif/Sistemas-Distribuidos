@@ -21,7 +21,16 @@ class BetSockStream:
         return self._skt.getpeername()
 
     def _recv_all(self, n: int) -> bytes:
-        return self._skt.recv(n, socket.MSG_WAITALL)
+        data = bytearray()
+
+        while len(data) < n:
+            read = self._skt.recv(n - len(data), socket.MSG_WAITALL)
+            if not read:
+                raise OSError("couldn't recv whole message")
+
+            data.extend(read)
+
+        return bytes(data)
 
     def recv(self) -> Bet:
         bet_size_bytes = self._recv_all(BET_SIZE_SIZE)
