@@ -36,7 +36,7 @@ class Bet:
         self.number = int(number)
 
     @classmethod
-    def from_bytes(cls, data: bytes):
+    def from_bytes(cls, data: bytearray):
         return cls(*data.decode().split(DELIMITER))
 
 

@@ -5,14 +5,26 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
+	"strconv"
 	"strings"
+)
+
+// Message kind
+const (
+    KIND_BATCH = iota
+    KIND_CONFIRM
+    KIND_WINNERS_REQUEST
 )
 
 const DELIMITER = ","
 const TERMINATOR = ";"
 const BATCH_SIZE_SIZE = 4
 const BATCH_COUNT_SIZE = 4
+const ID_SIZE = 1
+const MESSAGE_KIND_SIZE = 1
+const WINNER_COUNT_SIZE = 4
 
 type Bet struct {
 	Agency    string
@@ -38,14 +50,29 @@ func (m Bet) Encode() []byte {
 
 type BetSockStream struct {
 	conn net.Conn
+	id   int
 }
 
-func BetSockConnect(address string) (*BetSockStream, error) {
+func BetSockConnect(address string, id string) (*BetSockStream, error) {
+    parsedID, err := strconv.Atoi(id)
+    if err != nil {
+        return nil, err
+    }
+
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		return nil, err
 	}
-	return &BetSockStream{conn}, nil
+
+    // Share id with the other end
+    writer := bufio.NewWriter(conn)
+    writer.Write([]byte(id))
+    if err := writer.Flush(); err != nil {
+        conn.Close()
+        return nil, err
+    }
+
+	return &BetSockStream{conn, parsedID}, nil
 }
 
 func (s BetSockStream) PeerAddr() net.Addr {
@@ -69,9 +96,12 @@ func Batch(arr []Bet, r int) [][]Bet {
 	return res
 }
 
-func (s *BetSockStream) Send(bets []Bet, batchSize int) error {
+func (s *BetSockStream) SendBets(bets []Bet, batchSize int) error {
 	writer := bufio.NewWriter(s.conn)
 	batches := Batch(bets, batchSize)
+
+    // Write message kind
+    writer.Write([]byte{KIND_BATCH})
 
 	// Write batch count
 	nbatches := len(batches)
@@ -81,11 +111,9 @@ func (s *BetSockStream) Send(bets []Bet, batchSize int) error {
 
 	for _, batch := range batches {
 		betsEncoded := make([][]byte, 0)
-
 		for _, bet := range batch {
 			betsEncoded = append(betsEncoded, bet.Encode())
 		}
-
 		batchBytes := bytes.Join(betsEncoded, []byte(TERMINATOR))
 
 		// Write batch size and data
@@ -101,6 +129,31 @@ func (s *BetSockStream) Send(bets []Bet, batchSize int) error {
 	}
 
 	return nil
+}
+
+func (s *BetSockStream) Confirm() error {
+    writer := bufio.NewWriter(s.conn)
+
+    // Write message kind
+    writer.Write([]byte{KIND_BATCH})
+    
+    if err := writer.Flush(); err != nil {
+        return fmt.Errorf("couldn't send confirmation")
+    }
+
+    return nil
+}
+
+func (s *BetSockStream) RecvWinners() (int, error) {
+    countBytes := make([]byte, WINNER_COUNT_SIZE)
+    reader := bufio.NewReader(s.conn)
+
+    n, err := io.ReadFull(reader, countBytes)
+    if err != nil {
+        return 0, fmt.Errorf("couldn't recvc winner quantity, read %v out of %v bytes", n, WINNER_COUNT_SIZE)
+    }
+
+    return n, nil
 }
 
 func (s *BetSockStream) Close() {

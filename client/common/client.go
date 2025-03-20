@@ -30,7 +30,7 @@ func NewClient(config ClientConfig) *Client {
 }
 
 func (c *Client) createClientSocket() {
-	conn, err := BetSockConnect(c.config.ServerAddress)
+	conn, err := BetSockConnect(c.config.ServerAddress, c.config.ID)
 	if err != nil {
 		log.Criticalf("action: connect | result: fail | client_id: %v | error: %v", c.config.ID, err)
 	}
@@ -74,12 +74,32 @@ func (c *Client) StartClientLoop(betPath string) {
     case _ = <-sigs:
         return
     default:
-        err = c.conn.Send(bets, c.config.MaxBatchAmount)
+        err = c.conn.SendBets(bets, c.config.MaxBatchAmount)
     }
 
     if err != nil {
-        log.Infof("action send_batch | result: fail | client_id: %v | error: %v", id, err)
+        log.Errorf("action send_batch | result: fail | client_id: %v | error: %v", id, err)
     } else {
         log.Infof("action send_batch | result: success | client_id: %v", id)
 	}
+
+    if err = c.conn.Confirm(); err != nil {
+        log.Errorf("action confirm_batch | result: fail | client_id: %v | error: %v", id, err)
+    } else {
+        log.Infof("action confirm_batch | result: success | client_id: %v", id)
+    }
+
+    var winnerQuantity int
+    select {
+    case _ = <-sigs:
+        return
+    default:
+        winnerQuantity, err = c.conn.RecvWinners()
+    }
+
+    if err != nil {
+        log.Errorf("action: consulta_ganadores | result: fail")
+    } else {
+        log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", winnerQuantity)
+    }
 }
