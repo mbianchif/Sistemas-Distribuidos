@@ -1,7 +1,8 @@
 import csv
 import datetime
-import time
 
+
+DELIMITER = ","
 
 """ Bets storage location. """
 STORAGE_FILEPATH = "./bets.csv"
@@ -23,6 +24,10 @@ class Bet:
         self.document = document
         self.birthdate = datetime.date.fromisoformat(birthdate)
         self.number = int(number)
+
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        return cls(*data.decode().split(DELIMITER))
 
 """ Checks whether a bet won the prize or not. """
 def has_won(bet: Bet) -> bool:

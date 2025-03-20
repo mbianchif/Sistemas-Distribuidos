@@ -1,23 +1,7 @@
 import socket
+from utils import Bet
 
 BET_SIZE_SIZE = 4
-DELIMITER = ","
-
-
-class MsgBet:
-    def __init__(
-        self, agency: str, name: str, surname: str, id: str, birthdate: str, number: str
-    ):
-        self._agency = agency
-        self._name = name
-        self._surname = surname
-        self._id = id
-        self._birthdate = birthdate
-        self._number = number
-
-    @classmethod
-    def from_bytes(cls, data: bytes):
-        return cls(*data.decode().split(DELIMITER))
 
 
 class BetSockStream:
@@ -39,14 +23,12 @@ class BetSockStream:
     def _recv_all(self, n: int) -> bytes:
         return self._skt.recv(n, socket.MSG_WAITALL)
 
-    def recv(self) -> MsgBet:
+    def recv(self) -> Bet:
         bet_size_bytes = self._recv_all(BET_SIZE_SIZE)
         bet_size = int.from_bytes(bet_size_bytes, "big")
 
-        print("bet_size:", bet_size)
         bet_bytes = self._recv_all(bet_size)
-        print("bet_bytes:", bet_bytes)
-        return MsgBet.from_bytes(bet_bytes)
+        return Bet.from_bytes(bet_bytes)
 
     def close(self):
         self._skt.close()
