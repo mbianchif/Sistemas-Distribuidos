@@ -26,18 +26,9 @@ class Server:
 
     def _handle_client_connection(self, client_sock: BetSockStream):
         try:
-            msg = client_sock.recv()
-            bet = Bet(
-                msg._agency,
-                msg._name,
-                msg._surname,
-                msg._id,
-                msg._birthdate,
-                msg._number,
-            )
-
+            bet = client_sock.recv()
             store_bets([bet])
-            logging.info(f"action: apuesta_almacenada | result: success | dni: {msg._id} | numero: {msg._number}")
+            logging.info(f"action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}")
         except OSError as e:
             logging.error(f"action: receive_message | result: fail | error: {e}")
 
