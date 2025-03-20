@@ -3,11 +3,10 @@ import logging
 from common.protocol import BetSockListener, BetSockStream, MessageKind
 from common.utils import has_won, load_bets, store_bets
 
-N_AGENCIES = 5
-
 class Server:
-    def __init__(self, port, listen_backlog):
+    def __init__(self, port, listen_backlog, nclients):
         self._listener = BetSockListener.bind("", port, listen_backlog)
+        self._nclients = nclients
         self._shutdown = False
 
         def term_handler(_signum, _stacktrace):
@@ -18,14 +17,14 @@ class Server:
     def run(self):
         agencies = {}
 
-        while not self._shutdown and len(agencies) < N_AGENCIES:
+        while not self._shutdown and len(agencies) < self._nclients:
             stream = self._accept_new_connection()
             self._handle_client_connection(stream)
             agencies[stream.id] = stream
 
         if not self._shutdown:
             logging.info("action: sorteo | result: success")
-            winners_counts = [0] * N_AGENCIES
+            winners_counts = [0] * self._nclients
 
             for bet in load_bets():
                 if has_won(bet):
