@@ -80,13 +80,13 @@ func (s *BetSockStream) Send(bets []Bet, batchSize int) error {
 	writer.Write(nbatchesBytes)
 
 	for _, batch := range batches {
-		betsInBytes := make([][]byte, 0)
+		betsEncoded := make([][]byte, 0)
 
 		for _, bet := range batch {
-			betsInBytes = append(betsInBytes, bet.Encode())
+			betsEncoded = append(betsEncoded, bet.Encode())
 		}
 
-		batchBytes := bytes.Join(betsInBytes, []byte(TERMINATOR))
+		batchBytes := bytes.Join(betsEncoded, []byte(TERMINATOR))
 
 		// Write batch size and data
 		batchSize := len(batchBytes)

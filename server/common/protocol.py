@@ -1,25 +1,9 @@
 import socket
+from utils import Bet
 
-DELIMITER = ","
 TERMINATOR = ";"
 BATCH_SIZE_SIZE = 4
 BATCH_COUNT_SIZE = 4
-
-
-class MsgBet:
-    def __init__(
-        self, agency: str, name: str, surname: str, id: str, birthdate: str, number: str
-    ):
-        self._agency = agency
-        self._name = name
-        self._surname = surname
-        self._id = id
-        self._birthdate = birthdate
-        self._number = number
-
-    @classmethod
-    def from_bytes(cls, data: bytes):
-        return cls(*data.decode().split(DELIMITER))
 
 
 class BetSockStream:
@@ -41,7 +25,7 @@ class BetSockStream:
     def _recv_all(self, n: int) -> bytes:
         return self._skt.recv(n, socket.MSG_WAITALL)
 
-    def recv(self) -> list[MsgBet]:
+    def recv(self) -> list[Bet]:
         nbatches_bytes = self._recv_all(BATCH_COUNT_SIZE)
         nbatches = int.from_bytes(nbatches_bytes, "big")
         bets = []
@@ -52,7 +36,7 @@ class BetSockStream:
 
             batch_bytes = self._recv_all(batch_size)
             for bet_bytes in batch_bytes.split(TERMINATOR.encode()):
-                bet = MsgBet.from_bytes(bet_bytes)
+                bet = Bet.from_bytes(bet_bytes)
                 bets.append(bet)
 
         return bets

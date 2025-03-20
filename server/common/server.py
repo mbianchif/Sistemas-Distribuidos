@@ -1,7 +1,7 @@
 import signal
 import logging
 from common.protocol import BetSockListener, BetSockStream
-from common.utils import Bet, store_bets
+from common.utils import store_bets
 
 
 class Server:
@@ -26,20 +26,7 @@ class Server:
 
     def _handle_client_connection(self, client_sock: BetSockStream):
         try:
-            msgs = client_sock.recv()
-            bets = []
-
-            for msg in msgs:
-                bet = Bet(
-                    msg._agency,
-                    msg._name,
-                    msg._surname,
-                    msg._id,
-                    msg._birthdate,
-                    msg._number,
-                )
-                bets.append(bet)
-
+            bets = client_sock.recv()
             store_bets(bets)
             logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
         except OSError as _:
