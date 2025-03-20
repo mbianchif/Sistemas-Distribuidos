@@ -13,9 +13,8 @@ import (
 
 // Message kind
 const (
-    KIND_BATCH = iota
-    KIND_CONFIRM
-    KIND_WINNERS_REQUEST
+    KIND_BATCH = 0
+    KIND_CONFIRM = 1
 )
 
 const DELIMITER = ","
@@ -135,7 +134,7 @@ func (s *BetSockStream) Confirm() error {
     writer := bufio.NewWriter(s.conn)
 
     // Write message kind
-    writer.Write([]byte{KIND_BATCH})
+    writer.Write([]byte{KIND_CONFIRM})
     
     if err := writer.Flush(); err != nil {
         return fmt.Errorf("couldn't send confirmation")
