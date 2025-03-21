@@ -31,7 +31,9 @@ class Server:
                 if has_won(bet):
                     winners_counts[bet.agency].append(int(bet.document))
 
+            print(winners_counts)
             for agency, stream in agencies.items():
+                print("agency:", len(winners_counts[agency]))
                 stream.send_winner_count(winners_counts[agency])
 
         for stream in agencies.values():
