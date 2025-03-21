@@ -145,9 +145,8 @@ func (s *BetSockStream) Confirm() error {
 
 func (s *BetSockStream) RecvWinners() (int, error) {
     countBytes := make([]byte, WINNER_COUNT_SIZE)
-    reader := bufio.NewReader(s.conn)
 
-    n, err := io.ReadFull(reader, countBytes)
+    n, err := io.ReadFull(s.conn, countBytes)
     if err != nil {
         return 0, fmt.Errorf("couldn't recv winner quantity, read %v out of %v bytes", n, WINNER_COUNT_SIZE)
     }
