@@ -1,4 +1,3 @@
-from enum import Enum
 import socket
 from typing import Any
 from common.utils import Bet
@@ -11,13 +10,12 @@ MESSAGE_KIND_SIZE = 1
 WINNER_COUNT_SIZE = 4
 
 
-class MessageKind(Enum):
-    BATCH = 0
-    CONFIRM = 1
+KIND_BATCH = 0
+KIND_CONFIRM = 1
 
 
 class Message:
-    def __init__(self, kind: MessageKind, data: Any):
+    def __init__(self, kind: int, data: Any):
         self.kind = kind
         self.data = data
 
@@ -70,13 +68,12 @@ class BetSockStream:
     def recv(self):
         kind_bytes = _recv_all(self._skt, MESSAGE_KIND_SIZE)
         kind = int.from_bytes(kind_bytes, "big")
-        print(f"Recibi {kind=}, mientras que {MessageKind.BATCH=} y {MessageKind.CONFIRM=}")
 
-        if kind == MessageKind.BATCH:
+        if kind == KIND_BATCH:
             batch = self._recv_batch()
-            return Message(MessageKind.BATCH, batch)
-        if kind == MessageKind.CONFIRM:
-            return Message(MessageKind.CONFIRM, None)
+            return Message(kind, batch)
+        if kind == KIND_CONFIRM:
+            return Message(kind, None)
 
         raise ValueError(f"invalid message kind {kind}")
 
