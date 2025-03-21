@@ -153,8 +153,7 @@ func (s *BetSockStream) RecvWinners() ([]int, error) {
         return nil, fmt.Errorf("couldn't recv winner quantity, err: %v, read %v out of %v bytes", err, n, DNI_COUNT_SIZE)
     }
 
-    count := int(dniCountBytes[0])
-    fmt.Println("count:", count)
+    count := binary.BigEndian.Uint32(dniCountBytes)
     dnisBytes := make([]byte, DNI_SIZE * count)
     if _, err := io.ReadFull(s.conn, dnisBytes); err != nil {
         return nil, fmt.Errorf("couldn't recv winners, err: %v", err)
