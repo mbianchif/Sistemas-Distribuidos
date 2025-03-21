@@ -7,7 +7,8 @@ BATCH_SIZE_SIZE = 4
 BATCH_COUNT_SIZE = 4
 ID_SIZE = 1
 MESSAGE_KIND_SIZE = 1
-WINNER_COUNT_SIZE = 4
+DNI_COUNT_SIZE = 4
+DNI_SIZE = 4
 
 
 KIND_BATCH = 0
@@ -77,9 +78,13 @@ class BetSockStream:
 
         raise ValueError(f"invalid message kind {kind}")
 
-    def send_winner_count(self, n: int):
-        count_bytes = n.to_bytes(WINNER_COUNT_SIZE, "big")
+    def send_winner_count(self, winners: list[int]):
+        count_bytes = len(winners).to_bytes(DNI_COUNT_SIZE, "big")
         _send_all(self._skt, count_bytes)
+
+        for dni in winners:
+            dni_bytes = dni.to_bytes(DNI_SIZE, "big")
+            _send_all(self._skt, dni_bytes)
 
     def close(self):
         self._skt.close()

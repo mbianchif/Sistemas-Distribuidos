@@ -23,7 +23,8 @@ const BATCH_SIZE_SIZE = 4
 const BATCH_COUNT_SIZE = 4
 const ID_SIZE = 1
 const MESSAGE_KIND_SIZE = 1
-const WINNER_COUNT_SIZE = 4
+const DNI_COUNT_SIZE = 4
+const DNI_SIZE = 4
 
 type Bet struct {
 	Agency    string
@@ -145,15 +146,26 @@ func (s *BetSockStream) Confirm() error {
     return nil
 }
 
-func (s *BetSockStream) RecvWinners() (int, error) {
-    countBytes := make([]byte, WINNER_COUNT_SIZE)
+func (s *BetSockStream) RecvWinners() ([]int, error) {
+    dniCountBytes := make([]byte, DNI_COUNT_SIZE)
 
-    if n, err := io.ReadFull(s.conn, countBytes); err != nil {
-        return 0, fmt.Errorf("couldn't recv winner quantity, err: %v, read %v out of %v bytes", err, n, WINNER_COUNT_SIZE)
+    if n, err := io.ReadFull(s.conn, dniCountBytes); err != nil {
+        return nil, fmt.Errorf("couldn't recv winner quantity, err: %v, read %v out of %v bytes", err, n, DNI_COUNT_SIZE)
     }
 
-    count := binary.BigEndian.Uint32(countBytes)
-    return int(count), nil
+    count := int(dniCountBytes[0])
+    dnisBytes := make([]byte, DNI_SIZE * count)
+    if _, err := io.ReadFull(s.conn, dnisBytes); err != nil {
+        return nil, fmt.Errorf("couldn't recv winners, err: %v", err)
+    }
+
+    dnis := make([]int, count)
+    for i := 0; i < len(dnisBytes); i += DNI_SIZE {
+        dni := binary.BigEndian.Uint32(dnisBytes[i:i + DNI_SIZE])
+        dnis = append(dnis, int(dni))
+    }
+
+    return dnis, nil
 }
 
 func (s *BetSockStream) Close() {

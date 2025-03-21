@@ -25,11 +25,11 @@ class Server:
 
         if not self._shutdown:
             logging.info("action: sorteo | result: success")
-            winners_counts = defaultdict(int)
+            winners_counts = defaultdict(list)
 
             for bet in load_bets():
                 if has_won(bet):
-                    winners_counts[bet.agency] += 1
+                    winners_counts[bet.agency].append(int(bet.document))
 
             for agency, stream in agencies.items():
                 stream.send_winner_count(winners_counts[agency])

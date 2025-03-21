@@ -89,17 +89,17 @@ func (c *Client) StartClientLoop(betPath string) {
         log.Infof("action confirm_batch | result: success | client_id: %v", id)
     }
 
-    var winnerQuantity int
+    var winners []int
     select {
     case _ = <-sigs:
         return
     default:
-        winnerQuantity, err = c.conn.RecvWinners()
+        winners, err = c.conn.RecvWinners()
     }
 
     if err != nil {
         log.Errorf("action: consulta_ganadores | result: fail | error: %v", err)
     } else {
-        log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", winnerQuantity)
+        log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
     }
 }
