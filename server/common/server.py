@@ -40,8 +40,10 @@ class Server:
     def _handle_client_connection(self, client_sock: BetSockStream):
         while True:
             msg = client_sock.recv()
+
             if msg.kind == KIND_CONFIRM:
                 logging.info(f"action: confirmacion_recibida | result: success")
+                print("action: confirmacion_recibida | result: success")
                 break
 
             if msg.kind == KIND_BATCH:
