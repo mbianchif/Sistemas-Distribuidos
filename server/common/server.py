@@ -33,7 +33,9 @@ class Server:
 
             for agency, stream in agencies.items():
                 stream.send_winner_count(winners_counts[agency])
-                stream.close()
+
+        for stream in agencies.values():
+            stream.close()
 
         self._listener.close()
 
