@@ -148,10 +148,12 @@ func (s *BetSockStream) RecvWinners() (int, error) {
 
     n, err := io.ReadFull(s.conn, countBytes)
     if err != nil {
+        count := binary.BigEndian.Uint32(countBytes)
+        fmt.Printf("winners: %v\n", count)
         return 0, fmt.Errorf("couldn't recv winner quantity, err: %v, read %v out of %v bytes", err, n, WINNER_COUNT_SIZE)
     }
 
-    return n, nil
+    return 0, nil
 }
 
 func (s *BetSockStream) Close() {
