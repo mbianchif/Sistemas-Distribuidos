@@ -18,7 +18,7 @@ services:
     image: client:latest
     entrypoint: /client
     environment:
-      - CLI_LOGGING_LEVEL=DEBUG
+      - CLI_LOG_LEVEL=DEBUG
       - CLI_ID=1
     networks:
       - testing_net
@@ -33,7 +33,7 @@ services:
     image: client:latest
     entrypoint: /client
     environment:
-      - CLI_LOGGING_LEVEL=DEBUG
+      - CLI_LOG_LEVEL=DEBUG
       - CLI_ID=2
     networks:
       - testing_net
@@ -48,7 +48,7 @@ services:
     image: client:latest
     entrypoint: /client
     environment:
-      - CLI_LOGGING_LEVEL=DEBUG
+      - CLI_LOG_LEVEL=DEBUG
       - CLI_ID=3
     networks:
       - testing_net
@@ -63,7 +63,7 @@ services:
     image: client:latest
     entrypoint: /client
     environment:
-      - CLI_LOGGING_LEVEL=DEBUG
+      - CLI_LOG_LEVEL=DEBUG
       - CLI_ID=4
     networks:
       - testing_net
@@ -78,7 +78,7 @@ services:
     image: client:latest
     entrypoint: /client
     environment:
-      - CLI_LOGGING_LEVEL=DEBUG
+      - CLI_LOG_LEVEL=DEBUG
       - CLI_ID=5
     networks:
       - testing_net
