@@ -70,6 +70,7 @@ class BetSockStream:
     def recv(self):
         kind_bytes = _recv_all(self._skt, MESSAGE_KIND_SIZE)
         kind = int.from_bytes(kind_bytes, "big")
+        print(f"Recibi {kind=}, mientras que {MessageKind.BATCH=} y {MessageKind.CONFIRM=}")
 
         if kind == MessageKind.BATCH:
             batch = self._recv_batch()
