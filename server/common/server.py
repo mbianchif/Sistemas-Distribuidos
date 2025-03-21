@@ -4,6 +4,7 @@ import logging
 from common.protocol import BetSockListener, BetSockStream, KIND_BATCH, KIND_CONFIRM
 from common.utils import has_won, load_bets, store_bets
 
+
 class Server:
     def __init__(self, port, listen_backlog, nclients):
         self._listener = BetSockListener.bind("", port, listen_backlog)
@@ -23,6 +24,7 @@ class Server:
             self._handle_client_connection(stream)
             agencies[stream.id] = stream
 
+        self._listener.close()
         if not self._shutdown:
             logging.info("action: sorteo | result: success")
             winners_counts = defaultdict(list)
@@ -37,8 +39,6 @@ class Server:
         for stream in agencies.values():
             stream.close()
 
-        self._listener.close()
-
     def _handle_client_connection(self, client_sock: BetSockStream):
         while True:
             msg = client_sock.recv()
@@ -50,8 +50,9 @@ class Server:
             if msg.kind == KIND_BATCH:
                 bets = msg.data
                 store_bets(bets)
-                logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
-
+                logging.info(
+                    f"action: apuesta_recibida | result: success | cantidad: {len(bets)}"
+                )
 
     def _accept_new_connection(self) -> BetSockStream:
         logging.info("action: accept_connections | result: in_progress")
