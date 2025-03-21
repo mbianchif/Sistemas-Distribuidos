@@ -159,7 +159,7 @@ func (s *BetSockStream) RecvWinners() ([]int, error) {
         return nil, fmt.Errorf("couldn't recv winners, err: %v", err)
     }
 
-    dnis := make([]int, count)
+    dnis := make([]int, 0, count)
     for i := 0; i < len(dnisBytes); i += DNI_SIZE {
         dni := binary.BigEndian.Uint32(dnisBytes[i:i + DNI_SIZE])
         dnis = append(dnis, int(dni))

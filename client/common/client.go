@@ -97,7 +97,6 @@ func (c *Client) StartClientLoop(betPath string) {
         winners, err = c.conn.RecvWinners()
     }
 
-    log.Infof("winners: %v", winners)
     if err != nil {
         log.Errorf("action: consulta_ganadores | result: fail | error: %v", err)
     } else {
