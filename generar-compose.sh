@@ -16,6 +16,7 @@ echo "  server:
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
+      - LOGGING_LEVEL=DEBUG
       - NCLIENTS=$2
     networks:
       - testing_net
@@ -31,6 +32,7 @@ do
     image: client:latest
     entrypoint: /client
     environment:
+      - CLI_LOGGING_LEVEL=DEBUG
       - CLI_ID=$i
     networks:
       - testing_net
