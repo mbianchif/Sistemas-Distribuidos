@@ -31,11 +31,11 @@ class Server:
                 if has_won(bet):
                     winners_counts[bet.agency] += 1
 
+            print(f"{winners_counts=}")
             for agency, stream in agencies.items():
                 stream.send_winner_count(winners_counts[agency])
                 stream.close()
 
-        logging.info("action: close | result: success")
         self._listener.close()
 
     def _handle_client_connection(self, client_sock: BetSockStream):
