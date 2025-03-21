@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/op/go-logging"
 )
@@ -24,10 +23,9 @@ type Client struct {
 }
 
 func NewClient(config ClientConfig) *Client {
-	client := &Client{
-		config: config,
-	}
-	return client
+    return &Client {
+        config: config,
+    }
 }
 
 func (c *Client) createClientSocket() {
@@ -46,6 +44,7 @@ func (c *Client) StartClientLoop(betPath string) {
 	betFile, err := os.Open(betPath)
 	if err != nil {
 		log.Criticalf("action: bet_file_open | result: fail | client_id: %v | error: %v", id, err)
+        return
 	}
 	defer betFile.Close()
 
@@ -103,6 +102,4 @@ func (c *Client) StartClientLoop(betPath string) {
     } else {
         log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
     }
-
-    time.Sleep(time.Second * time.Duration(10))
 }
