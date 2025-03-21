@@ -104,5 +104,5 @@ func (c *Client) StartClientLoop(betPath string) {
         log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
     }
 
-    time.Sleep(time.Second * time.Duration(1))
+    time.Sleep(time.Second * time.Duration(5))
 }
