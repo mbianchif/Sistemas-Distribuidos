@@ -1,3 +1,4 @@
+from collections import defaultdict
 import signal
 import logging
 from common.protocol import BetSockListener, BetSockStream, KIND_BATCH, KIND_CONFIRM
@@ -24,7 +25,7 @@ class Server:
 
         if not self._shutdown:
             logging.info("action: sorteo | result: success")
-            winners_counts = [0] * self._nclients
+            winners_counts = defaultdict(int)
 
             for bet in load_bets():
                 if has_won(bet):
@@ -43,7 +44,6 @@ class Server:
 
             if msg.kind == KIND_CONFIRM:
                 logging.info(f"action: confirmacion_recibida | result: success")
-                print("action: confirmacion_recibida | result: success")
                 break
 
             if msg.kind == KIND_BATCH:
