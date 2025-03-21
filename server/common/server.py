@@ -1,6 +1,6 @@
 import signal
 import logging
-from common.protocol import BetSockListener, BetSockStream, MessageKind
+from common.protocol import BetSockListener, BetSockStream, KIND_BATCH, KIND_CONFIRM
 from common.utils import has_won, load_bets, store_bets
 
 class Server:
@@ -39,10 +39,10 @@ class Server:
     def _handle_client_connection(self, client_sock: BetSockStream):
         while True:
             msg = client_sock.recv()
-            if msg.kind == MessageKind.CONFIRM.value:
+            if msg.kind == KIND_CONFIRM:
                 logging.info(f"action: confirmacion_recibida | result: success")
                 break
-            else:
+            elif msg.kind == KIND_BATCH:
                 bets = msg.data
                 store_bets(bets)
                 logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
