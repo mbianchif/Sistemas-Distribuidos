@@ -31,13 +31,9 @@ class Server:
                 if has_won(bet):
                     winners_counts[bet.agency] += 1
 
-            print(f"{agencies=}")
-            print(f"{winners_counts=}")
             for agency, stream in agencies.items():
                 stream.send_winner_count(winners_counts[agency])
                 stream.close()
-
-            print(f"{winners_counts=}")
 
         self._listener.close()
 
