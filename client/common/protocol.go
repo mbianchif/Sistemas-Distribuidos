@@ -65,8 +65,7 @@ func BetSockConnect(address string, id string) (*BetSockStream, error) {
 
     // Share id with the other end
     writer := bufio.NewWriter(conn)
-    idBytes := make([]byte, ID_SIZE)
-    binary.BigEndian.PutUint32(idBytes, uint32(parsedID))
+    idBytes := []byte{byte(parsedID)}
     writer.Write(idBytes)
 
     if err := writer.Flush(); err != nil {
