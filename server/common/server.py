@@ -34,6 +34,7 @@ class Server:
                 stream.send_winner_count(winners_counts[agency])
                 stream.close()
 
+        logging.info("action: close | result: success")
         self._listener.close()
 
     def _handle_client_connection(self, client_sock: BetSockStream):
@@ -42,7 +43,8 @@ class Server:
             if msg.kind == KIND_CONFIRM:
                 logging.info(f"action: confirmacion_recibida | result: success")
                 break
-            elif msg.kind == KIND_BATCH:
+
+            if msg.kind == KIND_BATCH:
                 bets = msg.data
                 store_bets(bets)
                 logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
