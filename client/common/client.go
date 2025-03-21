@@ -98,7 +98,7 @@ func (c *Client) StartClientLoop(betPath string) {
     }
 
     if err != nil {
-        log.Errorf("action: consulta_ganadores | result: fail")
+        log.Errorf("action: consulta_ganadores | result: fail | error: %v", err)
     } else {
         log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", winnerQuantity)
     }
