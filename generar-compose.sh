@@ -32,7 +32,7 @@ do
     image: client:latest
     entrypoint: /client
     environment:
-      - CLI_LOGGING_LEVEL=DEBUG
+      - CLI_LOG_LEVEL=DEBUG
       - CLI_ID=$i
     networks:
       - testing_net
