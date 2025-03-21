@@ -40,6 +40,7 @@ class Server:
         while True:
             msg = client_sock.recv()
             if msg.kind == MessageKind.CONFIRM.value:
+                logging.info(f"action: confirmacion_recibida | result: success")
                 break
             else:
                 bets = msg.data
