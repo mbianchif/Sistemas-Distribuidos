@@ -39,7 +39,7 @@ class Server:
     def _handle_client_connection(self, client_sock: BetSockStream):
         while True:
             msg = client_sock.recv()
-            if msg.kind == MessageKind.CONFIRM:
+            if msg.kind == MessageKind.CONFIRM.value:
                 break
             else:
                 bets = msg.data
