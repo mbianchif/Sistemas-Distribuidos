@@ -148,7 +148,7 @@ func (s *BetSockStream) RecvWinners() (int, error) {
 
     n, err := io.ReadFull(s.conn, countBytes)
     if err != nil {
-        return 0, fmt.Errorf("couldn't recv winner quantity, read %v out of %v bytes", n, WINNER_COUNT_SIZE)
+        return 0, fmt.Errorf("couldn't recv winner quantity, err: %v, read %v out of %v bytes", err, n, WINNER_COUNT_SIZE)
     }
 
     return n, nil
