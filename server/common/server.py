@@ -49,10 +49,10 @@ class Server:
 
             if msg.kind == KIND_BATCH:
                 bets = msg.data
-                store_bets(bets)
                 logging.info(
                     f"action: apuesta_recibida | result: success | cantidad: {len(bets)}"
                 )
+                store_bets(bets)
 
     def _accept_new_connection(self) -> BetSockStream:
         logging.info("action: accept_connections | result: in_progress")
