@@ -98,7 +98,7 @@ func (c *Client) StartClientLoop(betPath string) {
         winners, err = c.conn.RecvWinners()
     }
 
-    time.Sleep(time.Duration(1) * time.Second)
+    time.Sleep(time.Duration(5) * time.Second)
     if err != nil {
         log.Errorf("action: consulta_ganadores | result: fail | error: %v", err)
     } else {
