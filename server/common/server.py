@@ -34,7 +34,14 @@ class Server:
                     winners_counts[bet.agency].append(int(bet.document))
 
             for agency, stream in agencies.items():
-                stream.send_winner_count(winners_counts[agency])
+                winners = winners_counts[agency]
+                logging.debug(
+                    f"action: send_winners | result: in_progress | agency: {agency} | winners: {winners}"
+                )
+                stream.send_winner_count(winners)
+                logging.debug(
+                    f"action: send_winners | result: success | agency: {agency} | winners: {winners}"
+                )
 
         for stream in agencies.values():
             stream.close()
@@ -48,11 +55,10 @@ class Server:
                 break
 
             if msg.kind == KIND_BATCH:
-                bets = msg.data
                 logging.info(
-                    f"action: apuesta_recibida | result: success | cantidad: {len(bets)}"
+                    f"action: apuesta_recibida | result: success | cantidad: {len(msg.data)}"
                 )
-                store_bets(bets)
+                store_bets(msg.data)
 
     def _accept_new_connection(self) -> BetSockStream:
         logging.info("action: accept_connections | result: in_progress")
