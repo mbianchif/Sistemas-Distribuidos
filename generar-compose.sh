@@ -34,6 +34,7 @@ do
     environment:
       - CLI_LOG_LEVEL=DEBUG
       - CLI_ID=$i
+      - GODEBUG=asyncpreemptoff=1
     networks:
       - testing_net
     depends_on:
