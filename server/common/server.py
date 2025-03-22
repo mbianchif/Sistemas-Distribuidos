@@ -1,6 +1,7 @@
 from collections import defaultdict
 import signal
 import logging
+import sys
 from common.protocol import BetSockListener, BetSockStream, KIND_BATCH, KIND_CONFIRM
 from common.utils import has_won, load_bets, store_bets
 
@@ -27,6 +28,8 @@ class Server:
         self._listener.close()
         if not self._shutdown:
             logging.info("action: sorteo | result: success")
+            sys.stdout.flush()
+
             winners_counts = defaultdict(list)
 
             for bet in load_bets():
@@ -34,14 +37,7 @@ class Server:
                     winners_counts[bet.agency].append(int(bet.document))
 
             for agency, stream in agencies.items():
-                winners = winners_counts[agency]
-                logging.debug(
-                    f"action: send_winners | result: in_progress | agency: {agency} | winners: {winners}"
-                )
-                stream.send_winner_count(winners)
-                logging.debug(
-                    f"action: send_winners | result: success | agency: {agency} | winners: {winners}"
-                )
+                stream.send_winner_count(winners_counts[agency])
 
         for stream in agencies.values():
             stream.close()
