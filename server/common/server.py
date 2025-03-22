@@ -48,16 +48,20 @@ class Server:
 
             if msg.kind == KIND_CONFIRM:
                 logging.info(f"action: confirmacion_recibida | result: success")
+                sys.stdout.flush()
                 break
 
             if msg.kind == KIND_BATCH:
                 logging.info(
                     f"action: apuesta_recibida | result: success | cantidad: {len(msg.data)}"
                 )
+                sys.stdout.flush()
                 store_bets(msg.data)
 
     def _accept_new_connection(self) -> BetSockStream:
         logging.info("action: accept_connections | result: in_progress")
+        sys.stdout.flush()
         conn, addr = self._listener.accept()
         logging.info(f"action: accept_connections | result: success | ip: {addr[0]}")
+        sys.stdout.flush()
         return conn
