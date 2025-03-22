@@ -14,6 +14,7 @@ echo "  server:
     container_name: server
     image: server:latest
     entrypoint: python3 /main.py
+    tty: true
     environment:
       - PYTHONUNBUFFERED=1
       - LOGGING_LEVEL=DEBUG
@@ -31,6 +32,7 @@ do
     container_name: client$i
     image: client:latest
     entrypoint: /client
+    tty: true
     environment:
       - CLI_LOG_LEVEL=DEBUG
       - CLI_ID=$i
