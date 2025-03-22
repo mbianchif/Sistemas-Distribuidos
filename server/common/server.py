@@ -27,7 +27,6 @@ class Server:
         self._listener.close()
         if not self._shutdown:
             logging.info("action: sorteo | result: success")
-            logging.getLogger().handlers[0].flush()
             winners_counts = defaultdict(list)
 
             for bet in load_bets():

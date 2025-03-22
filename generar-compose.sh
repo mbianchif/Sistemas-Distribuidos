@@ -13,9 +13,8 @@ services:" > $1
 echo "  server:
     container_name: server
     image: server:latest
-    entrypoint: python3 /main.py
+    entrypoint: python3 -u /main.py
     environment:
-      - PYTHONUNBUFFERED=1
       - LOGGING_LEVEL=DEBUG
       - NCLIENTS=$2
     networks:
