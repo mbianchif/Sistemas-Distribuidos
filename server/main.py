@@ -3,6 +3,7 @@
 from configparser import ConfigParser
 from common.server import Server
 import logging
+import sys
 import os
 
 
@@ -48,6 +49,7 @@ def main():
     # of the component
     logging.debug(f"action: config | result: success | port: {port} | "
                   f"listen_backlog: {listen_backlog} | logging_level: {logging_level}")
+    sys.stdout.flush()
 
     # Initialize server and start server loop
     server = Server(port, listen_backlog, nclients)
