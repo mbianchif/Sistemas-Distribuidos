@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+    "time"
 
 	"github.com/op/go-logging"
 )
@@ -97,6 +98,7 @@ func (c *Client) StartClientLoop(betPath string) {
         winners, err = c.conn.RecvWinners()
     }
 
+    time.Sleep(time.Duration(1) * time.Second)
     if err != nil {
         log.Errorf("action: consulta_ganadores | result: fail | error: %v", err)
     } else {
