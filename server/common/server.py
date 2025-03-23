@@ -58,7 +58,7 @@ class Server:
         winners = []
         with file_lock:
             for bet in load_bets():
-                if has_won(bet):
+                if has_won(bet) and bet.agency == client.id:
                     winners.append(int(bet.document))
 
         client.send_winner_count(winners)
