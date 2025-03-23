@@ -54,12 +54,6 @@ Este mensaje es vacío, solo con saber el tipo de mensaje es suficiente, por lo 
 
 #### Mensaje de DNIs
 
-Decidí parsear los DNI y enviarlos como enteros, concluyendo en la siguiente estructura
-
-Este mensaje es vacío, solo con saber el tipo de mensaje es suficiente, por lo que no tiene datos.
-
-#### Mensaje de DNIs
-
 Decidí parsear los DNI y enviarlos como enteros, concluyendo en la siguiente estructura. Un detalle es que el enunciado pide enviar todos los dni, era suficiente pasar la cantidad de ganadores para poder loggearla.
 
 ```terminal
