@@ -1,6 +1,8 @@
 from collections import defaultdict
 import signal
 import logging
+import os
+import multiprocessing as mp
 from common.protocol import BetSockListener, BetSockStream, KIND_BATCH, KIND_CONFIRM
 from common.utils import has_won, load_bets, store_bets
 
@@ -18,13 +20,19 @@ class Server:
 
     def run(self):
         agencies = {}
+        children = []
 
         while not self._shutdown and len(agencies) < self._nclients:
             stream = self._accept_new_connection()
-            self._handle_client_connection(stream)
             agencies[stream.id] = stream
+            child = mp.Process(target=self._handle_client_connection, args=(stream,))
+            children.append(child)
+            child.start()
 
         self._listener.close()
+        for child in children:
+            os.waitpid(child.pid, 0)
+
         if not self._shutdown:
             logging.info("action: sorteo | result: success")
             winners_counts = defaultdict(list)
@@ -38,6 +46,9 @@ class Server:
 
         for stream in agencies.values():
             stream.close()
+
+        for child in mp.active_children():
+            child.join()
 
     def _handle_client_connection(self, client_sock: BetSockStream):
         while True:
