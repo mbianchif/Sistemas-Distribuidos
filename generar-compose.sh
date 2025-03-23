@@ -39,7 +39,7 @@ do
       - server
     volumes:
       - ./client/config.yaml:/config.yaml
-      - ./.data/agency-$i.csv:/agency-bets.csv
+      - ./.data/agency-$i.csv:/bets.csv
 " >> $1
 done
 

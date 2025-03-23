@@ -1,4 +1,3 @@
-from collections import defaultdict
 import signal
 import logging
 import multiprocessing as mp
@@ -7,66 +6,62 @@ from common.utils import has_won, load_bets, store_bets
 
 
 class Server:
-    def __init__(self, port, listen_backlog, nclients):
-        self._listener = BetSockListener.bind("", port, listen_backlog)
-        self._bets_file_lock = mp.Lock()
-        self._shutdown = mp.Event()
+    def __init__(self, port, listen_backlogging, nclients):
+        self._listener = BetSockListener.bind("", port, listen_backlogging)
+        self._barrier = mp.Barrier(nclients)
+        self._file_lock = mp.Lock()
         self._nclients = nclients
+        self._shutdown = False
 
         def term_handler(_signum, _stacktrace):
-            self._shutdown.set()
+            self._shutdown = True
 
         signal.signal(signal.SIGTERM, term_handler)
 
     def run(self):
-        agencies = {}
-        children = []
+        clients = []
 
-        while not self._shutdown and len(agencies) < self._nclients:
+        while not self._shutdown and len(clients) < self._nclients:
             stream = self._accept_new_connection()
-            agencies[stream.id] = stream
             child = mp.Process(
                 name=str(stream.id),
                 target=self._handle_client_connection,
-                args=(stream, self._shutdown, self._bets_file_lock),
+                args=(stream, self._file_lock, self._barrier),
             )
-            children.append(child)
+
+            clients.append((child, stream))
             child.start()
 
         self._listener.close()
-        for child in children:
+        for child, stream in clients:
             child.join()
-
-        if not self._shutdown.is_set():
-            logging.info("action: sorteo | result: success")
-            winners_counts = defaultdict(list)
-
-            for bet in load_bets():
-                if has_won(bet):
-                    winners_counts[bet.agency].append(int(bet.document))
-
-            for agency, stream in agencies.items():
-                stream.send_winner_count(winners_counts[agency])
-
-        for stream in agencies.values():
             stream.close()
 
-    def _handle_client_connection(self, client, shutdown, file_lock):
-        while not shutdown.is_set():
+    def _handle_client_connection(self, client, file_lock, barrier):
+        while True:
             msg = client.recv()
 
             if msg.kind == KIND_CONFIRM:
                 logging.info(f"action: confirmacion_recibida | result: success")
+                self._send_winners(client, file_lock, barrier)
                 break
 
             if msg.kind == KIND_BATCH:
-                logging.info(
-                    f"action: apuesta_recibida | result: success | cantidad: {len(msg.data)}"
-                )
+                logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(msg.data)}")
+                with file_lock:
+                    store_bets(msg.data)
 
-                file_lock.acquire()
-                store_bets(msg.data)
-                file_lock.release()
+    def _send_winners(self, client, file_lock, barrier):
+        if barrier.wait() == 0:
+            logging.info("action: sorteo | result: success")
+
+        winners = []
+        with file_lock:
+            for bet in load_bets():
+                if has_won(bet):
+                    winners.append(int(bet.document))
+
+        client.send_winner_count(winners)
 
     def _accept_new_connection(self) -> BetSockStream:
         logging.info("action: accept_connections | result: in_progress")
