@@ -1,6 +1,6 @@
 import signal
 import logging
-import multiprocessing as mp
+from multiprocessing import Barrier, Lock, Process
 from common.protocol import BetSockListener, BetSockStream, KIND_BATCH, KIND_CONFIRM
 from common.utils import has_won, load_bets, store_bets
 
@@ -8,9 +8,9 @@ from common.utils import has_won, load_bets, store_bets
 class Server:
     def __init__(self, port, listen_backlogging, nclients):
         self._listener = BetSockListener.bind("", port, listen_backlogging)
-        self._barrier = mp.Barrier(nclients)
-        self._file_lock = mp.Lock()
+        self._barrier = Barrier(nclients)
         self._nclients = nclients
+        self._file_lock = Lock()
         self._shutdown = False
 
         def term_handler(_signum, _stacktrace):
@@ -23,7 +23,7 @@ class Server:
 
         while not self._shutdown and len(clients) < self._nclients:
             stream = self._accept_new_connection()
-            child = mp.Process(
+            child = Process(
                 name=str(stream.id),
                 target=self._handle_client_connection,
                 args=(stream, self._file_lock, self._barrier),
