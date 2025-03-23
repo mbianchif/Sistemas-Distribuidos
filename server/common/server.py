@@ -38,6 +38,10 @@ class Server:
             child.join()
             stream.close()
 
+        # Esto está para garantizar que el proceso del server termine después que
+        # el de todos los clientes. Hay un test que cuenta la cantidad de exits
+        # leídos en los logs, si el server termina antes que alguno de los clientes
+        # es muy probable que no haya leído la cantidad de ganadores de ese cliene.
         sleep(5)
 
     def _handle_client_connection(self, client, file_lock, barrier):
