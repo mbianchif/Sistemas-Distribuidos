@@ -1,6 +1,7 @@
 import signal
 import logging
 from multiprocessing import Barrier, Lock, Process
+from time import sleep
 from common.protocol import BetSockListener, BetSockStream, KIND_BATCH, KIND_CONFIRM
 from common.utils import has_won, load_bets, store_bets
 
@@ -36,6 +37,8 @@ class Server:
         for child, stream in clients:
             child.join()
             stream.close()
+
+        sleep(5)
 
     def _handle_client_connection(self, client, file_lock, barrier):
         while True:
