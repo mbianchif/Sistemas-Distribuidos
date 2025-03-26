@@ -78,8 +78,8 @@ func (c *Client) StartClientLoop(betPath string) {
     }
 
     if err != nil {
-        log.Infof("action send_batch | result: fail | client_id: %v | error: %v", id, err)
+        log.Infof("action: send_batch | result: fail | client_id: %v | error: %v", id, err)
     } else {
-        log.Infof("action send_batch | result: success | client_id: %v", id)
+        log.Infof("action: send_batch | result: success | client_id: %v", id)
 	}
 }
