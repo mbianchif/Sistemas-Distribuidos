@@ -61,7 +61,7 @@ func (c *Client) StartClientLoop() {
 	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
 		select {
 		case _ = <-sigs:
-			break
+            return
 		default:
 			c.createClientSocket()
 		}
