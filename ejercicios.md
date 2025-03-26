@@ -122,7 +122,7 @@ Para la ejecución es igual que el ejercicio 5, el archivo de compose está conf
 
 ## Ejercicio 7
 
-Se implementó un protocolo para que el cliente sea capaz de enviar distintos tipos de mensajes.
+Se implementó un protocolo para que el cliente sea capaz de enviar distintos tipos de mensajes. Para esto se agrego una variable de entorno `NCLIENTS` que le permite al servidor saber de antemano cuantos clientes se van a conectar para enviar las apuestas.
 
 ## Protocolo
 
@@ -183,4 +183,22 @@ Decidí parsear los DNI y enviarlos como enteros, concluyendo en la siguiente es
 * `COUNT`: 4 bytes que almacenan la cantidad de dnis en el mensaje.
 * `DNIi`: 4 bytes con el número de documento.
 
+### Ejecución
 
+Para ejecutar el ejemplo, es otra vez igual, utilizando el mismo comando de las otras veces. El archivo `docker-compose-dev.yaml` está configurado con 5 clientes, en caso de querer cambiarlo se puede utilizar el archivo generador el primer ejercicio.
+
+## Ejercicio 8
+
+Se modificó la implementación del servidor para que pueda responder en paralelo a las consultas de los clientes. Para ello se utilizaron las siguientes primitivas de sincronización.
+
+### Sync
+
+Utilicé el módulo `multiprocessing` para evitar el GIL de python.
+
+Por cada nueva conexión, el servidor crea un nuevo `Process` al que le pasa por argumento un `Lock` y una `Barrier`.
+
+Una vez el servidor inició la cantidad esperada de clientes, este cierra su socket listener y queda esperando a que sus subprocesos terminen y así cerrar los sockets de conexión con los clientes.
+
+Dentro del método `Server._handle_client_connection`, se reciben mensajes hasta recibir la confirmación del cliente de que no va a enviar más mensajes de apuestas, entonces entra en `Server._send_winners`.
+
+Aquí se hace uso del `Lock` y la `Barrier`, donde la barrera sirve para sincronizar a todos los clientes a esperar a que todos confirmen haber enviado a todas sus apuestas. Una vez se rompe la barrera, los subprocesos compiten por el lock del archivo de apuestas del servidor para calcular sus ganadores y ser enviados al respectivo cliente.
