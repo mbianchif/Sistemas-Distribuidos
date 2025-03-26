@@ -11,18 +11,18 @@ class Server:
 
         def term_handler(_signum, _stacktrace):
             self._shutdown = True
+            self._listener.close()
 
         signal.signal(signal.SIGTERM, term_handler)
 
     def run(self):
         while not self._shutdown:
-            stream = self._accept_new_connection()
             try:
+                stream = self._accept_new_connection()
                 self._handle_client_connection(stream)
-            finally:
-                stream.close()
-
-        self._listener.close()
+            except OSError as e:
+                logging.error(f"action: run_server | result: fail | error: {e}")
+                break
 
     def _handle_client_connection(self, client_sock: BetSockStream):
         try:
@@ -31,6 +31,8 @@ class Server:
             logging.info(f"action: apuesta_recibida | result: success | cantidad: {len(bets)}")
         except OSError as _:
             logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bets)}")
+        finally:
+            client_sock.close()
 
     def _accept_new_connection(self) -> BetSockStream:
         logging.info("action: accept_connections | result: in_progress")
