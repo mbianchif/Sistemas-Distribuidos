@@ -42,6 +42,8 @@ func (c *Client) createClientSocket() error {
 
 func (c *Client) StartClientLoop() {
 	sigs := make(chan os.Signal, 1)
+    defer close(sigs)
+
 	signal.Notify(sigs, syscall.SIGTERM)
 
     if c.createClientSocket() != nil {
