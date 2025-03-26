@@ -90,9 +90,9 @@ Se implementó el envío de mensajes por baches. Para esto se utilizaron los _vo
 +------------+-------+--------+-----+-----+-------+--------+
 ```
 
-- BATCHCOUNT: 4 bytes que establecen la cantidad de baches del mensaje. 
-- SIZEi: 4 bytes que establecen el largo del bache en bytes.
-- BATCHi: Datos del i-ésimo bache.
+* `BATCHCOUNT`: 4 bytes que establecen la cantidad de baches del mensaje. 
+* `SIZEi`: 4 bytes que establecen el largo del bache en bytes.
+* `BATCHi`: Datos del i-ésimo bache.
 
 #### Batch
 
@@ -102,7 +102,7 @@ Se implementó el envío de mensajes por baches. Para esto se utilizaron los _vo
 +-------------------+
 ```
 
-- BETi: Datos de la i-ésima apuesta.
+* `BETi`: Datos de la i-ésima apuesta.
 
 Las apuestas están separadas por un delimitador, elegí separarlas por `;`.
 
@@ -118,4 +118,69 @@ Los campos de cada apuesta están separadas por un delimitador, elegí separarlo
 
 ### Ejecución
 
-Para la ejecución
+Para la ejecución es igual que el ejercicio 5, el archivo de compose está configurado con un único cliente, en caso de querer agregar más se puede utilizar el archivo `generar-compose.yaml` para agregar más.
+
+## Ejercicio 7
+
+Se implementó un protocolo para que el cliente sea capaz de enviar distintos tipos de mensajes.
+
+## Protocolo
+
+#### Mensaje
+
+Hay 3 tipos de mensajes, siendo estos el de apuestas, el de confirmación y el de los DNIs.
+
+Los mensajes de apuesta y confirmación, llevan un byte por delante que aclara que tipo de mensaje es. Esto es porque son los mensaje que envía el cliente y en particular el mensaje de confirmación no se sabe a priori cuando podría llegar, por lo que tiene que poder ser leído desde el mismo método que el mensaje de apuestas.
+
+#### Mensaje de Apuesta
+
+```terminal
++------------+-------+--------+-----+-----+-------+--------+
+| BATCHCOUNT | SIZE1 | BATCH1 | ... | ... | SIZEN | BATCHN |
++------------+-------+--------+-----+-----+-------+--------+
+```
+
+* `BATCHCOUNT`: 4 bytes que establecen la cantidad de baches del mensaje. 
+* `SIZEi`: 4 bytes dedicados a establecer el largo del bache en bytes.
+* `BATCHi`: Datos del i-ésimo bache.
+
+#### Batch
+
+```terminal
++-------------------+
+| BET1 ; ... ; BETN |
++-------------------+
+```
+
+* `BETi`: Datos de la i-ésima apuesta.
+
+Las apuestas están separadas por un delimitador, elegí separarlas por `;`.
+
+#### Bet
+
+```terminal
++---------------------------------------------------+
+| Agency , Name , Surname , Id , Birthdate , Number |
++---------------------------------------------------+
+```
+
+Los campos de cada apuesta están separadas por un delimitador, elegí separarlos por `,`.
+
+#### Mensaje de Confirmación
+
+Este mensaje es vacío, solo con saber el tipo de mensaje es suficiente, por lo que no tiene datos.
+
+#### Mensaje de DNIs
+
+Decidí parsear los DNI y enviarlos como enteros, concluyendo en la siguiente estructura. Un detalle es que el enunciado pide enviar todos los dni, era suficiente pasar la cantidad de ganadores para poder loggearla.
+
+```terminal
++-------+------+-----+------+
+| COUNT | DNI1 | ... | DNIN |
++-------+------+-----+------+
+```
+
+* `COUNT`: 4 bytes que almacenan la cantidad de dnis en el mensaje.
+* `DNIi`: 4 bytes con el número de documento.
+
+
