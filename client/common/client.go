@@ -23,9 +23,9 @@ type Client struct {
 }
 
 func NewClient(config ClientConfig) *Client {
-    return &Client {
-        config: config,
-    }
+	return &Client{
+		config: config,
+	}
 }
 
 func (c *Client) createClientSocket() {
@@ -38,13 +38,15 @@ func (c *Client) createClientSocket() {
 
 func (c *Client) StartClientLoop(betPath string) {
 	sigs := make(chan os.Signal, 1)
+	defer close(sigs)
+
 	signal.Notify(sigs, syscall.SIGTERM)
 	id := c.config.ID
 
 	betFile, err := os.Open(betPath)
 	if err != nil {
 		log.Criticalf("action: bet_file_open | result: fail | client_id: %v | error: %v", id, err)
-        return
+		return
 	}
 	defer betFile.Close()
 
@@ -52,54 +54,54 @@ func (c *Client) StartClientLoop(betPath string) {
 	defer c.conn.Close()
 
 	betFileReader := csv.NewReader(betFile)
-    bets := make([]Bet, 0)
+	bets := make([]Bet, 0)
 
-    for {
-        line, err := betFileReader.Read()
-        if err != nil {
-            break
-        }
+	for {
+		line, err := betFileReader.Read()
+		if err != nil {
+			break
+		}
 
-        bets = append(bets, Bet{
-            Agency:    id,
-            Name:      line[0],
-            Surname:   line[1],
-            Id:        line[2],
-            Birthdate: line[3],
-            Number:    line[4],
-        })
-    }
-
-    select {
-    case _ = <-sigs:
-        return
-    default:
-        err = c.conn.SendBets(bets, c.config.MaxBatchAmount)
-    }
-
-    if err != nil {
-        log.Errorf("action send_batch | result: fail | client_id: %v | error: %v", id, err)
-    } else {
-        log.Infof("action send_batch | result: success | client_id: %v", id)
+		bets = append(bets, Bet{
+			Agency:    id,
+			Name:      line[0],
+			Surname:   line[1],
+			Id:        line[2],
+			Birthdate: line[3],
+			Number:    line[4],
+		})
 	}
 
-    if err = c.conn.Confirm(); err != nil {
-        log.Errorf("action confirm_batch | result: fail | client_id: %v | error: %v", id, err)
-    } else {
-        log.Infof("action confirm_batch | result: success | client_id: %v", id)
-    }
+	select {
+	case _ = <-sigs:
+		return
+	default:
+		err = c.conn.SendBets(bets, c.config.MaxBatchAmount)
+	}
 
-    var winners []int
-    select {
-    case _ = <-sigs:
-        return
-    default:
-        winners, err = c.conn.RecvWinners()
-    }
+	if err != nil {
+		log.Errorf("action send_batch | result: fail | client_id: %v | error: %v", id, err)
+	} else {
+		log.Infof("action send_batch | result: success | client_id: %v", id)
+	}
 
-    if err != nil {
-        log.Errorf("action: consulta_ganadores | result: fail | error: %v", err)
-    } else {
-        log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
-    }
+	if err = c.conn.Confirm(); err != nil {
+		log.Errorf("action confirm_batch | result: fail | client_id: %v | error: %v", id, err)
+	} else {
+		log.Infof("action confirm_batch | result: success | client_id: %v", id)
+	}
+
+	var winners []int
+	select {
+	case _ = <-sigs:
+		return
+	default:
+		winners, err = c.conn.RecvWinners()
+	}
+
+	if err != nil {
+		log.Errorf("action: consulta_ganadores | result: fail | error: %v", err)
+	} else {
+		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
+	}
 }
