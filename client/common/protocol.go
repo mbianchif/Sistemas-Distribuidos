@@ -13,8 +13,8 @@ import (
 
 // Message kind
 const (
-    KIND_BATCH = 0
-    KIND_CONFIRM = 1
+	KIND_BATCH   = 0
+	KIND_CONFIRM = 1
 )
 
 const DELIMITER = ","
@@ -54,25 +54,25 @@ type BetSockStream struct {
 }
 
 func BetSockConnect(address string, id string) (*BetSockStream, error) {
-    parsedID, err := strconv.Atoi(id)
-    if err != nil {
-        return nil, err
-    }
+	parsedID, err := strconv.Atoi(id)
+	if err != nil {
+		return nil, err
+	}
 
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		return nil, err
 	}
 
-    // Share id with the other end
-    writer := bufio.NewWriter(conn)
-    idBytes := []byte{byte(parsedID)}
-    writer.Write(idBytes)
+	// Share id with the other end
+	writer := bufio.NewWriter(conn)
+	idBytes := []byte{byte(parsedID)}
+	writer.Write(idBytes)
 
-    if err := writer.Flush(); err != nil {
-        conn.Close()
-        return nil, err
-    }
+	if err := writer.Flush(); err != nil {
+		conn.Close()
+		return nil, err
+	}
 
 	return &BetSockStream{conn, parsedID}, nil
 }
@@ -102,8 +102,8 @@ func (s *BetSockStream) SendBets(bets []Bet, batchSize int) error {
 	writer := bufio.NewWriter(s.conn)
 	batches := Batch(bets, batchSize)
 
-    // Write message kind
-    writer.Write([]byte{KIND_BATCH})
+	// Write message kind
+	writer.Write([]byte{KIND_BATCH})
 
 	// Write batch count
 	nbatches := len(batches)
@@ -134,40 +134,42 @@ func (s *BetSockStream) SendBets(bets []Bet, batchSize int) error {
 }
 
 func (s *BetSockStream) Confirm() error {
-    writer := bufio.NewWriter(s.conn)
+	writer := bufio.NewWriter(s.conn)
 
-    // Write message kind
-    writer.Write([]byte{KIND_CONFIRM})
-    
-    if err := writer.Flush(); err != nil {
-        return fmt.Errorf("couldn't send confirmation")
-    }
+	// Write message kind
+	writer.Write([]byte{KIND_CONFIRM})
 
-    return nil
+	if err := writer.Flush(); err != nil {
+		return fmt.Errorf("couldn't send confirmation")
+	}
+
+	return nil
 }
 
 func (s *BetSockStream) RecvWinners() ([]int, error) {
-    dniCountBytes := make([]byte, DNI_COUNT_SIZE)
+	dniCountBytes := make([]byte, DNI_COUNT_SIZE)
 
-    if n, err := io.ReadFull(s.conn, dniCountBytes); err != nil {
-        return nil, fmt.Errorf("couldn't recv winner quantity, err: %v, read %v out of %v bytes", err, n, DNI_COUNT_SIZE)
-    }
+	if n, err := io.ReadFull(s.conn, dniCountBytes); err != nil {
+		return nil, fmt.Errorf("couldn't recv winner quantity, err: %v, read %v out of %v bytes", err, n, DNI_COUNT_SIZE)
+	}
 
-    count := binary.BigEndian.Uint32(dniCountBytes)
-    dnisBytes := make([]byte, DNI_SIZE * count)
-    if _, err := io.ReadFull(s.conn, dnisBytes); err != nil {
-        return nil, fmt.Errorf("couldn't recv winners, err: %v", err)
-    }
+	count := binary.BigEndian.Uint32(dniCountBytes)
+	dnisBytes := make([]byte, DNI_SIZE*count)
+	if _, err := io.ReadFull(s.conn, dnisBytes); err != nil {
+		return nil, fmt.Errorf("couldn't recv winners, err: %v", err)
+	}
 
-    dnis := make([]int, 0, count)
-    for i := 0; i < len(dnisBytes); i += DNI_SIZE {
-        dni := binary.BigEndian.Uint32(dnisBytes[i:i + DNI_SIZE])
-        dnis = append(dnis, int(dni))
-    }
+	dnis := make([]int, 0, count)
+	for i := 0; i < len(dnisBytes); i += DNI_SIZE {
+		dni := binary.BigEndian.Uint32(dnisBytes[i : i+DNI_SIZE])
+		dnis = append(dnis, int(dni))
+	}
 
-    return dnis, nil
+	return dnis, nil
 }
 
 func (s *BetSockStream) Close() {
-	s.conn.Close()
+	if s.conn != nil {
+		s.conn.Close()
+	}
 }
