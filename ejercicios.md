@@ -202,3 +202,9 @@ Una vez el servidor inició la cantidad esperada de clientes, este cierra su soc
 Dentro del método `Server._handle_client_connection`, se reciben mensajes hasta recibir la confirmación del cliente de que no va a enviar más mensajes de apuestas, entonces entra en `Server._send_winners`.
 
 Aquí se hace uso del `Lock` y la `Barrier`, donde la barrera sirve para sincronizar a todos los clientes a esperar a que todos confirmen haber enviado a todas sus apuestas. Una vez se rompe la barrera, los subprocesos compiten por el lock del archivo de apuestas del servidor para calcular sus ganadores y ser enviados al respectivo cliente.
+
+Para pasar los tests se hizo uso de un `sleep` al final de la ejecución del servidor, no es utilizado para sincronizar procesos.
+
+### Ejecución
+
+Para ejecutar el ejemplo, es igual que los otros ejercicios. El archivo `docker-compose-dev.yaml` está configurado con 5 clientes.
