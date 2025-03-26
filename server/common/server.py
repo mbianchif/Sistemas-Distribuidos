@@ -7,13 +7,14 @@ class Server:
     def __init__(self, port, listen_backlog):
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_shutdown = False
+        self._server_socket.bind(('', port))
+        self._server_socket.listen(listen_backlog)
 
         def term_handler(_signum, _stacktrace):
             self._server_shutdown = True
+            self._server_socket.close()
 
         signal.signal(signal.SIGTERM, term_handler)
-        self._server_socket.bind(('', port))
-        self._server_socket.listen(listen_backlog)
 
     def run(self):
         """
@@ -26,8 +27,6 @@ class Server:
         while not self._server_shutdown:
             with self.__accept_new_connection() as client_sock:
                 self.__handle_client_connection(client_sock)
-
-        self._server_socket.close()
 
     def __handle_client_connection(self, client_sock):
         """
