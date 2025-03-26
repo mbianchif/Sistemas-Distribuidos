@@ -16,6 +16,7 @@ echo "  server:
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
+      - NCLIENTS=$2
     networks:
       - testing_net
     volumes:

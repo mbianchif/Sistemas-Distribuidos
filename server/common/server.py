@@ -5,8 +5,9 @@ from common.utils import store_bets
 
 
 class Server:
-    def __init__(self, port, listen_backlog):
+    def __init__(self, port, listen_backlog, nclients):
         self._listener = BetSockListener.bind("", port, listen_backlog)
+        self._nclients = nclients
         self._shutdown = False
 
         def term_handler(_signum, _stacktrace):
@@ -16,10 +17,12 @@ class Server:
         signal.signal(signal.SIGTERM, term_handler)
 
     def run(self):
-        while not self._shutdown:
+        served = 0
+        while not self._shutdown and served < self._nclients:
             try:
                 stream = self._accept_new_connection()
                 self._handle_client_connection(stream)
+                served += 1
             except OSError as e:
                 logging.error(f"action: run_server | result: fail | error: {e}")
                 break
