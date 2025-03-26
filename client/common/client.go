@@ -39,6 +39,8 @@ func (c *Client) createClientSocket() {
 
 func (c *Client) StartClientLoop(betPath string) {
 	sigs := make(chan os.Signal, 1)
+    defer close(sigs)
+
 	signal.Notify(sigs, syscall.SIGTERM)
 	id := c.config.ID
 
