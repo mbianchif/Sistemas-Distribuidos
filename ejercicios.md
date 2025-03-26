@@ -60,3 +60,62 @@ Para este ejercicio y el siguiente el cliente implementa el lado de escritura y 
 
 La apuesta es representada por sus campos en el mismo orden en el que están definidos en la clase `Bet` dentro de `common/utils.py` de forma que sea sencillo de deserializar. Los campos se guardan en formato string y están serparados por una `,`.
 
+### Ejecución
+
+Para la ejecución del mismo es suficiente con correr el siguiente comando
+
+```sh
+make docker-compose-up
+```
+
+El archivo `docker-compose-dev.yaml` está configurado para correr con un solo cliente, en caso de querer correr con más habra que correr el comando del `Ejercicio 1` para más clientes.
+
+Para ver los logs del sistema se puede correr el comando
+
+```sh
+make docker-compose-logs
+```
+
+## Ejercicio 6
+
+Se implementó el envío de mensajes por baches. Para esto se utilizaron los _volumes_ de docker para evitar que los archivos de datos formen parte de la imágen de docker y se implementó el siguiente protocolo.
+
+### Protocolo
+
+#### Mensaje
+
+```terminal
++------------+-------+--------+-----+-----+-------+--------+
+| BATCHCOUNT | SIZE1 | BATCH1 | ... | ... | SIZEN | BATCHN |
++------------+-------+--------+-----+-----+-------+--------+
+```
+
+- BATCHCOUNT: 4 bytes que establecen la cantidad de baches del mensaje. 
+- SIZEi: 4 bytes que establecen el largo del bache en bytes.
+- BATCHi: Datos del i-ésimo bache.
+
+#### Batch
+
+```terminal
++-------------------+
+| BET1 ; ... ; BETN |
++-------------------+
+```
+
+- BETi: Datos de la i-ésima apuesta.
+
+Las apuestas están separadas por un delimitador, elegí separarlas por `;`.
+
+#### Bet
+
+```terminal
++---------------------------------------------------+
+| Agency , Name , Surname , Id , Birthdate , Number |
++---------------------------------------------------+
+```
+
+Los campos de cada apuesta están separadas por un delimitador, elegí separarlos por `,`.
+
+### Ejecución
+
+Para la ejecución
