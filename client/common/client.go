@@ -37,14 +37,16 @@ func (c *Client) createClientSocket() error {
 		)
 	}
 	c.conn = conn
-	return nil
+	return err
 }
 
 func (c *Client) StartClientLoop() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM)
 
-    c.createClientSocket()
+    if c.createClientSocket() != nil {
+        return
+    }
     defer c.conn.Close()
 
     msg := Bet{
