@@ -63,7 +63,9 @@ func (c *Client) StartClientLoop() {
 		case _ = <-sigs:
             return
 		default:
-			c.createClientSocket()
+            if c.createClientSocket() != nil {
+                return
+            }
 		}
 
 		// TODO: Modify the send to avoid short-write
