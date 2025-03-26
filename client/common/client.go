@@ -106,5 +106,7 @@ func (c *Client) StartClientLoop(betPath string) {
 		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
 	}
 
+    // Este Sleep está para que se flusheen los
+    // logs antes de que tire exit el proceso.
     time.Sleep(time.Duration(5) * time.Second)
 }
