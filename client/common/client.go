@@ -29,16 +29,19 @@ func NewClient(config ClientConfig) *Client {
 	return client
 }
 
-func (c *Client) createClientSocket() {
+func (c *Client) createClientSocket() error {
 	conn, err := BetSockConnect(c.config.ServerAddress)
 	if err != nil {
 		log.Criticalf("action: connect | result: fail | client_id: %v | error: %v", c.config.ID, err)
 	}
 	c.conn = conn
+    return err
 }
 
 func (c *Client) StartClientLoop(betPath string) {
 	sigs := make(chan os.Signal, 1)
+    defer close(sigs)
+
 	signal.Notify(sigs, syscall.SIGTERM)
 	id := c.config.ID
 
@@ -48,7 +51,9 @@ func (c *Client) StartClientLoop(betPath string) {
 	}
 	defer betFile.Close()
 
-	c.createClientSocket()
+	if c.createClientSocket() != nil {
+        return
+    }
 	defer c.conn.Close()
 
 	betFileReader := csv.NewReader(betFile)
