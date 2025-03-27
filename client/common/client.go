@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/op/go-logging"
 )
@@ -87,4 +88,6 @@ func (c *Client) StartClientLoop(betPath string) {
     } else {
         log.Infof("action: send_batch | result: success | client_id: %v", id)
 	}
+
+    time.Sleep(time.Duration(1) * time.Second)
 }
