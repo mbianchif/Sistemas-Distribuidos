@@ -90,6 +90,7 @@ func (c *Client) StartClientLoop(betPath string) {
 			return
 		default:
 			if len(bets) == c.config.MaxBatchAmount {
+				c.SendBets(bets)
 				bets = make([]Bet, 0, c.config.MaxBatchAmount)
 			}
 		}

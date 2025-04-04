@@ -80,13 +80,6 @@ func (s BetSockStream) PeerAddr() net.Addr {
 	return s.conn.RemoteAddr()
 }
 
-func minInt(a int, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func (s *BetSockStream) SendBets(bets []Bet) error {
 	writer := bufio.NewWriter(s.conn)
 

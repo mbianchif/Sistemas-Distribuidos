@@ -3,7 +3,7 @@ import logging
 from socket import SHUT_RD
 from multiprocessing import Barrier, Lock, Process
 from time import sleep
-from common.protocol import BetSockListener, BetSockStream, KIND_BATCH, KIND_CONFIRM
+from common.protocol import BetSockListener, KIND_BATCH, KIND_CONFIRM
 from common.utils import has_won, load_bets, store_bets
 
 
