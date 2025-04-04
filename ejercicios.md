@@ -187,6 +187,8 @@ Decidí parsear los DNI y enviarlos como enteros, concluyendo en la siguiente es
 
 Para ejecutar el ejemplo, es otra vez igual, utilizando el mismo comando de las otras veces. El archivo `docker-compose-dev.yaml` está configurado con 5 clientes, en caso de querer cambiarlo se puede utilizar el archivo generador el primer ejercicio.
 
+# Parte 3
+
 ## Ejercicio 8
 
 Se modificó la implementación del servidor para que pueda responder en paralelo a las consultas de los clientes. Para ello se utilizaron las siguientes primitivas de sincronización.
