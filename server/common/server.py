@@ -1,5 +1,6 @@
 import signal
 import logging
+from socket import SHUT_RD
 from multiprocessing import Barrier, Lock, Process
 from time import sleep
 from common.protocol import BetSockListener, BetSockStream, KIND_BATCH, KIND_CONFIRM
@@ -16,6 +17,7 @@ class Server:
 
         def term_handler(_signum, _stacktrace):
             self._shutdown = True
+            self._listener.shutdown(SHUT_RD)
 
         signal.signal(signal.SIGTERM, term_handler)
 
@@ -24,6 +26,9 @@ class Server:
 
         while not self._shutdown and len(clients) < self._nclients:
             stream = self._accept_new_connection()
+            if stream is None:
+                continue
+
             child = Process(
                 name=str(stream.id),
                 target=self._handle_client_connection,
@@ -70,8 +75,12 @@ class Server:
 
         client.send_winner_count(winners)
 
-    def _accept_new_connection(self) -> BetSockStream:
+    def _accept_new_connection(self) -> BetSockStream | None:
         logging.info("action: accept_connections | result: in_progress")
-        conn, addr = self._listener.accept()
+        try:
+            conn, addr = self._listener.accept()
+        except OSError:
+            return None
+
         logging.info(f"action: accept_connections | result: success | ip: {addr[0]}")
         return conn

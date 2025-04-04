@@ -113,5 +113,8 @@ class BetSockListener:
         id = int.from_bytes(id_bytes, "big")
         return BetSockStream(skt, id), addr
 
+    def shutdown(self, how: int):
+        self._skt.shutdown(how)
+
     def close(self):
         self._skt.close()
