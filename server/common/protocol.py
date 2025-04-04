@@ -4,7 +4,6 @@ from common.utils import Bet
 
 BET_DELIMITER = ";"
 BATCH_SIZE_SIZE = 4
-BATCH_COUNT_SIZE = 4
 ID_SIZE = 1
 MESSAGE_KIND_SIZE = 1
 DNI_COUNT_SIZE = 4
@@ -51,18 +50,14 @@ class BetSockStream:
         self.id = id
 
     def _recv_batch(self) -> list[Bet]:
-        nbatches_bytes = _recv_all(self._skt, BATCH_COUNT_SIZE)
-        nbatches = int.from_bytes(nbatches_bytes, "big")
+        batch_size_bytes = _recv_all(self._skt, BATCH_SIZE_SIZE)
+        batch_size = int.from_bytes(batch_size_bytes, "big")
+        batch_bytes = _recv_all(self._skt, batch_size)
+
         bets = []
-
-        for _ in range(nbatches):
-            batch_size_bytes = _recv_all(self._skt, BATCH_SIZE_SIZE)
-            batch_size = int.from_bytes(batch_size_bytes, "big")
-
-            batch_bytes = _recv_all(self._skt, batch_size)
-            for bet_bytes in batch_bytes.split(BET_DELIMITER.encode()):
-                bet = Bet.from_bytes(bet_bytes)
-                bets.append(bet)
+        for bet_bytes in batch_bytes.split(BET_DELIMITER.encode()):
+            bet = Bet.from_bytes(bet_bytes)
+            bets.append(bet)
 
         return bets
 

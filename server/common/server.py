@@ -51,7 +51,11 @@ class Server:
 
     def _handle_client_connection(self, client, file_lock, barrier):
         while True:
-            msg = client.recv()
+            try:
+                msg = client.recv()
+            except OSError:
+                logging.info(f"action: cierre_inesperado | result: failure")
+                break
 
             if msg.kind == KIND_CONFIRM:
                 logging.info(f"action: confirmacion_recibida | result: success")

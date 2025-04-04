@@ -37,6 +37,16 @@ func (c *Client) createClientSocket() {
 	c.conn = conn
 }
 
+func (c *Client) SendBets(bets []Bet) {
+	id := c.conn.id
+	err := c.conn.SendBets(bets)
+	if err != nil {
+		log.Errorf("action send_batch | result: fail | client_id: %v | error: %v", id, err)
+	} else {
+		log.Infof("action send_batch | result: success | client_id: %v", id)
+	}
+}
+
 func (c *Client) StartClientLoop(betPath string) {
 	sigs := make(chan os.Signal, 1)
 	defer close(sigs)
@@ -55,11 +65,14 @@ func (c *Client) StartClientLoop(betPath string) {
 	defer c.conn.Close()
 
 	betFileReader := csv.NewReader(betFile)
-	bets := make([]Bet, 0)
+	bets := make([]Bet, 0, c.config.MaxBatchAmount)
 
 	for {
 		line, err := betFileReader.Read()
 		if err != nil {
+			if len(bets) > 0 {
+				c.SendBets(bets)
+			}
 			break
 		}
 
@@ -71,19 +84,15 @@ func (c *Client) StartClientLoop(betPath string) {
 			Birthdate: line[3],
 			Number:    line[4],
 		})
-	}
 
-	select {
-	case _ = <-sigs:
-		return
-	default:
-		err = c.conn.SendBets(bets, c.config.MaxBatchAmount)
-	}
-
-	if err != nil {
-		log.Errorf("action send_batch | result: fail | client_id: %v | error: %v", id, err)
-	} else {
-		log.Infof("action send_batch | result: success | client_id: %v", id)
+		select {
+		case _ = <- sigs:
+			return
+		default:
+			if len(bets) == c.config.MaxBatchAmount {
+				bets = make([]Bet, 0, c.config.MaxBatchAmount)
+			}
+		}
 	}
 
 	if err = c.conn.Confirm(); err != nil {
@@ -106,7 +115,7 @@ func (c *Client) StartClientLoop(betPath string) {
 		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
 	}
 
-    // Este Sleep está para que se flusheen los
-    // logs antes de que tire exit el proceso.
-    time.Sleep(time.Duration(5) * time.Second)
+	// Este Sleep está para que se flusheen los
+	// logs antes de que tire exit el proceso.
+	time.Sleep(time.Duration(5) * time.Second)
 }

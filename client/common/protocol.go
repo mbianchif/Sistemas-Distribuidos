@@ -20,7 +20,6 @@ const (
 const DELIMITER = ","
 const BET_DELIMITER = ";"
 const BATCH_SIZE_SIZE = 4
-const BATCH_COUNT_SIZE = 4
 const ID_SIZE = 1
 const MESSAGE_KIND_SIZE = 1
 const DNI_COUNT_SIZE = 4
@@ -88,43 +87,25 @@ func minInt(a int, b int) int {
 	return b
 }
 
-func Batch(arr []Bet, r int) [][]Bet {
-	res := make([][]Bet, 0)
-	for i := 0; i < len(arr); i += r {
-		start := i
-		end := minInt(len(arr), i+r)
-		res = append(res, arr[start:end])
-	}
-	return res
-}
-
-func (s *BetSockStream) SendBets(bets []Bet, batchSize int) error {
+func (s *BetSockStream) SendBets(bets []Bet) error {
 	writer := bufio.NewWriter(s.conn)
-	batches := Batch(bets, batchSize)
 
 	// Write message kind
 	writer.Write([]byte{KIND_BATCH})
 
-	// Write batch count
-	nbatches := len(batches)
-	nbatchesBytes := make([]byte, BATCH_COUNT_SIZE)
-	binary.BigEndian.PutUint32(nbatchesBytes, uint32(nbatches))
-	writer.Write(nbatchesBytes)
-
-	for _, batch := range batches {
-		betsEncoded := make([][]byte, 0)
-		for _, bet := range batch {
-			betsEncoded = append(betsEncoded, bet.Encode())
-		}
-		batchBytes := bytes.Join(betsEncoded, []byte(BET_DELIMITER))
-
-		// Write batch size and data
-		batchSize := len(batchBytes)
-		batchSizeBytes := make([]byte, BATCH_SIZE_SIZE)
-		binary.BigEndian.PutUint32(batchSizeBytes, uint32(batchSize))
-		writer.Write(batchSizeBytes)
-		writer.Write(batchBytes)
+	// Encode batch
+	betsEncoded := make([][]byte, 0)
+	for _, bet := range bets {
+		betsEncoded = append(betsEncoded, bet.Encode())
 	}
+	batchBytes := bytes.Join(betsEncoded, []byte(BET_DELIMITER))
+
+	// Write batch size and data
+	batchSize := len(batchBytes)
+	batchSizeBytes := make([]byte, BATCH_SIZE_SIZE)
+	binary.BigEndian.PutUint32(batchSizeBytes, uint32(batchSize))
+	writer.Write(batchSizeBytes)
+	writer.Write(batchBytes)
 
 	if err := writer.Flush(); err != nil {
 		return fmt.Errorf("couldn't send message: %v", err)

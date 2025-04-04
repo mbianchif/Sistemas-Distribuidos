@@ -135,14 +135,13 @@ Los mensajes de apuesta y confirmación, llevan un byte por delante que aclara q
 #### Mensaje de Apuesta
 
 ```terminal
-+------------+-------+--------+-----+-----+-------+--------+
-| BATCHCOUNT | SIZE1 | BATCH1 | ... | ... | SIZEN | BATCHN |
-+------------+-------+--------+-----+-----+-------+--------+
++-------+-------+
+| SIZE1 | BATCH |
++-------+-------+
 ```
 
-* `BATCHCOUNT`: 4 bytes que establecen la cantidad de baches del mensaje. 
 * `SIZEi`: 4 bytes dedicados a establecer el largo del bache en bytes.
-* `BATCHi`: Datos del i-ésimo bache.
+* `BATCH`: Datos del bache.
 
 #### Batch
 
