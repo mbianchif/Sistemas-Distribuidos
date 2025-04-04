@@ -79,7 +79,7 @@ class Server:
 
         client.send_winner_count(winners)
 
-    def _accept_new_connection(self) -> BetSockStream | None:
+    def _accept_new_connection(self):
         logging.info("action: accept_connections | result: in_progress")
         try:
             conn, addr = self._listener.accept()
