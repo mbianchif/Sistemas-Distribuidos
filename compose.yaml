@@ -6,4 +6,10 @@ services:
     image: client:latest
     env_file: src/client/.env
     volumes:
-      - ./.data:/.data
+      - .data:/data
+
+  gateway:
+    container_name: gateway
+    build: src/gateway
+    image: gateway:latest
+    env_file: src/gateway/.env
