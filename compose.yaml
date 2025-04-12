@@ -1,5 +1,13 @@
 name: moviesanalyzer
 services:
+  gateway:
+    container_name: gateway
+    build: src/gateway
+    image: gateway:latest
+    env_file: src/gateway/.env
+    ports:
+      - 9090:9090
+
   client:
     container_name: client
     build: src/client
@@ -7,9 +15,5 @@ services:
     env_file: src/client/.env
     volumes:
       - .data:/data
-
-  gateway:
-    container_name: gateway
-    build: src/gateway
-    image: gateway:latest
-    env_file: src/gateway/.env
+    depends_on:
+      - gateway
