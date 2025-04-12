@@ -1,0 +1,9 @@
+name: moviesanalyzer
+services:
+  client:
+    container_name: client
+    build: src/client
+    image: client:latest
+    env_file: src/client/.env
+    volumes:
+      - ./.data:/.data
