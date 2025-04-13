@@ -31,12 +31,19 @@ func Connect(ip string, port uint16) (*CsvTransferStream, error) {
 
 func (s *CsvTransferStream) sendBatch(writer *bufio.Writer, lines [][]byte) error {
 	writer.WriteByte(MSG_BATCH)
+	err := writer.Flush()
+	if err != nil {
+		return fmt.Errorf("couldn't send batch")
+	}
 
 	quantBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(quantBytes, uint32(len(lines)))
 	writer.Write(quantBytes)
 
 	for _, line := range lines {
+		if len(line) == 0 || line[len(line)-1] != '\n' {
+			line = append(line, '\n')
+		}
 		writer.Write(line)
 	}
 
@@ -58,7 +65,16 @@ func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) e
 	for {
 		line, err = reader.ReadBytes('\n')
 		if err == io.EOF {
-			err = s.sendBatch(writer, lines)
+			if len(line) > 0 {
+				lines = append(lines, line)
+			}
+			if len(lines) > 0 {
+				err = s.sendBatch(writer, lines)
+				if err != nil {
+					break
+				}
+			}
+			err = nil
 			break
 		}
 
@@ -78,7 +94,11 @@ func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) e
 
 	if err != nil {
 		writer.WriteByte(MSG_ERR)
-		return writer.Flush()
+		errFlush := writer.Flush()
+		if errFlush != nil {
+			return fmt.Errorf("couldn't send error")
+		}
+		return err
 	}
 
 	writer.WriteByte(MSG_FIN)

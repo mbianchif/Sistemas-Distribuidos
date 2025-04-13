@@ -2,8 +2,21 @@ from protocol.socket import CsvTransferListener, CsvTransferStream, MSG_BATCH, M
 from config.config import Config
 import logging
 
+def configLogging():
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler("gateway.log"),
+            logging.StreamHandler()
+        ]
+    )
+    logging.info("Logging configured")
+
 def main():
     con = Config()
+    configLogging()
+
     lis = CsvTransferListener.bind(con.host, con.port)
 
     logging.info(f"Waiting for connections...")
@@ -31,6 +44,7 @@ def main():
                 return
             else:
                 logging.critical(f"An unknown msg kind was received {msg.kind}")
+                return
     
     logging.info("File upload was successfull")
     

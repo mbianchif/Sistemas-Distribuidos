@@ -40,6 +40,7 @@ func main() {
 			break
 		}
 	}
+	log.Debugf("Se mandó todo")
 
 	// log.Infof("Waiting for results")
 	// for range 5 {

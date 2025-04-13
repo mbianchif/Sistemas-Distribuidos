@@ -44,10 +44,15 @@ class CsvTransferStream:
         batch_size_bytes = _recv_all(self._skt, 4)
         batch_size = int.from_bytes(batch_size_bytes, "big")
 
-        lines = [0] * batch_size
-        reader = io.BufferedReader(self._skt.makefile("rb"))
-        for i in range(batch_size):
-            lines[i] = reader.readline()
+        lines = []
+        for _ in range(batch_size):
+            line = bytearray()
+            while True:
+                ch = _recv_all(self._skt, 1)
+                line.extend(ch)
+                if ch == b'\n':
+                    break
+            lines.append(line)
 
         return Message(msg_kind, lines)
 
