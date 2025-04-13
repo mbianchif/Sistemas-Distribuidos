@@ -2,17 +2,17 @@ name: moviesanalyzer
 services:
   gateway:
     container_name: gateway
-    build: src/gateway
+    build: gateway
     image: gateway:latest
-    env_file: src/gateway/.env
+    env_file: gateway/.env
     ports:
       - 9090:9090
 
   client:
     container_name: client
-    build: src/client
+    build: client
     image: client:latest
-    env_file: src/client/.env
+    env_file: client/.env
     volumes:
       - .data:/data
     depends_on:

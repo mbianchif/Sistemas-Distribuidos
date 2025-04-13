@@ -1,17 +1,15 @@
 import os
+import logging
 
 class Config:
     def __init__(self):
-        self.host = os.getenv("HOST")
-        if not self.host:
-            self.host = ""
-        
-        port_var = os.getenv("PORT")
-        if not port_var:
-            raise ValueError("no port was given")
+        self.host = os.getenv("HOST", "")
+
+        log_level = os.getenv("LOG_LEVEL", "DEBUG").upper()
+        self.log_level = getattr(logging, log_level) or logging.DEBUG
 
         try:
-            self.port = int(port_var)
+            self.port = int(os.getenv("PORT", "9090"))
         except ValueError as e:
             raise ValueError("the given port is not a number") from e
 

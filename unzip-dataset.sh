@@ -13,8 +13,13 @@ done
 
 # Extract files
 unzip -j $DIR/$ZIP "movies_metadata.csv" -d $DIR
-unzip -j $DIR/$ZIP "ratings.csv" -d $DIR
 unzip -j $DIR/$ZIP "credits.csv" -d $DIR
+unzip -j $DIR/$ZIP "ratings.csv" -d $DIR
+
+# Remove first line
+sed -i "1d" "$DIR/movies_metadata.csv"
+sed -i "1d" "$DIR/credits.csv"
+sed -i "1d" "$DIR/ratings.csv"
 
 # Make small versions of the dataset if n was provided
 if [ $# -eq 1 ]; then

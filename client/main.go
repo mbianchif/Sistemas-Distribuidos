@@ -11,11 +11,21 @@ import (
 
 var log = logging.MustGetLogger("log")
 
+func configLog(logLevel logging.Level) {
+	backend := logging.NewLogBackend(os.Stderr, "", 0)
+	format := logging.MustStringFormatter(`%{time:2006-01-02 15:04:05}	%{level:.4s}	%{message}`)
+	backendFormatter := logging.NewBackendFormatter(backend, format)
+	backendLeveled := logging.AddModuleLevel(backendFormatter)
+	logging.SetLevel(logLevel, "log")
+	logging.SetBackend(backendLeveled)
+}
+
 func main() {
 	con, err := config.Create()
 	if err != nil {
 		log.Fatalf("Couldn't read envars: %v", err)
 	}
+	configLog(con.LogLevel)
 
 	skt, err := protocol.Connect(con.GatewayHost, con.GatewayPort)
 	if err != nil {
@@ -23,6 +33,7 @@ func main() {
 		log.Fatalf("Can't connect with gateway: %v", err)
 	}
 	defer skt.Close()
+	log.Infof("Connected to gateway server")
 
 	files := []string{"movies_metadata.csv", "credits.csv", "ratings.csv"}
 	for id, filename := range files {
@@ -34,7 +45,7 @@ func main() {
 		}
 		defer fp.Close()
 
-		log.Debugf("Sending file %s", filename)
+		log.Debugf("Sending %s", filename)
 		if err = skt.SendFile(fp, uint8(id), con.BatchSize); err != nil {
 			log.Criticalf("Couldn't send batch of file %s: %v", filename, err)
 			break

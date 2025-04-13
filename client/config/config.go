@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
+
+	"github.com/op/go-logging"
 )
 
 type Config struct {
@@ -12,6 +15,7 @@ type Config struct {
 	GatewayPort uint16
 	DataPath    string
 	Storage     string
+	LogLevel    logging.Level
 }
 
 func Create() (*Config, error) {
@@ -40,11 +44,18 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("no storage path was proviced")
 	}
 
+	logLevelVar := strings.ToUpper(os.Getenv("LOG_LEVEL"))
+	logLevel, err := logging.LogLevel(logLevelVar)
+	if err != nil {
+		logLevel = logging.DEBUG
+	}
+
 	return &Config{
 		BatchSize:   batchSize,
 		GatewayHost: gatewayHost,
 		GatewayPort: uint16(gatewayPort),
 		DataPath:    dataPath,
 		Storage:     storage,
+		LogLevel:    logLevel,
 	}, nil
 }

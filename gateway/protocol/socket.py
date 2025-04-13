@@ -1,6 +1,5 @@
 import socket
-from typing import Self
-import io
+from typing import Self, Any
 
 # Files
 FILE_MOVIES  = 0
@@ -22,7 +21,7 @@ def _recv_all(skt: socket.socket, n: int) -> bytearray:
     return data
 
 class Message:
-    def __init__(self, kind: int, data: bytearray):
+    def __init__(self, kind: int, data: Any):
         self.kind = kind
         self.data = data
 
@@ -35,7 +34,7 @@ class CsvTransferStream:
         file_id = int.from_bytes(file_id_bytes, "big")
         return ["movies_metadata.csv", "credits.csv", "ratings.csv"][file_id]
 
-    def recv(self):
+    def recv(self) -> Message:
         msg_kind_bytes = _recv_all(self._skt, 1)
         msg_kind = int.from_bytes(msg_kind_bytes, "big")
         if msg_kind != MSG_BATCH:
@@ -46,13 +45,10 @@ class CsvTransferStream:
 
         lines = []
         for _ in range(batch_size):
-            line = bytearray()
-            while True:
-                ch = _recv_all(self._skt, 1)
-                line.extend(ch)
-                if ch == b'\n':
-                    break
-            lines.append(line)
+            len_bytes = _recv_all(self._skt, 4)
+            len = int.from_bytes(len_bytes, "big")
+            line = _recv_all(self._skt, len)
+            lines.append(line.decode())
 
         return Message(msg_kind, lines)
 
