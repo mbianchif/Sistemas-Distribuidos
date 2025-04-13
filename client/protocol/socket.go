@@ -67,7 +67,7 @@ func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) e
 		if err == io.EOF {
 			err = nil
 			if len(line) > 0 {
-				lines = append(lines, line)
+				lines = append(lines, line[:len(line)-1])
 			}
 			if len(lines) > 0 {
 				err = s.sendBatch(writer, lines)
@@ -108,5 +108,7 @@ func (s *CsvTransferStream) RecvQueryResult(storage string) (int, error) {
 }
 
 func (s *CsvTransferStream) Close() {
-	s.conn.Close()
+	if s != nil && s.conn != nil {
+		s.conn.Close()
+	}
 }

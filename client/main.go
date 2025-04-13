@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"time"
 
 	"client/config"
 	"client/protocol"
@@ -52,6 +53,9 @@ func main() {
 		}
 	}
 	log.Debugf("Se mandó todo")
+
+	// sleep temporal para que el servidor tenga tiempo de leer todo
+	time.Sleep(10 * time.Second)
 
 	// log.Infof("Waiting for results")
 	// for range 5 {
