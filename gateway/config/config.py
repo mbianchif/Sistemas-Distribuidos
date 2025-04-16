@@ -13,3 +13,7 @@ class Config:
         except ValueError as e:
             raise ValueError("the given port is not a number") from e
 
+        try:
+            self.backlog = int(os.getenv("BACKLOG", "0"))
+        except ValueError as e:
+            raise ValueError("the given backlog is not a number") from e
