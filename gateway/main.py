@@ -35,6 +35,7 @@ def main() -> int:
                 break
             elif msg.kind == MSG_BATCH:
                 # Enviar el archivo correspondiente a la cola de mensajes
+                print("Received", len(msg.data), "lines")
                 pass
             elif msg.kind == MSG_ERR:
                 logging.critical("An error occurred, exiting...")
