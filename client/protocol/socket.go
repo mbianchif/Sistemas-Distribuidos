@@ -2,8 +2,8 @@ package protocol
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"net"
 	"os"
@@ -31,10 +31,6 @@ func Connect(ip string, port uint16) (*CsvTransferStream, error) {
 
 func (s *CsvTransferStream) sendBatch(writer *bufio.Writer, lines [][]byte) error {
 	writer.WriteByte(MSG_BATCH)
-	err := writer.Flush()
-	if err != nil {
-		return fmt.Errorf("couldn't send batch")
-	}
 
 	quantBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(quantBytes, uint32(len(lines)))
@@ -50,43 +46,51 @@ func (s *CsvTransferStream) sendBatch(writer *bufio.Writer, lines [][]byte) erro
 	return writer.Flush()
 }
 
-func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) error {
+func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int, nlines int) error {
 	writer := bufio.NewWriter(s.conn)
 	writer.WriteByte(fileId)
-	if err := writer.Flush(); err != nil {
-		return fmt.Errorf("couldn't send file id")
-	}
 
 	reader := bufio.NewReader(fp)
 	lines := make([][]byte, 0, batchSize)
+	sentLines := 0
 
-	var line []byte
-	var err error
+	// Skip header line
+	line, err := reader.ReadBytes('\n')
 	for {
 		line, err = reader.ReadBytes('\n')
+		line = bytes.TrimSpace(line)
+		if len(line) > 0 {
+			lines = append(lines, line)
+		}
+
+		// File was read entirely
 		if err == io.EOF {
 			err = nil
-			if len(line) > 0 {
-				lines = append(lines, line[:len(line)-1])
-			}
 			if len(lines) > 0 {
 				err = s.sendBatch(writer, lines)
 			}
 			break
 		}
 
-		if err != nil {
+		// Read the wanted lines of the file
+		if nlines != -1 && sentLines + len(lines) == nlines {
+			if len(lines) > 0 {
+				err = s.sendBatch(writer, lines)
+			}
 			break
 		}
 
-		// Append line without \n
-		lines = append(lines, line[:len(line)-1])
+		// batchSize lines were read
 		if len(lines) == batchSize {
 			err = s.sendBatch(writer, lines)
 			if err != nil {
 				break
 			}
+			sentLines += len(lines)
 			lines = lines[:0]
+			if sentLines == nlines {
+				break
+			}
 		}
 	}
 
@@ -96,11 +100,7 @@ func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) e
 		writer.WriteByte(MSG_FIN)
 	}
 
-	if writer.Flush() != nil {
-		return fmt.Errorf("couldn't flush error")
-	}
-
-	return err
+	return writer.Flush()
 }
 
 func (s *CsvTransferStream) RecvQueryResult(storage string) (int, error) {

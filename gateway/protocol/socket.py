@@ -29,7 +29,7 @@ class CsvTransferStream:
     def __init__(self, skt: socket.socket):
         self._skt = skt
 
-    def filename(self):
+    def resource(self):
         file_id_bytes = _recv_all(self._skt, 1)
         file_id = int.from_bytes(file_id_bytes, "big")
         return ["movies_metadata.csv", "credits.csv", "ratings.csv"][file_id]

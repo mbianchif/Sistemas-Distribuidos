@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -24,7 +25,7 @@ func configLog(logLevel logging.Level) {
 func main() {
 	con, err := config.Create()
 	if err != nil {
-		log.Fatalf("Couldn't read envars: %v", err)
+		fmt.Fprintln(os.Stderr, "Couldn't read envars:", err)
 	}
 	configLog(con.LogLevel)
 
@@ -41,13 +42,13 @@ func main() {
 		path := con.DataPath + "/" + filename
 		fp, err := os.Open(path)
 		if err != nil {
-			log.Criticalf("Can't open file %s: %v", path, err)
+			log.Fatalf("Can't open file %s: %v", path, err)
 			break
 		}
 		defer fp.Close()
 
 		log.Debugf("Sending %s", filename)
-		if err = skt.SendFile(fp, uint8(id), con.BatchSize); err != nil {
+		if err = skt.SendFile(fp, uint8(id), con.BatchSize, con.Lines); err != nil {
 			log.Criticalf("Couldn't send batch of file %s: %v", filename, err)
 			break
 		}
