@@ -1,5 +1,17 @@
 name: moviesanalyzer
 services:
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:management
+    ports:
+      - 15672:15672
+    healthcheck:
+      test: rabbitmq-diagnostics check_port_connectivity
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 50s
+
   gateway:
     container_name: gateway
     build: gateway
@@ -7,6 +19,9 @@ services:
     env_file: gateway/.env
     ports:
       - 9090:9090
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
   client:
     container_name: client
@@ -18,15 +33,28 @@ services:
     depends_on:
       - gateway
 
-  filter::
-    container_name: filter
-    build: workers/filter
-    image: filter:latest
-    env_file: workers/.env
+  sanitize-movies:
+    container_name: sanitize
+    build: workers/sanitize
+    image: sanitize:latest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     environment:
-      - INPUT_QUEUES=
-      - OUTPUT_QUEUES=
-      - FILTER_RANGE=
-      - FILTER_CONTAINS=
-      - FILTER_LEN=
-      - FILTER_KEY=cast
+      # Rabbit configuration
+      - RABBIT_URL=amqp://guest:guest@rabbitmq:5672/
+      - INPUT_EXCHANGE_NAME=gateway
+      - INPUT_EXCHANGE_TYPE=direct
+      - INPUT_QUEUES=movies
+      - INPUT_QUEUE_KEYS=movies
+      - OUTPUT_EXCHANGE_NAME=sanitize_movies
+      - OUTPUT_EXCHANGE_TYPE=fanout
+      - OUTPUT_QUEUES=filter_release_date_[2000; ...)
+      - OUTPUT_QUEUE_KEYS=
+
+      # Worker
+      - SELECT=id,title,genres,release_date,overview,production_countries,spoken_languages,budget,revenue
+
+      # Sanitize
+      - HANDLER=movies
+
