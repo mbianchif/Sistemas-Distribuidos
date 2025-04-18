@@ -17,3 +17,16 @@ services:
       - .data:/data
     depends_on:
       - gateway
+
+  filter::
+    container_name: filter
+    build: workers/filter
+    image: filter:latest
+    env_file: workers/.env
+    environment:
+      - INPUT_QUEUES=
+      - OUTPUT_QUEUES=
+      - FILTER_RANGE=
+      - FILTER_CONTAINS=
+      - FILTER_LEN=
+      - FILTER_KEY=cast
