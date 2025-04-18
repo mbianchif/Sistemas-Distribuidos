@@ -1,17 +1,25 @@
 package main
 
-import "workers/sanitize/config"
+import (
+	"fmt"
+	"workers/sanitize/config"
+	impl "workers/sanitize/impl"
+)
 
 func main() {
 	con, err := config.Create()
 	if err != nil {
-		return
+		panic(err)
 	}
 
-	w, err := New(con)
+	w, err := impl.New(con)
 	if err != nil {
-		return
+		panic(err)
 	}
 
-	w.Run()
+	if err := w.Run(con); err != nil {
+		panic(err)
+	}
+
+	fmt.Println("todo ok")
 }

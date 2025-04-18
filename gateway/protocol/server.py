@@ -6,6 +6,7 @@ from protocol.socket import (
     MSG_FIN,
     MSG_ERR,
 )
+from rabbit.broker import Broker
 import logging
 import signal
 
@@ -14,6 +15,7 @@ class Server:
     def __init__(self, host: str, port: int, backlog: int = 0):
         self._lis = CsvTransferListener.bind(host, port, backlog)
         self._shutdown = False
+        self._broker = Broker()
 
         def term_handler(_signum, _stacktrace):
             self._shutdown = True
@@ -43,9 +45,12 @@ class Server:
                     logging.info(f"{filename} was successfully received")
                     break
                 elif msg.kind == MSG_BATCH:
-                    # Enviar el archivo correspondiente a la cola de mensajes
                     print("Received", len(msg.data), "lines")
-                    pass
+                    for line in msg.data:
+                        if filename == "movies":
+                            print(f"line: `{line}`")
+                        self._broker.publish(routing_key=filename, body=line)
+
                 elif msg.kind == MSG_ERR:
                     logging.critical("An error occurred, exiting...")
                     stream.close()

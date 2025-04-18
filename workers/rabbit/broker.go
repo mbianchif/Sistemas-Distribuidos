@@ -105,3 +105,15 @@ func (b *Broker) Consume(q amqp.Queue, consumer string) (<-chan amqp.Delivery, e
 		nil,   // args
 	)
 }
+
+func (b *Broker) Publish(exchangeName string, key string, body []byte) error {
+	return b.ch.Publish(
+		exchangeName,
+		key,
+		false, // mandatory
+		false, // immediate
+		amqp.Publishing{
+			ContentType: "application/octet-stream",
+			Body:        body,
+		})
+}

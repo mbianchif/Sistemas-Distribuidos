@@ -16,7 +16,7 @@ type Config struct {
 	OutputExchangeType string
 	OutputQueues       []string
 	OutputQueueKeys    []string
-	Select             []string
+	Select             map[string]struct{}
 }
 
 func Create() (*Config, error) {
@@ -63,11 +63,14 @@ func Create() (*Config, error) {
 	outputQueueKeysString := os.Getenv("OUTPUT_QUEUES_KEYS")
 	outputQueueKeys := strings.Split(outputQueueKeysString, ",")
 
-	columnsString := os.Getenv("SELECT")
-	if len(columnsString) == 0 {
+	selectString := os.Getenv("SELECT")
+	if len(selectString) == 0 {
 		return nil, fmt.Errorf("the select were not provided")
 	}
-	columns := strings.Split(columnsString, ",")
+	selectMap := make(map[string]struct{})
+	for _, field := range strings.Split(selectString, ",") {
+		selectMap[field] = struct{}{}
+	}
 
 	return &Config{
 		Url:                url,
@@ -79,6 +82,6 @@ func Create() (*Config, error) {
 		OutputExchangeType: outputExchangeType,
 		OutputQueues:       outputQueues,
 		OutputQueueKeys:    outputQueueKeys,
-		Select:             columns,
+		Select:             selectMap,
 	}, nil
 }

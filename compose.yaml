@@ -11,12 +11,20 @@ services:
       timeout: 3s
       retries: 10
       start_period: 50s
+    logging:
+      driver: none
 
   gateway:
     container_name: gateway
     build: gateway
     image: gateway:latest
     env_file: gateway/.env
+    environment:
+      # Rabbit configuration
+      - OUTPUT_EXCHANGE_NAME=gateway
+      - OUTPUT_EXCHANGE_TYPE=direct
+      - OUTPUT_QUEUES=movies,credits,ratings
+      - OUTPUT_QUEUE_KEYS=movies,credits,ratings
     ports:
       - 9090:9090
     depends_on:
@@ -34,19 +42,22 @@ services:
       - gateway
 
   sanitize-movies:
-    container_name: sanitize
-    build: workers/sanitize
+    container_name: sanitize-movies
     image: sanitize:latest
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
+    build:
+      context: workers
+      dockerfile: dockerfiles/sanitize.Dockerfile
     environment:
       # Rabbit configuration
       - RABBIT_URL=amqp://guest:guest@rabbitmq:5672/
+  
+      # Input
       - INPUT_EXCHANGE_NAME=gateway
       - INPUT_EXCHANGE_TYPE=direct
       - INPUT_QUEUES=movies
       - INPUT_QUEUE_KEYS=movies
+
+      # Output
       - OUTPUT_EXCHANGE_NAME=sanitize_movies
       - OUTPUT_EXCHANGE_TYPE=fanout
       - OUTPUT_QUEUES=filter_release_date_[2000; ...)
@@ -57,4 +68,7 @@ services:
 
       # Sanitize
       - HANDLER=movies
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 

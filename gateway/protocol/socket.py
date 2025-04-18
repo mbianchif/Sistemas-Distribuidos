@@ -32,7 +32,7 @@ class CsvTransferStream:
     def resource(self):
         file_id_bytes = _recv_all(self._skt, 1)
         file_id = int.from_bytes(file_id_bytes, "big")
-        return ["movies_metadata.csv", "credits.csv", "ratings.csv"][file_id]
+        return ["movies", "credits", "ratings"][file_id]
 
     def recv(self) -> Message:
         msg_kind_bytes = _recv_all(self._skt, 1)
