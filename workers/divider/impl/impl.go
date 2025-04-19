@@ -30,54 +30,56 @@ func (w *Divider) Run(con *config.DividerConfig, log *logging.Logger) error {
 		return err
 	}
 
-	handler := map[string]func(*Divider, map[string]string) (map[string]string, error){
-		"revenue_budget": handleRateBudget,
-	}[con.Handler]
-
-	log.Infof("Running with handler: %v", con.Handler)
-
+	log.Infof("Running")
 	for msg := range recvChan {
-		if len(msg.Body) == 0 {
-			log.Errorf("empty body received, rejecting message")
+		fieldMap, err := protocol.Decode(msg.Body)
+		if err != nil {
+			log.Errorf("failed to decode message: %v", err)
 			msg.Nack(false, false)
 			continue
 		}
 
-		decodedMsg, err := protocol.Decode(msg.Body)
-		if err != nil {
-			log.Errorf("failed to decode msg: ", err)
-			continue
-		}
-		responseFieldMap, err := handler(w, decodedMsg)
+		responseFieldMap, err := handleRateBudget(fieldMap)
 		if err != nil {
 			log.Errorf("failed to handle message: %v", err)
+			msg.Nack(false, false)
 			continue
 		}
 
-		body := protocol.Encode(responseFieldMap, con.Select)
-		outQKey := con.OutputQueueKeys[0]
-		if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
-			log.Errorf("failed to publish message: %v", err)
+		if responseFieldMap != nil {
+			body := protocol.Encode(responseFieldMap, con.Select)
+			outQKey := con.OutputQueueKeys[0]
+			if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
+				log.Errorf("failed to publish message: %v", err)
+			}
 		}
-	}
-	log.Info("Recv channel was closed")
 
+		msg.Ack(false)
+	}
+
+	log.Info("Recv channel was closed")
 	return nil
 }
 
-func handleRateBudget(w *Divider, msg map[string]string) (map[string]string, error) {
+func handleRateBudget(msg map[string]string) (map[string]string, error) {
 	revenueStr, ok := msg["revenue"]
 	if !ok {
 		return nil, fmt.Errorf("missing revenue field")
 	}
+
 	budgetStr, ok := msg["budget"]
 	if !ok {
 		return nil, fmt.Errorf("missing budget field")
 	}
+
 	revenue, err := strconv.Atoi(revenueStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert revenue to int: %v", err)
 	}
+	if revenue == 0 {
+		return nil, fmt.Errorf("revenue is 0")
+	}
+
 	budget, err := strconv.Atoi(budgetStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert budget to int: %v", err)

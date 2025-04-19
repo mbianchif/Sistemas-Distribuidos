@@ -31,6 +31,7 @@ func (w *Filter) Run(con *config.FilterConfig, log *logging.Logger) error {
 		return err
 	}
 
+	log.Infof("Running with handler: %v", con.Handler)
 	handler := map[string]func(*Filter, map[string]string, *config.FilterConfig) (map[string]string, error){
 		"range":    handleRange,
 		"contains": handleContains,
@@ -47,7 +48,7 @@ func (w *Filter) Run(con *config.FilterConfig, log *logging.Logger) error {
 
 		responseFieldMap, err := handler(w, fieldMap, con)
 		if err != nil {
-			log.Errorf("failed to handdle message: %v")
+			log.Errorf("failed to handle message: %v", err)
 			msg.Nack(false, false)
 			continue
 		}
