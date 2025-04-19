@@ -50,7 +50,7 @@ services:
     environment:
       # Rabbit configuration
       - RABBIT_URL=amqp://guest:guest@rabbitmq:5672/
-  
+
       # Input
       - INPUT_EXCHANGE_NAME=gateway
       - INPUT_EXCHANGE_TYPE=direct
@@ -60,7 +60,7 @@ services:
       # Output
       - OUTPUT_EXCHANGE_NAME=sanitize_movies
       - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUES=filter_release_date_[2000; ...)
+      - OUTPUT_QUEUES=filter_release_date_since_2000
       - OUTPUT_QUEUE_KEYS=
 
       # Worker
@@ -72,3 +72,36 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  filter-release_date:
+    container_name: filter-release_date
+    image: filter:latest
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    environment:
+      # Rabbit configuration
+      - RABBIT_URL=amqp://guest:guest@rabbitmq:5672/
+
+      # Input
+      - INPUT_EXCHANGE_NAME=sanitize_movies
+      - INPUT_EXCHANGE_TYPE=fanout
+      - INPUT_QUEUES=filter_release_date_since_2000
+      - INPUT_QUEUE_KEYS=
+
+      # Output
+      - OUTPUT_EXCHANGE_NAME=filter_release_date_since_2000
+      - OUTPUT_EXCHANGE_TYPE=fanout
+      - OUTPUT_QUEUES=filter_release_date_since_2000
+      - OUTPUT_QUEUE_KEYS=
+
+      # Worker
+      - SELECT=id,title,genres,release_date,overview,production_countries,spoken_languages,budget,revenue
+
+      # Filter
+      - FILTER_TYPE=range
+      - FILTER_KEY=release_date
+      - FILTER_VALUE=2000,
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy

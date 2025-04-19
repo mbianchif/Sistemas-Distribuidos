@@ -79,9 +79,12 @@ func Decode(data []byte) (map[string]string, error) {
 
 	for kv := range bytes.SplitSeq(data, []byte(";")) {
 		pair := bytes.Split(kv, []byte("="))
+		if len(pair) != 2 {
+			continue
+		}
 
 		keyNum, err := strconv.Atoi(string(pair[0]))
-		if err != nil {
+		if err != nil || keyNum >= len(id2Name) {
 			continue
 		}
 
