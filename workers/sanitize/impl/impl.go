@@ -42,7 +42,7 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 
 	log.Infof("Running with handler: %v", con.Handler)
 	for msg := range recvChan {
-		responseFieldMap, err := handler(w, msg) 
+		responseFieldMap, err := handler(w, msg)
 		if err != nil {
 			log.Errorf("failed to handle message: %v", err)
 			continue
@@ -82,10 +82,10 @@ func parseNamesFromJson(field string) ([]string, error) {
 func isValidRow(fields []string) bool {
 	for _, value := range fields {
 		if len(value) == 0 {
-			return false 
+			return false
 		}
 	}
-	return true 
+	return true
 }
 
 func handleMovie(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
@@ -153,9 +153,9 @@ func handleRating(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
 		return nil, err
 	}
 
-	fields := map[string]string {
-		"movieId": strings.TrimSpace(line[1]),
-		"rating":  strings.TrimSpace(line[2]),
+	fields := map[string]string{
+		"movieId":   strings.TrimSpace(line[1]),
+		"rating":    strings.TrimSpace(line[2]),
 		"timestamp": timestamp,
 	}
 
@@ -163,5 +163,25 @@ func handleRating(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
 }
 
 func handleCredit(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
-	return nil, nil
+	reader := csv.NewReader(strings.NewReader(string(del.Body)))
+	line, err := reader.Read()
+	if err != nil {
+		return nil, err
+	}
+
+	if !isValidRow(line) {
+		return nil, nil
+	}
+
+	cast, err := parseNamesFromJson(line[0])
+	if err != nil {
+		return nil, err
+	}
+
+	fields := map[string]string{
+		"id":   strings.TrimSpace(line[2]),
+		"cast": strings.Join(cast, ","),
+	}
+
+	return fields, nil
 }
