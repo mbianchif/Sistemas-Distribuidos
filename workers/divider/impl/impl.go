@@ -6,6 +6,8 @@ import (
 	"workers"
 	"workers/divider/config"
 	"workers/protocol"
+
+	"github.com/op/go-logging"
 )
 
 type Divider struct {
@@ -20,41 +22,44 @@ func New(con *config.DividerConfig) (*Divider, error) {
 	return &Divider{base}, nil
 }
 
-func (w *Divider) Run(con *config.DividerConfig) error {
+func (w *Divider) Run(con *config.DividerConfig, log *logging.Logger) error {
 	inputQueue := w.InputQueues[0]
 	recvChan, err := w.Broker.Consume(inputQueue, "")
 	if err != nil {
 		return err
 	}
 
-	handlers := map[string]func(*Divider, map[string]string) (map[string]string, error){
+	handler := map[string]func(*Divider, map[string]string) (map[string]string, error){
 		"revenue_budget": handleRateBudget,
-	}
+	}[con.Handler]
+
+	log.Infof("Running with handler: %v", con.Handler)
 
 	for msg := range recvChan {
 		if len(msg.Body) == 0 {
-			fmt.Println("Empty body received, rejecting message")
+			log.Errorf("empty body received, rejecting message")
 			msg.Nack(false, false)
 			continue
 		}
 
 		decodedMsg, err := protocol.Decode(msg.Body)
 		if err != nil {
-			fmt.Println("Failed tod decode msg: ", err)
+			log.Errorf("failed to decode msg: ", err)
 			continue
 		}
-		responseFieldMap, err := handlers[con.Handler](w, decodedMsg)
+		responseFieldMap, err := handler(w, decodedMsg)
 		if err != nil {
-			fmt.Println(err)
+			log.Errorf("failed to handle message: %v", err)
 			continue
 		}
 
 		body := protocol.Encode(responseFieldMap, con.Select)
-		outQKey := con.OutputQueueKeys[0] // direct
+		outQKey := con.OutputQueueKeys[0]
 		if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
-			// log
+			log.Errorf("failed to publish message: %v", err)
 		}
 	}
+	log.Info("Recv channel was closed")
 
 	return nil
 }
