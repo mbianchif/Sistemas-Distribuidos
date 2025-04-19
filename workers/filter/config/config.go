@@ -24,12 +24,12 @@ func Create() (*FilterConfig, error) {
 		return nil, fmt.Errorf("no filterType was provided")
 	}
 
-	filterKey := os.Getenv("FILTER_TYPE")
+	filterKey := os.Getenv("FILTER_KEY")
 	if len(filterKey) == 0 {
 		return nil, fmt.Errorf("no filterType was provided")
 	}
 
-	filterValue := os.Getenv("FILTER_TYPE")
+	filterValue := os.Getenv("FILTER_VALUE")
 	if len(filterValue) == 0 {
 		return nil, fmt.Errorf("no filterType was provided")
 	}

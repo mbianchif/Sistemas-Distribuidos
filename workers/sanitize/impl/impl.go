@@ -50,6 +50,7 @@ func (w *Sanitize) Run(con *config.SanitizeConfig) error {
 		if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
 			// log
 		}
+		msg.Ack(false)
 	}
 
 	return nil

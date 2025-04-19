@@ -2,7 +2,8 @@ package impl
 
 import (
 	"fmt"
-
+	"strconv"
+	"strings"
 	"workers"
 	"workers/filter/config"
 	"workers/protocol"
@@ -28,10 +29,10 @@ func (w *Filter) Run(con *config.FilterConfig) error {
 		return err
 	}
 
-	handlers := map[string]func(*Filter, map[string]string) (map[string]string, error){
+	handlers := map[string]func(*Filter, map[string]string, string, string) (map[string]string, error){
 		"range":    handleRange,
 		"contains": handleContains,
-		"length":   hanldeLength,
+		"length":   handleLength,
 	}
 
 	for msg := range recvChan {
@@ -46,12 +47,12 @@ func (w *Filter) Run(con *config.FilterConfig) error {
 			fmt.Println("Failed tod decode msg: ", err)
 			continue
 		}
-		responseFieldMap, err := handlers[con.FilterType](w, decodedMsg)
+		responseFieldMap, err := handlers[con.FilterType](w, decodedMsg, con.FilterKey, con.FilterValue)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
-
+		fmt.Println("responseFieldMap: ", responseFieldMap)
 		body := protocol.Encode(responseFieldMap, con.Select)
 		outQKey := con.OutputQueueKeys[0] // fanout
 		if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
@@ -63,24 +64,33 @@ func (w *Filter) Run(con *config.FilterConfig) error {
 	return nil
 }
 
-func hasEmptyValues(fields map[string]string) bool {
-	for _, value := range fields {
-		if value == "" {
-			return true
+func handleRange(w *Filter, msg map[string]string, filterColumn string, filterValue string) (map[string]string, error) {
+	rang, err := parseMathRange(filterValue)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range msg {
+		if k == filterColumn {
+			year, err := strconv.Atoi(strings.Split(v, "-")[0])
+			if err != nil {
+				return nil, fmt.Errorf("invalid year format")
+			}
+			if !rang.Contains(year) {
+				return nil, fmt.Errorf("value %d is not in range", year)
+			} else {
+				return msg, nil
+			}
 		}
 	}
-	return false
+
+	return nil, fmt.Errorf("column %s not found in message", filterColumn)
 }
 
-func handleRange(w *Filter, msg map[string]string) (map[string]string, error) {
-	fmt.Println("msg: ", msg)
+func handleLength(w *Filter, msg map[string]string, filterColumn string, filterValue string) (map[string]string, error) {
 	return nil, nil
 }
 
-func hanldeLength(w *Filter, msg map[string]string) (map[string]string, error) {
-	return nil, nil
-}
-
-func handleContains(w *Filter, msg map[string]string) (map[string]string, error) {
+func handleContains(w *Filter, msg map[string]string, filterColumn string, filterValue string) (map[string]string, error) {
 	return nil, nil
 }

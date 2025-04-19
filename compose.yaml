@@ -91,7 +91,7 @@ services:
       # Output
       - OUTPUT_EXCHANGE_NAME=filter_release_date_since_2000
       - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUES=filter_release_date_since_2000
+      - OUTPUT_QUEUES=join_credits
       - OUTPUT_QUEUE_KEYS=
 
       # Worker
@@ -100,7 +100,7 @@ services:
       # Filter
       - FILTER_TYPE=range
       - FILTER_KEY=release_date
-      - FILTER_VALUE=2000,
+      - FILTER_VALUE=[2000,)
 
     depends_on:
       rabbitmq:
