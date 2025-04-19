@@ -11,6 +11,7 @@ import (
 	"workers/sanitize/config"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/op/go-logging"
 )
 
 type Sanitize struct {
@@ -25,30 +26,33 @@ func New(con *config.SanitizeConfig) (*Sanitize, error) {
 	return &Sanitize{base}, nil
 }
 
-func (w *Sanitize) Run(con *config.SanitizeConfig) error {
+func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 	inputQueue := w.InputQueues[0]
 	recvChan, err := w.Broker.Consume(inputQueue, "")
 	if err != nil {
 		return err
 	}
 
-	handlers := map[string]func(*Sanitize, amqp.Delivery) (map[string]string, error){
+	handler := map[string]func(*Sanitize, amqp.Delivery) (map[string]string, error){
 		"movies":  handleMovie,
 		"credits": handleCredit,
 		"ratings": handleRating,
-	}
+	}[con.Handler]
 
+	log.Infof("Running with handler: %v", con.Handler)
 	for msg := range recvChan {
-		responseFieldMap, err := handlers[con.Handler](w, msg)
+		responseFieldMap, err := handler(w, msg) 
 		if err != nil {
-			fmt.Println(err)
+			log.Errorf("failed to handle message: %v", err)
 			continue
 		}
 
-		body := protocol.Encode(responseFieldMap, con.Select)
-		outQKey := con.OutputQueueKeys[0] // fanout
-		if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
-			// log
+		if responseFieldMap != nil {
+			body := protocol.Encode(responseFieldMap, con.Select)
+			outQKey := con.OutputQueueKeys[0]
+			if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
+				log.Errorf("failed to publish message: %v", err)
+			}
 		}
 	}
 
@@ -74,13 +78,13 @@ func parseNamesFromJson(field string) ([]string, error) {
 	return names, nil
 }
 
-func hasEmptyValues(fields map[string]string) bool {
+func isValidRow(fields map[string]string) bool {
 	for _, value := range fields {
-		if value == "" {
-			return true
+		if len(value) == 0 {
+			return false 
 		}
 	}
-	return false
+	return true 
 }
 
 func handleMovie(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
@@ -115,8 +119,8 @@ func handleMovie(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
 		"spoken_languages":     strings.Join(spokLangs, ","),
 	}
 
-	if hasEmptyValues(fields) {
-		return nil, fmt.Errorf("la linea tiene campos vacios")
+	if !isValidRow(fields) {
+		return nil, nil
 	}
 
 	return fields, nil

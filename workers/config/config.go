@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/op/go-logging"
 )
 
 type Config struct {
@@ -17,6 +19,15 @@ type Config struct {
 	OutputQueues       []string
 	OutputQueueKeys    []string
 	Select             map[string]struct{}
+}
+
+func configLog(logLevel logging.Level) {
+	backend := logging.NewLogBackend(os.Stderr, "", 0)
+	format := logging.MustStringFormatter(`%{time:2006-01-02 15:04:05}	%{level:.4s}	%{message}`)
+	backendFormatter := logging.NewBackendFormatter(backend, format)
+	backendLeveled := logging.AddModuleLevel(backendFormatter)
+	logging.SetLevel(logLevel, "log")
+	logging.SetBackend(backendLeveled)
 }
 
 func Create() (*Config, error) {
@@ -68,9 +79,16 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the select were not provided")
 	}
 	selectMap := make(map[string]struct{})
-	for _, field := range strings.Split(selectString, ",") {
+	for field := range strings.SplitSeq(selectString, ",") {
 		selectMap[field] = struct{}{}
 	}
+
+	logLevelVar := strings.ToUpper(os.Getenv("LOG_LEVEL"))
+	logLevel, err := logging.LogLevel(logLevelVar)
+	if err != nil {
+		logLevel = logging.DEBUG
+	}
+	configLog(logLevel)
 
 	return &Config{
 		Url:                url,

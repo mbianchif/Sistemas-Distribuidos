@@ -51,6 +51,9 @@ services:
       # Rabbit configuration
       - RABBIT_URL=amqp://guest:guest@rabbitmq:5672/
 
+      # Logging
+      - LOG_LEVEL=DEBUG
+
       # Input
       - INPUT_EXCHANGE_NAME=gateway
       - INPUT_EXCHANGE_TYPE=direct
@@ -81,6 +84,9 @@ services:
     environment:
       # Rabbit configuration
       - RABBIT_URL=amqp://guest:guest@rabbitmq:5672/
+
+      # Logging
+      - LOG_LEVEL=DEBUG
 
       # Input
       - INPUT_EXCHANGE_NAME=sanitize_movies
