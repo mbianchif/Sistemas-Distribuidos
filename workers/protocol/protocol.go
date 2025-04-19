@@ -26,6 +26,7 @@ var name2Id = map[string]int{
 	"cast": 12,
 
 	// Agregados
+	"rate_revenue_budget": 13,
 }
 
 var id2Name = []string{
@@ -47,6 +48,9 @@ var id2Name = []string{
 
 	// credits
 	"cast",
+
+	// Agregados
+	"rate_revenue_budget",
 }
 
 func Encode(fields map[string]string, filterCols map[string]struct{}) []byte {

@@ -60,7 +60,7 @@ services:
       # Output
       - OUTPUT_EXCHANGE_NAME=sanitize_movies
       - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUES=filter_release_date_since_2000
+      - OUTPUT_QUEUES=filter_release_date_since_2000,revenue_budget_divider
       - OUTPUT_QUEUE_KEYS=
 
       # Worker
@@ -102,6 +102,37 @@ services:
       - FILTER_KEY=release_date
       - FILTER_VALUE=2000,
 
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  revenue_budget_divider:
+    container_name: revenue_budget_divider
+    image: divider:latest
+    build:
+      context: workers
+      dockerfile: dockerfiles/divider.Dockerfile
+    environment:
+      # Rabbit configuration
+      - RABBIT_URL=amqp://guest:guest@rabbitmq:5672/
+
+      # Input
+      - INPUT_EXCHANGE_NAME=sanitize_movies
+      - INPUT_EXCHANGE_TYPE=fanout
+      - INPUT_QUEUES=revenue_budget_divider
+      - INPUT_QUEUE_KEYS=
+
+      # Output
+      - OUTPUT_EXCHANGE_NAME=revenue_budget_divider
+      - OUTPUT_EXCHANGE_TYPE=direct
+      - OUTPUT_QUEUES=revenue_budget_divider
+      - OUTPUT_QUEUE_KEYS=revenue_budget_divider
+
+      # Worker
+      - SELECT=id,title,genres,release_date,overview,production_countries,spoken_languages,budget,revenue
+
+      # Divider
+      - HANDLER=revenue_budget
     depends_on:
       rabbitmq:
         condition: service_healthy
