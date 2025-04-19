@@ -30,3 +30,7 @@ func New(con *config.Config) (*Worker, error) {
 		outputQueues,
 	}, nil
 }
+
+func (w *Worker) Close() {
+	w.Broker.DeInit()
+}
