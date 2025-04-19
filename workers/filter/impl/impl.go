@@ -94,7 +94,20 @@ func handleRange(w *Filter, msg map[string]string, con *config.FilterConfig) (ma
 }
 
 func handleLength(w *Filter, msg map[string]string, con *config.FilterConfig) (map[string]string, error) {
-	return nil, nil
+	length, err := strconv.Atoi(con.Value)
+	if err != nil {
+		return nil, fmt.Errorf("given length is not a number")
+	}
+	countries, ok := msg[con.Key]
+	if !ok {
+		return nil, fmt.Errorf("key %v is not in message", con.Key)
+	}
+	countryList := strings.Split(countries, ",")
+	if len(countryList) != length {
+		return nil, nil
+	}
+
+	return msg, nil
 }
 
 func handleContains(w *Filter, msg map[string]string, con *config.FilterConfig) (map[string]string, error) {

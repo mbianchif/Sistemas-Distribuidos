@@ -89,6 +89,36 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  filter-production_countries_length:
+    container_name: filter-production_countries_length
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    env_file: workers/.env
+    environment:
+      # Input
+      - INPUT_EXCHANGE_NAME=sanitize_movies
+      - INPUT_EXCHANGE_TYPE=fanout
+      - INPUT_QUEUE_NAMES=production_countries_length
+      - INPUT_QUEUE_KEYS=
+
+      # Output
+      - OUTPUT_EXCHANGE_NAME=production_countries_length
+      - OUTPUT_EXCHANGE_TYPE=fanout
+      - OUTPUT_QUEUE_NAMES=null
+      - OUTPUT_QUEUE_KEYS=
+
+      # Worker
+      - SELECT=production_countries,budget
+
+      # Filter
+      - HANDLER=length
+      - KEY=production_countries
+      - VALUE=1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   filter-release_date_since_2000:
     container_name: filter-release_date_since_2000
     build:
