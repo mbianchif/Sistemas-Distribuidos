@@ -39,7 +39,7 @@ func (w *Divider) Run(con *config.DividerConfig, log *logging.Logger) error {
 			continue
 		}
 
-		responseFieldMap, err := handleRateBudget(fieldMap)
+		responseFieldMap, err := handleDivide(fieldMap)
 		if err != nil {
 			log.Errorf("failed to handle message: %v", err)
 			msg.Nack(false, false)
@@ -47,6 +47,7 @@ func (w *Divider) Run(con *config.DividerConfig, log *logging.Logger) error {
 		}
 
 		if responseFieldMap != nil {
+			log.Debugf("fieldMap: %v", fieldMap)
 			body := protocol.Encode(responseFieldMap, con.Select)
 			outQKey := con.OutputQueueKeys[0]
 			if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
@@ -61,7 +62,7 @@ func (w *Divider) Run(con *config.DividerConfig, log *logging.Logger) error {
 	return nil
 }
 
-func handleRateBudget(msg map[string]string) (map[string]string, error) {
+func handleDivide(msg map[string]string) (map[string]string, error) {
 	revenueStr, ok := msg["revenue"]
 	if !ok {
 		return nil, fmt.Errorf("missing revenue field")
@@ -76,20 +77,18 @@ func handleRateBudget(msg map[string]string) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert revenue to int: %v", err)
 	}
-	if revenue == 0 {
-		return nil, fmt.Errorf("revenue is 0")
-	}
 
 	budget, err := strconv.Atoi(budgetStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert budget to int: %v", err)
 	}
-	if budget == 0 {
-		return nil, fmt.Errorf("budget is 0")
+
+	if revenue == 0 || budget == 0 {
+		return nil, nil
 	}
 
-	rate_revenue_budget := revenue / budget
-	msg["rate_revenue_budget"] = strconv.Itoa(rate_revenue_budget)
+	rate_revenue_budget := float64(revenue) / float64(budget)
+	msg["rate_revenue_budget"] = strconv.FormatFloat(rate_revenue_budget, 'f', 4, 32)
 
 	return msg, nil
 }
