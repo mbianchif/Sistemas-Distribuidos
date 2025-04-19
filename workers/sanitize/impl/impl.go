@@ -91,7 +91,7 @@ func parseNamesFromJson(field string) ([]string, error) {
 	return names, nil
 }
 
-func isValidRow(fields []string) bool {
+func isValidRow(fields map[string]string) bool {
 	for _, value := range fields {
 		if len(value) == 0 {
 			return false
@@ -101,10 +101,6 @@ func isValidRow(fields []string) bool {
 }
 
 func handleMovie(w *Sanitize, line []string) (map[string]string, error) {
-	if !isValidRow(line) {
-		return nil, nil
-	}
-
 	genres, err := parseNamesFromJson(line[3])
 	if err != nil {
 		return nil, err
@@ -130,6 +126,10 @@ func handleMovie(w *Sanitize, line []string) (map[string]string, error) {
 		"spoken_languages":     strings.Join(spokLangs, ","),
 	}
 
+	if !isValidRow(fields) {
+		return nil, nil
+	}
+
 	return fields, nil
 }
 
@@ -144,10 +144,6 @@ func parseTimestamp(timestamp string) (string, error) {
 }
 
 func handleRating(w *Sanitize, line []string) (map[string]string, error) {
-	if !isValidRow(line) {
-		return nil, nil
-	}
-
 	timestamp, err := parseTimestamp(line[3])
 	if err != nil {
 		return nil, err
@@ -159,14 +155,14 @@ func handleRating(w *Sanitize, line []string) (map[string]string, error) {
 		"timestamp": timestamp,
 	}
 
+	if !isValidRow(fields) {
+		return nil, nil
+	}
+
 	return fields, nil
 }
 
 func handleCredit(w *Sanitize, line []string) (map[string]string, error) {
-	if !isValidRow(line) {
-		return nil, nil
-	}
-
 	cast, err := parseNamesFromJson(line[0])
 	if err != nil {
 		return nil, err
@@ -175,6 +171,10 @@ func handleCredit(w *Sanitize, line []string) (map[string]string, error) {
 	fields := map[string]string{
 		"id":   strings.TrimSpace(line[2]),
 		"cast": strings.Join(cast, ","),
+	}
+
+	if !isValidRow(fields) {
+		return nil, nil
 	}
 
 	return fields, nil
