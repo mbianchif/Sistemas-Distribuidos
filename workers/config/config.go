@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/op/go-logging"
@@ -41,9 +42,11 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the input exchange name was not provided")
 	}
 
+	validExchangeTypes := []string{"direct", "fanout", "topic", "headers"}
+
 	inputExchangeType := os.Getenv("INPUT_EXCHANGE_TYPE")
-	if len(inputExchangeType) == 0 {
-		return nil, fmt.Errorf("the input exchange name was not provided")
+	if !slices.Contains(validExchangeTypes, inputExchangeType) {
+		return nil, fmt.Errorf("the input exchange type is invalid: %v", inputExchangeType)
 	}
 
 	inputQueuesString := os.Getenv("INPUT_QUEUES")
@@ -61,8 +64,8 @@ func Create() (*Config, error) {
 	}
 
 	outputExchangeType := os.Getenv("OUTPUT_EXCHANGE_TYPE")
-	if len(outputExchangeName) == 0 {
-		return nil, fmt.Errorf("th output exchange type was not provided")
+	if !slices.Contains(validExchangeTypes, outputExchangeType) {
+		return nil, fmt.Errorf("the output exchange type is invalid: %v", outputExchangeType)
 	}
 
 	outputQueuesString := os.Getenv("OUTPUT_QUEUES")

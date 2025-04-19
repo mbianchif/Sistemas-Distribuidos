@@ -45,6 +45,7 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 		responseFieldMap, err := handler(w, msg)
 		if err != nil {
 			log.Errorf("failed to handle message: %v", err)
+			msg.Nack(false, false)
 			continue
 		}
 
@@ -55,7 +56,10 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 				log.Errorf("failed to publish message: %v", err)
 			}
 		}
+
+		msg.Ack(false)
 	}
+	log.Info("Recv channel was closed")
 
 	return nil
 }
