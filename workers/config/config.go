@@ -49,7 +49,7 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the input exchange type is invalid: %v", inputExchangeType)
 	}
 
-	inputQueuesString := os.Getenv("INPUT_QUEUES")
+	inputQueuesString := os.Getenv("INPUT_QUEUE_NAMES")
 	if len(inputQueuesString) == 0 {
 		return nil, fmt.Errorf("the input queues were not provided")
 	}
@@ -68,7 +68,7 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the output exchange type is invalid: %v", outputExchangeType)
 	}
 
-	outputQueuesString := os.Getenv("OUTPUT_QUEUES")
+	outputQueuesString := os.Getenv("OUTPUT_QUEUE_NAMES")
 	if len(outputQueuesString) == 0 {
 		return nil, fmt.Errorf("the output queues were not provided")
 	}

@@ -50,6 +50,7 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 		}
 
 		if responseFieldMap != nil {
+			log.Debugf("fieldMap: %v", responseFieldMap)
 			body := protocol.Encode(responseFieldMap, con.Select)
 			outQKey := con.OutputQueueKeys[0]
 			if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
