@@ -3,15 +3,16 @@ package impl
 import (
 	"encoding/csv"
 	"encoding/json"
-	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"workers"
 	"workers/protocol"
 	"workers/sanitize/config"
 
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/op/go-logging"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Sanitize struct {
@@ -78,7 +79,7 @@ func parseNamesFromJson(field string) ([]string, error) {
 	return names, nil
 }
 
-func isValidRow(fields map[string]string) bool {
+func isValidRow(fields []string) bool {
 	for _, value := range fields {
 		if len(value) == 0 {
 			return false 
@@ -92,6 +93,10 @@ func handleMovie(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
 	line, err := reader.Read()
 	if err != nil {
 		return nil, err
+	}
+
+	if !isValidRow(line) {
+		return nil, nil
 	}
 
 	genres, err := parseNamesFromJson(line[3])
@@ -119,15 +124,42 @@ func handleMovie(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
 		"spoken_languages":     strings.Join(spokLangs, ","),
 	}
 
-	if !isValidRow(fields) {
-		return nil, nil
-	}
-
 	return fields, nil
 }
 
+func parseTimestamp(timestamp string) (string, error) {
+	unixEpoc, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil {
+		return "", err
+	}
+
+	t := time.Unix(unixEpoc, 0)
+	return t.Format("2006-01-02 15:04:05"), nil
+}
+
 func handleRating(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
-	return nil, nil
+	reader := csv.NewReader(strings.NewReader(string(del.Body)))
+	line, err := reader.Read()
+	if err != nil {
+		return nil, err
+	}
+
+	if !isValidRow(line) {
+		return nil, nil
+	}
+
+	timestamp, err := parseTimestamp(line[3])
+	if err != nil {
+		return nil, err
+	}
+
+	fields := map[string]string {
+		"movieId": strings.TrimSpace(line[1]),
+		"rating":  strings.TrimSpace(line[2]),
+		"timestamp": timestamp,
+	}
+
+	return fields, nil
 }
 
 func handleCredit(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
