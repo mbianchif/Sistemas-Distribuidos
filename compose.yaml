@@ -52,7 +52,7 @@ services:
       # Output
       - OUTPUT_EXCHANGE_NAME=sanitize_movies
       - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=sentiment_model
+      - OUTPUT_QUEUE_NAMES=divider
       - OUTPUT_QUEUE_KEYS=
 
       # Worker
@@ -74,17 +74,17 @@ services:
       # Input
       - INPUT_EXCHANGE_NAME=sanitize_movies
       - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=sentiment_model
+      - INPUT_QUEUE_NAMES=divider
       - INPUT_QUEUE_KEYS=
 
       # Output
       - OUTPUT_EXCHANGE_NAME=divider
       - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=divider
+      - OUTPUT_QUEUE_NAMES=sentiment_model
       - OUTPUT_QUEUE_KEYS=
 
       # Worker
-      - SELECT=sentiment,rate_revenue_budget
+      - SELECT=overview,rate_revenue_budget
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -127,7 +127,7 @@ services:
     env_file: workers/.env
     environment:
       # Input
-      - INPUT_EXCHANGE_NAME=sanitize_movies
+      - INPUT_EXCHANGE_NAME=divider
       - INPUT_EXCHANGE_TYPE=fanout
       - INPUT_QUEUE_NAMES=sentiment_model
       - INPUT_QUEUE_KEYS=
@@ -135,11 +135,11 @@ services:
       # Output
       - OUTPUT_EXCHANGE_NAME=sentiment_model
       - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=divider
+      - OUTPUT_QUEUE_NAMES=groupby_sentiment_mean_rate_revenue_budget
       - OUTPUT_QUEUE_KEYS=
 
       # Worker
-      - SELECT=sentiment,budget,revenue
+      - SELECT=sentiment,rate_revenue_budget
     depends_on:
       rabbitmq:
         condition: service_healthy
