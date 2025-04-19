@@ -12,7 +12,6 @@ import (
 	"workers/sanitize/config"
 
 	"github.com/op/go-logging"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Sanitize struct {
@@ -34,7 +33,7 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 		return err
 	}
 
-	handler := map[string]func(*Sanitize, amqp.Delivery) (map[string]string, error){
+	handler := map[string]func(*Sanitize, []string) (map[string]string, error){
 		"movies":  handleMovie,
 		"credits": handleCredit,
 		"ratings": handleRating,
@@ -42,7 +41,15 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 
 	log.Infof("Running with handler: %v", con.Handler)
 	for msg := range recvChan {
-		responseFieldMap, err := handler(w, msg)
+		reader := csv.NewReader(strings.NewReader(string(msg.Body)))
+		line, err := reader.Read()
+		if err != nil {
+			log.Errorf("failed to decode message: %v", err)
+			msg.Nack(false, false)
+			continue
+		}
+
+		responseFieldMap, err := handler(w, line)
 		if err != nil {
 			log.Errorf("failed to handle message: %v", err)
 			msg.Nack(false, false)
@@ -60,8 +67,8 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 
 		msg.Ack(false)
 	}
-	log.Info("Recv channel was closed")
 
+	log.Info("recv channel was closed")
 	return nil
 }
 
@@ -93,13 +100,7 @@ func isValidRow(fields []string) bool {
 	return true
 }
 
-func handleMovie(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
-	reader := csv.NewReader(strings.NewReader(string(del.Body)))
-	line, err := reader.Read()
-	if err != nil {
-		return nil, err
-	}
-
+func handleMovie(w *Sanitize, line []string) (map[string]string, error) {
 	if !isValidRow(line) {
 		return nil, nil
 	}
@@ -142,13 +143,7 @@ func parseTimestamp(timestamp string) (string, error) {
 	return t.Format("2006-01-02 15:04:05"), nil
 }
 
-func handleRating(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
-	reader := csv.NewReader(strings.NewReader(string(del.Body)))
-	line, err := reader.Read()
-	if err != nil {
-		return nil, err
-	}
-
+func handleRating(w *Sanitize, line []string) (map[string]string, error) {
 	if !isValidRow(line) {
 		return nil, nil
 	}
@@ -167,13 +162,7 @@ func handleRating(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
 	return fields, nil
 }
 
-func handleCredit(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
-	reader := csv.NewReader(strings.NewReader(string(del.Body)))
-	line, err := reader.Read()
-	if err != nil {
-		return nil, err
-	}
-
+func handleCredit(w *Sanitize, line []string) (map[string]string, error) {
 	if !isValidRow(line) {
 		return nil, nil
 	}

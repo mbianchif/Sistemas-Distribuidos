@@ -3,14 +3,15 @@ package config
 import (
 	"fmt"
 	"os"
+	"slices"
 	"workers/config"
 )
 
 type FilterConfig struct {
 	*config.Config
-	FilterType  string
-	FilterKey   string
-	FilterValue string
+	Handler string
+	Key     string
+	Value   string
 }
 
 func Create() (*FilterConfig, error) {
@@ -19,19 +20,21 @@ func Create() (*FilterConfig, error) {
 		return nil, err
 	}
 
-	filterType := os.Getenv("FILTER_TYPE")
-	if len(filterType) == 0 {
-		return nil, fmt.Errorf("no filterType was provided")
+	validFilterHandlers := []string{"length", "range", "contains"}
+	handler := os.Getenv("HANDLER")
+	if !slices.Contains(validFilterHandlers, handler) {
+		return nil, fmt.Errorf("no filter handler was provided")
 	}
 
-	filterKey := os.Getenv("FILTER_KEY")
-	if len(filterKey) == 0 {
-		return nil, fmt.Errorf("no filterType was provided")
+	key := os.Getenv("KEY")
+	if len(key) == 0 {
+		return nil, fmt.Errorf("no filter key was provided")
 	}
 
-	filterValue := os.Getenv("FILTER_VALUE")
-	if len(filterValue) == 0 {
-		return nil, fmt.Errorf("no filterType was provided")
+	value := os.Getenv("VALUE")
+	if len(value) == 0 {
+		return nil, fmt.Errorf("no filter value was provided")
 	}
-	return &FilterConfig{Config: con, FilterType: filterType, FilterKey: filterKey, FilterValue: filterValue}, nil
+
+	return &FilterConfig{Config: con, Handler: handler, Key: key, Value: value}, nil
 }

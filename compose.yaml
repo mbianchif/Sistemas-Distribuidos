@@ -11,13 +11,10 @@ services:
       timeout: 3s
       retries: 10
       start_period: 50s
-    logging:
-      driver: none
 
   gateway:
     container_name: gateway
     build: gateway
-    image: gateway:latest
     env_file: gateway/.env
     environment:
       - OUTPUT_EXCHANGE_NAME=gateway
@@ -33,7 +30,6 @@ services:
   client:
     container_name: client
     build: client
-    image: client:latest
     env_file: client/.env
     volumes:
       - .data:/data
@@ -42,7 +38,6 @@ services:
 
   sanitize-movies:
     container_name: sanitize-movies
-    image: sanitize:latest
     build:
       context: workers
       dockerfile: dockerfiles/sanitize.Dockerfile
@@ -57,8 +52,8 @@ services:
       # Output
       - OUTPUT_EXCHANGE_NAME=sanitize_movies
       - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=sentiment_model,filter_production_countries_len_1,filter_release_date_since_2000
-      - OUTPUT_QUEUE_KEYS=,,
+      - OUTPUT_QUEUE_NAMES=filter_release_date_since_2000
+      - OUTPUT_QUEUE_KEYS=
 
       # Worker
       - SELECT=id,title,genres,release_date,overview,production_countries,spoken_languages,budget,revenue
@@ -71,7 +66,6 @@ services:
 
   filter-release_date_since_2000:
     container_name: filter-release_date_since_2000
-    image: filter:latest
     build:
       context: workers
       dockerfile: dockerfiles/filter.Dockerfile
@@ -80,22 +74,22 @@ services:
       # Input
       - INPUT_EXCHANGE_NAME=sanitize_movies
       - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUES=filter_release_date_since_2000
+      - INPUT_QUEUE_NAMES=filter_release_date_since_2000
       - INPUT_QUEUE_KEYS=
 
       # Output
       - OUTPUT_EXCHANGE_NAME=filter_release_date_since_2000
       - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUES=join_movies_credits_id,filter_production_countries_argentina_spain,filter_production_countries_argentina
-      - OUTPUT_QUEUE_KEYS=,,
+      - OUTPUT_QUEUE_NAMES=null
+      - OUTPUT_QUEUE_KEYS=
 
       # Worker
       - SELECT=id,title,genres,production_countries,release_date
 
       # Filter
-      - FILTER_TYPE=range
-      - FILTER_KEY=release_date
-      - FILTER_VALUE=[2000,)
+      - HANDLER=range
+      - KEY=release_date
+      - VALUE=2000,
 
     depends_on:
       rabbitmq:

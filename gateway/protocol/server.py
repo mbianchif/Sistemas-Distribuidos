@@ -45,10 +45,7 @@ class Server:
                     logging.info(f"{filename} was successfully received")
                     break
                 elif msg.kind == MSG_BATCH:
-                    print("Received", len(msg.data), "lines")
                     for line in msg.data:
-                        if filename == "movies":
-                            print(f"line: `{line}`")
                         self._broker.publish(routing_key=filename, body=line)
 
                 elif msg.kind == MSG_ERR:

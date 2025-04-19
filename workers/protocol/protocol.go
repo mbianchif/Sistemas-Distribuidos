@@ -25,7 +25,7 @@ var name2Id = map[string]int{
 	// credits
 	"cast": 12,
 
-	// Agregados
+	// Added
 }
 
 var id2Name = []string{
@@ -47,11 +47,13 @@ var id2Name = []string{
 
 	// credits
 	"cast",
+
+	// Added
 }
 
 func Encode(fields map[string]string, filterCols map[string]struct{}) []byte {
 	it := 0
-	bytes := make([]byte, 0, 1024)
+	bytes := make([]byte, 0, 512)
 	for k, v := range fields {
 		if len(filterCols) > 0 {
 			if _, ok := filterCols[k]; !ok {

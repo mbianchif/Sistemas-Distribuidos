@@ -7,75 +7,46 @@ import (
 )
 
 type Range struct {
-	From     *int
-	To       *int
-	FromIncl bool
-	ToIncl   bool
+	From *int
+	To   *int
 }
 
 func parseMathRange(input string) (*Range, error) {
-	if len(input) < 5 {
-		return nil, fmt.Errorf("invalid range format: %s", input)
-	}
-
-	fromIncl := input[0] == '['
-	toIncl := input[len(input)-1] == ']'
-
-	body := input[1 : len(input)-1]
-	parts := strings.Split(body, ",")
+	parts := strings.Split(input, ",")
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid range body: %s", body)
+		return nil, fmt.Errorf("the range must be defined with two parts, given %v", len(parts))
 	}
 
-	var fromPtr, toPtr *int
-
-	if parts[0] != "" {
-		from, err := strconv.Atoi(parts[0])
+	var from, to *int
+	if len(parts[0]) > 0 {
+		fromParsed, err := strconv.Atoi(parts[0])
 		if err != nil {
-			return nil, fmt.Errorf("invalid lower bound: %s", parts[0])
+			return nil, fmt.Errorf("the lower bound of the range is not a number")
 		}
-		fromPtr = &from
+		from = &fromParsed
 	}
 
-	if parts[1] != "" {
-		to, err := strconv.Atoi(parts[1])
+	if len(parts[1]) > 0 {
+		toParsed, err := strconv.Atoi(parts[1])
 		if err != nil {
-			return nil, fmt.Errorf("invalid upper bound: %s", parts[1])
+			return nil, fmt.Errorf("the upper bound of the range is not a numer")
 		}
-		toPtr = &to
+		to = &toParsed
 	}
 
 	return &Range{
-		From:     fromPtr,
-		To:       toPtr,
-		FromIncl: fromIncl,
-		ToIncl:   toIncl,
+		From: from,
+		To:   to,
 	}, nil
 }
 
 func (r *Range) Contains(value int) bool {
-	if r.From != nil {
-		if r.FromIncl {
-			if value < *r.From {
-				return false
-			}
-		} else {
-			if value <= *r.From {
-				return false
-			}
-		}
+	if r.From != nil && value < *r.From {
+		return false
 	}
 
-	if r.To != nil {
-		if r.ToIncl {
-			if value > *r.To {
-				return false
-			}
-		} else {
-			if value >= *r.To {
-				return false
-			}
-		}
+	if r.To != nil && *r.To <= value {
+		return false
 	}
 
 	return true

@@ -1,25 +1,29 @@
 package main
 
 import (
-	"fmt"
 	"workers/filter/config"
 	impl "workers/filter/impl"
+
+	"github.com/op/go-logging"
 )
+
+var log = logging.MustGetLogger("log")
 
 func main() {
 	con, err := config.Create()
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed config: %v", err)
 	}
+	log.Debug("successfull config")
 
 	w, err := impl.New(con)
 	if err != nil {
-		panic(err)
+		w.Close()
+		log.Fatalf("failed init: %v", err)
 	}
+	log.Debug("successfull init")
 
-	if err := w.Run(con); err != nil {
-		panic(err)
+	if err := w.Run(con, log); err != nil {
+		log.Criticalf("failed run: %v", err)
 	}
-
-	fmt.Println("todo ok")
 }
