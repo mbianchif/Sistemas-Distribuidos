@@ -47,13 +47,8 @@ services:
     build:
       context: workers
       dockerfile: dockerfiles/sanitize.Dockerfile
+    env_file: workers/.env
     environment:
-      # Rabbit configuration
-      - RABBIT_URL=amqp://guest:guest@rabbitmq:5672/
-
-      # Logging
-      - LOG_LEVEL=DEBUG
-
       # Input
       - INPUT_EXCHANGE_NAME=gateway
       - INPUT_EXCHANGE_TYPE=direct
