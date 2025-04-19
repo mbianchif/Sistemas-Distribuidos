@@ -78,9 +78,9 @@ services:
 
       # Output
       - OUTPUT_EXCHANGE_NAME=divider
-      - OUTPUT_EXCHANGE_TYPE=direct
+      - OUTPUT_EXCHANGE_TYPE=fanout
       - OUTPUT_QUEUE_NAMES=divider
-      - OUTPUT_QUEUE_KEYS=divider
+      - OUTPUT_QUEUE_KEYS=
 
       # Worker
       - SELECT=sentiment,rate_revenue_budget
