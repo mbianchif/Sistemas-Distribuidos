@@ -3,6 +3,7 @@ package impl
 import (
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -72,7 +73,14 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 	return nil
 }
 
-func parseNamesFromJson(field string) ([]string, error) {
+func parseNamesFromJson(field string) (names []string) {
+	handlePanic := func() {
+		if recover() != nil {
+			names = nil
+		}
+	}
+	defer handlePanic()
+
 	type Named struct {
 		Name string `json:"name"`
 	}
@@ -81,14 +89,15 @@ func parseNamesFromJson(field string) ([]string, error) {
 
 	var values []Named
 	if err := json.Unmarshal([]byte(field), &values); err != nil {
-		return nil, err
+		return nil
 	}
-	names := make([]string, 0, len(values))
+
+	names = make([]string, 0, len(values))
 	for _, named := range values {
 		names = append(names, named.Name)
 	}
 
-	return names, nil
+	return names
 }
 
 func isValidRow(fields map[string]string) bool {
@@ -101,17 +110,21 @@ func isValidRow(fields map[string]string) bool {
 }
 
 func handleMovie(w *Sanitize, line []string) (map[string]string, error) {
-	genres, err := parseNamesFromJson(line[3])
-	if err != nil {
-		return nil, err
+	if len(line) != 24 {
+		return nil, fmt.Errorf("invalid size for csv register, is %v", len(line))
 	}
-	prodCountries, err := parseNamesFromJson(line[13])
-	if err != nil {
-		return nil, err
+
+	genres := parseNamesFromJson(line[3])
+	if genres == nil {
+		return nil, nil
 	}
-	spokLangs, err := parseNamesFromJson(line[17])
-	if err != nil {
-		return nil, err
+	prodCountries := parseNamesFromJson(line[13])
+	if prodCountries == nil {
+		return nil, nil
+	}
+	spokLangs := parseNamesFromJson(line[17])
+	if spokLangs == nil {
+		return nil, nil
 	}
 
 	fields := map[string]string{
@@ -144,6 +157,10 @@ func parseTimestamp(timestamp string) (string, error) {
 }
 
 func handleRating(w *Sanitize, line []string) (map[string]string, error) {
+	if len(line) != 4 {
+		return nil, fmt.Errorf("invalid size for csv register, is %v", len(line))
+	}
+
 	timestamp, err := parseTimestamp(line[3])
 	if err != nil {
 		return nil, err
@@ -163,9 +180,13 @@ func handleRating(w *Sanitize, line []string) (map[string]string, error) {
 }
 
 func handleCredit(w *Sanitize, line []string) (map[string]string, error) {
-	cast, err := parseNamesFromJson(line[0])
-	if err != nil {
-		return nil, err
+	if len(line) != 3 {
+		return nil, fmt.Errorf("invalid size for csv register, is %v", len(line))
+	}
+
+	cast := parseNamesFromJson(line[0])
+	if cast == nil {
+		return nil, nil
 	}
 
 	fields := map[string]string{
