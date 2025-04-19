@@ -16,11 +16,6 @@ services:
     container_name: gateway
     build: gateway
     env_file: gateway/.env
-    environment:
-      - OUTPUT_EXCHANGE_NAME=gateway
-      - OUTPUT_EXCHANGE_TYPE=direct
-      - OUTPUT_QUEUE_NAMES=movies,credits,ratings
-      - OUTPUT_QUEUE_KEYS=movies,credits,ratings
     ports:
       - 9090:9090
     depends_on:
@@ -36,230 +31,106 @@ services:
     depends_on:
       - gateway
 
-  sanitize-movies:
-    container_name: sanitize-movies
+  # ====================== Sanitizers ======================
+
+  sanitize-movies-1:
+    container_name: sanitize-movies-1
     build:
       context: workers
       dockerfile: dockerfiles/sanitize.Dockerfile
-    env_file: workers/.env
-    environment:
-      # Input
-      - INPUT_EXCHANGE_NAME=gateway
-      - INPUT_EXCHANGE_TYPE=direct
-      - INPUT_QUEUE_NAMES=movies
-      - INPUT_QUEUE_KEYS=movies
-
-      # Output
-      - OUTPUT_EXCHANGE_NAME=sanitize_movies
-      - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=divider,filter-production_countries_length,filter-release_date_since_2000
-      - OUTPUT_QUEUE_KEYS=,,
-
-      # Worker
-      - SELECT=id,title,genres,release_date,overview,production_countries,spoken_languages,budget,revenue
-
-      # Sanitize
-      - HANDLER=movies
     depends_on:
       rabbitmq:
         condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/sanitize/.env.movies
 
-  divider:
-    container_name: divider
+  # ====================== Filters ======================
+
+  filter-production_countries_length-1:
+    container_name: filter-production_countries_length-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.production_countries_length
+
+  filter-release_date_since_2000-1:
+    container_name: filter-release_date_since_2000-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.release_date_since_2000
+
+  filter-production_countries_argentina_spain-1:
+    container_name: filter-production_countries_argentina_spain-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.production_countries_argentina_spain
+
+  filter-production_countries_argentina-1:
+    container_name: filter-production_countries_argentina-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.production_countries_argentina
+
+  filter-release_date_upto_2010-1:
+    container_name: filter-release_date_upto_2010-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.release_date_upto_2010
+
+  # ====================== Dividers ======================
+    
+  divider-1:
+    container_name: divider-1
     build:
       context: workers
       dockerfile: dockerfiles/divider.Dockerfile
-    env_file: workers/.env
-    environment:
-      # Input
-      - INPUT_EXCHANGE_NAME=sanitize_movies
-      - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=divider
-      - INPUT_QUEUE_KEYS=
-
-      # Output
-      - OUTPUT_EXCHANGE_NAME=divider
-      - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=sentiment_model
-      - OUTPUT_QUEUE_KEYS=
-
-      # Worker
-      - SELECT=overview,rate_revenue_budget
     depends_on:
       rabbitmq:
         condition: service_healthy
+    env_file: 
+      - workers/.env
+      - envs/divider/.env.divider
 
-  filter-production_countries_length:
-    container_name: filter-production_countries_length
-    build:
-      context: workers
-      dockerfile: dockerfiles/filter.Dockerfile
-    env_file: workers/.env
-    environment:
-      # Input
-      - INPUT_EXCHANGE_NAME=sanitize_movies
-      - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=filter-production_countries_length
-      - INPUT_QUEUE_KEYS=
+  # ====================== Sentiments ======================
 
-      # Output
-      - OUTPUT_EXCHANGE_NAME=filter-production_countries_length
-      - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=null
-      - OUTPUT_QUEUE_KEYS=
-
-      # Worker
-      - SELECT=production_countries,budget
-
-      # Filter
-      - HANDLER=length
-      - KEY=production_countries
-      - VALUE=1
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  filter-release_date_since_2000:
-    container_name: filter-release_date_since_2000
-    build:
-      context: workers
-      dockerfile: dockerfiles/filter.Dockerfile
-    env_file: workers/.env
-    environment:
-      # Input
-      - INPUT_EXCHANGE_NAME=sanitize_movies
-      - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=filter-release_date_since_2000
-      - INPUT_QUEUE_KEYS=
-
-      # Output
-      - OUTPUT_EXCHANGE_NAME=filter-release_date_since_2000
-      - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=filter-production_countries_argentina_spain,filter_production_countries_argentina
-      - OUTPUT_QUEUE_KEYS=,
-
-      # Worker
-      - SELECT=id,title,genres,production_countries,release_date
-
-      # Filter
-      - HANDLER=range
-      - KEY=release_date
-      - VALUE=2000,
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  filter-production_countries_argentina_spain:
-    container_name: filter-production_countries_argentina_spain
-    build:
-      context: workers
-      dockerfile: dockerfiles/filter.Dockerfile
-    env_file: workers/.env
-    environment:
-      # Input
-      - INPUT_EXCHANGE_NAME=filter-release_date_since_2000
-      - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=filter-production_countries_argentina_spain
-      - INPUT_QUEUE_KEYS=
-
-      # Output
-      - OUTPUT_EXCHANGE_NAME=filter-production_countries_argentina_spain
-      - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=filter-release_date_upto_2010
-      - OUTPUT_QUEUE_KEYS=
-
-      # Worker
-      - SELECT=title,genres,release_date
-
-      # Filter
-      - HANDLER=contains
-      - KEY=production_countries
-      - VALUE=Argentina,Spain
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  filter-production_countries_argentina:
-    container_name: filter-production_countries_argentina
-    build:
-      context: workers
-      dockerfile: dockerfiles/filter.Dockerfile
-    env_file: workers/.env
-    environment:
-      # Input
-      - INPUT_EXCHANGE_NAME=filter-release_date_since_2000
-      - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=filter-production_countries_argentina
-      - INPUT_QUEUE_KEYS=
-
-      # Output
-      - OUTPUT_EXCHANGE_NAME=filter-production_countries_argentina
-      - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=null
-      - OUTPUT_QUEUE_KEYS=
-
-      # Worker
-      - SELECT=id,title
-
-      # Filter
-      - HANDLER=contains
-      - KEY=production_countries
-      - VALUE=Argentina
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  filter-release_date_upto_2010:
-    container_name: filter-release_date_upto_2010
-    build:
-      context: workers
-      dockerfile: dockerfiles/filter.Dockerfile
-    env_file: workers/.env
-    environment:
-      # Input
-      - INPUT_EXCHANGE_NAME=filter-production_countries_argentina_spain
-      - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=filter-release_date_upto_2010
-      - INPUT_QUEUE_KEYS=
-
-      # Output
-      - OUTPUT_EXCHANGE_NAME=filter-release_date_upto_2010
-      - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=sink_q1
-      - OUTPUT_QUEUE_KEYS=
-
-      # Worker
-      - SELECT=title,genres
-
-      # Filter
-      - HANDLER=range
-      - KEY=release_date
-      - VALUE=,2010
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-
-  sentiment:
-    container_name: sentiment
+  sentiment-1:
+    container_name: sentiment-1
     build:
       context: workers
       dockerfile: dockerfiles/sentiment.Dockerfile
-    env_file: workers/.env
-    environment:
-      # Input
-      - INPUT_EXCHANGE_NAME=divider
-      - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=sentiment_model
-      - INPUT_QUEUE_KEYS=
-
-      # Output
-      - OUTPUT_EXCHANGE_NAME=sentiment_model
-      - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=groupby_sentiment_mean_rate_revenue_budget
-      - OUTPUT_QUEUE_KEYS=
-
-      # Worker
-      - SELECT=sentiment,rate_revenue_budget
     depends_on:
       rabbitmq:
         condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/sentiment/.env.sentiment
