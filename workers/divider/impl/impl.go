@@ -2,6 +2,7 @@ package impl
 
 import (
 	"fmt"
+	"strconv"
 
 	"workers"
 	"workers/divider/config"
@@ -65,6 +66,28 @@ func (w *Divider) Run(con *config.DividerConfig, log *logging.Logger) error {
 }
 
 func handleRateBudget(w *Divider, msg map[string]string) (map[string]string, error) {
-	fmt.Println("msg: ", msg)
-	return nil, nil
+	revenueStr, ok := msg["revenue"]
+	if !ok {
+		return nil, fmt.Errorf("missing revenue field")
+	}
+	budgetStr, ok := msg["budget"]
+	if !ok {
+		return nil, fmt.Errorf("missing budget field")
+	}
+	revenue, err := strconv.Atoi(revenueStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert revenue to int: %v", err)
+	}
+	budget, err := strconv.Atoi(budgetStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert budget to int: %v", err)
+	}
+	if budget == 0 {
+		return nil, fmt.Errorf("budget is 0")
+	}
+
+	rate_revenue_budget := revenue / budget
+	msg["rate_revenue_budget"] = strconv.Itoa(rate_revenue_budget)
+
+	return msg, nil
 }
