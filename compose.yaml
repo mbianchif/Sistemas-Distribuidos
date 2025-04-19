@@ -52,8 +52,8 @@ services:
       # Output
       - OUTPUT_EXCHANGE_NAME=sanitize_movies
       - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=divider
-      - OUTPUT_QUEUE_KEYS=
+      - OUTPUT_QUEUE_NAMES=divider,filter-production_countries_length,filter-release_date_since_2000
+      - OUTPUT_QUEUE_KEYS=,,
 
       # Worker
       - SELECT=id,title,genres,release_date,overview,production_countries,spoken_languages,budget,revenue
@@ -99,11 +99,11 @@ services:
       # Input
       - INPUT_EXCHANGE_NAME=sanitize_movies
       - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=production_countries_length
+      - INPUT_QUEUE_NAMES=filter-production_countries_length
       - INPUT_QUEUE_KEYS=
 
       # Output
-      - OUTPUT_EXCHANGE_NAME=production_countries_length
+      - OUTPUT_EXCHANGE_NAME=filter-production_countries_length
       - OUTPUT_EXCHANGE_TYPE=fanout
       - OUTPUT_QUEUE_NAMES=null
       - OUTPUT_QUEUE_KEYS=
@@ -129,14 +129,14 @@ services:
       # Input
       - INPUT_EXCHANGE_NAME=sanitize_movies
       - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=filter_release_date_since_2000
+      - INPUT_QUEUE_NAMES=filter-release_date_since_2000
       - INPUT_QUEUE_KEYS=
 
       # Output
-      - OUTPUT_EXCHANGE_NAME=filter_release_date_since_2000
+      - OUTPUT_EXCHANGE_NAME=filter-release_date_since_2000
       - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=filter_production_countries_argentina_spain,filter_production_countries_argentina
-      - OUTPUT_QUEUE_KEYS=argentina_spain,argentina
+      - OUTPUT_QUEUE_NAMES=filter-production_countries_argentina_spain,filter_production_countries_argentina
+      - OUTPUT_QUEUE_KEYS=,
 
       # Worker
       - SELECT=id,title,genres,production_countries,release_date
@@ -157,19 +157,19 @@ services:
     env_file: workers/.env
     environment:
       # Input
-      - INPUT_EXCHANGE_NAME=filter_release_date_since_2000
+      - INPUT_EXCHANGE_NAME=filter-release_date_since_2000
       - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=filter_production_countries_argentina_spain,filter_production_countries_argentina
-      - INPUT_QUEUE_KEYS=argentina_spain,argentina
+      - INPUT_QUEUE_NAMES=filter-production_countries_argentina_spain
+      - INPUT_QUEUE_KEYS=
 
       # Output
-      - OUTPUT_EXCHANGE_NAME=filter_production_countries_argentina_spain
+      - OUTPUT_EXCHANGE_NAME=filter-production_countries_argentina_spain
       - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=null
+      - OUTPUT_QUEUE_NAMES=filter-release_date_upto_2010
       - OUTPUT_QUEUE_KEYS=
 
       # Worker
-      - SELECT=id,title,genres,release_date
+      - SELECT=title,genres,release_date
 
       # Filter
       - HANDLER=contains
@@ -187,13 +187,13 @@ services:
     env_file: workers/.env
     environment:
       # Input
-      - INPUT_EXCHANGE_NAME=filter_release_date_since_2000
+      - INPUT_EXCHANGE_NAME=filter-release_date_since_2000
       - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=filter_production_countries_argentina_spain,production_countries_argentina
-      - INPUT_QUEUE_KEYS=argentina_spain,argentina
+      - INPUT_QUEUE_NAMES=filter-production_countries_argentina
+      - INPUT_QUEUE_KEYS=
 
       # Output
-      - OUTPUT_EXCHANGE_NAME=production_countries_argentina
+      - OUTPUT_EXCHANGE_NAME=filter-production_countries_argentina
       - OUTPUT_EXCHANGE_TYPE=fanout
       - OUTPUT_QUEUE_NAMES=null
       - OUTPUT_QUEUE_KEYS=
@@ -205,6 +205,36 @@ services:
       - HANDLER=contains
       - KEY=production_countries
       - VALUE=Argentina
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  filter-release_date_upto_2010:
+    container_name: filter-release_date_upto_2010
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    env_file: workers/.env
+    environment:
+      # Input
+      - INPUT_EXCHANGE_NAME=filter-production_countries_argentina_spain
+      - INPUT_EXCHANGE_TYPE=fanout
+      - INPUT_QUEUE_NAMES=filter-release_date_upto_2010
+      - INPUT_QUEUE_KEYS=
+
+      # Output
+      - OUTPUT_EXCHANGE_NAME=filter-release_date_upto_2010
+      - OUTPUT_EXCHANGE_TYPE=fanout
+      - OUTPUT_QUEUE_NAMES=sink_q1
+      - OUTPUT_QUEUE_KEYS=
+
+      # Worker
+      - SELECT=title,genres
+
+      # Filter
+      - HANDLER=range
+      - KEY=release_date
+      - VALUE=,2010
     depends_on:
       rabbitmq:
         condition: service_healthy
