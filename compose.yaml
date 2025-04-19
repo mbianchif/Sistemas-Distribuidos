@@ -52,7 +52,7 @@ services:
       # Output
       - OUTPUT_EXCHANGE_NAME=sanitize_movies
       - OUTPUT_EXCHANGE_TYPE=fanout
-      - OUTPUT_QUEUE_NAMES=sentiment_analysis
+      - OUTPUT_QUEUE_NAMES=sentiment_model
       - OUTPUT_QUEUE_KEYS=
 
       # Worker
@@ -69,6 +69,7 @@ services:
     build:
       context: workers
       dockerfile: dockerfiles/divider.Dockerfile
+    env_file: workers/.env
     environment:
       # Input
       - INPUT_EXCHANGE_NAME=sanitize_movies
@@ -114,6 +115,31 @@ services:
       - HANDLER=range
       - KEY=release_date
       - VALUE=2000,
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  
+  sentiment:
+    container_name: sentiment
+    build:
+      context: workers
+      dockerfile: dockerfiles/sentiment.Dockerfile
+    env_file: workers/.env
+    environment:
+      # Input
+      - INPUT_EXCHANGE_NAME=sanitize_movies
+      - INPUT_EXCHANGE_TYPE=fanout
+      - INPUT_QUEUE_NAMES=sentiment_model
+      - INPUT_QUEUE_KEYS=
+
+      # Output
+      - OUTPUT_EXCHANGE_NAME=sentiment_model
+      - OUTPUT_EXCHANGE_TYPE=fanout
+      - OUTPUT_QUEUE_NAMES=divider
+      - OUTPUT_QUEUE_KEYS=
+
+      # Worker
+      - SELECT=sentiment,budget,revenue
     depends_on:
       rabbitmq:
         condition: service_healthy
