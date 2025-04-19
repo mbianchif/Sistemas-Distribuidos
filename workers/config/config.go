@@ -49,14 +49,17 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the input exchange type is invalid: %v", inputExchangeType)
 	}
 
-	inputQueuesString := os.Getenv("INPUT_QUEUE_NAMES")
-	if len(inputQueuesString) == 0 {
+	inputQueueNamesString := os.Getenv("INPUT_QUEUE_NAMES")
+	if len(inputQueueNamesString) == 0 {
 		return nil, fmt.Errorf("the input queues were not provided")
 	}
-	inputQueues := strings.Split(inputQueuesString, ",")
+	inputQueueNames := strings.Split(inputQueueNamesString, ",")
 
-	inputQueueKeysString := os.Getenv("INPUT_QUEUES_KEYS")
+	inputQueueKeysString := os.Getenv("INPUT_QUEUE_KEYS")
 	inputQueueKeys := strings.Split(inputQueueKeysString, ",")
+	if len(inputQueueNames) != len(inputQueueKeys) {
+		return nil, fmt.Errorf("length for input queue names and keys don't match (names: %v, keys: %v)", len(inputQueueNames), len(inputQueueKeys))
+	}
 
 	outputExchangeName := os.Getenv("OUTPUT_EXCHANGE_NAME")
 	if len(outputExchangeName) == 0 {
@@ -68,14 +71,17 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the output exchange type is invalid: %v", outputExchangeType)
 	}
 
-	outputQueuesString := os.Getenv("OUTPUT_QUEUE_NAMES")
-	if len(outputQueuesString) == 0 {
+	outputQueueNamesString := os.Getenv("OUTPUT_QUEUE_NAMES")
+	if len(outputQueueNamesString) == 0 {
 		return nil, fmt.Errorf("the output queues were not provided")
 	}
-	outputQueues := strings.Split(outputQueuesString, ",")
+	outputQueueNames := strings.Split(outputQueueNamesString, ",")
 
-	outputQueueKeysString := os.Getenv("OUTPUT_QUEUES_KEYS")
+	outputQueueKeysString := os.Getenv("OUTPUT_QUEUE_KEYS")
 	outputQueueKeys := strings.Split(outputQueueKeysString, ",")
+	if len(outputQueueNames) != len(outputQueueKeys) {
+		return nil, fmt.Errorf("length for output queue names and keys don't match (names: %v, keys: %v)", len(outputQueueNames), len(outputQueueKeys))
+	}
 
 	selectString := os.Getenv("SELECT")
 	if len(selectString) == 0 {
@@ -97,11 +103,11 @@ func Create() (*Config, error) {
 		Url:                url,
 		InputExchangeName:  inputExchangeName,
 		InputExchangeType:  inputExchangeType,
-		InputQueues:        inputQueues,
+		InputQueues:        inputQueueNames,
 		InputQueueKeys:     inputQueueKeys,
 		OutputExchangeName: outputExchangeName,
 		OutputExchangeType: outputExchangeType,
-		OutputQueues:       outputQueues,
+		OutputQueues:       outputQueueNames,
 		OutputQueueKeys:    outputQueueKeys,
 		Select:             selectMap,
 	}, nil

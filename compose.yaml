@@ -11,13 +11,10 @@ services:
       timeout: 3s
       retries: 10
       start_period: 50s
-    logging:
-      driver: none
 
   gateway:
     container_name: gateway
     build: gateway
-    image: gateway:latest
     env_file: gateway/.env
     environment:
       - OUTPUT_EXCHANGE_NAME=gateway
@@ -33,7 +30,6 @@ services:
   client:
     container_name: client
     build: client
-    image: client:latest
     env_file: client/.env
     volumes:
       - .data:/data
@@ -42,7 +38,6 @@ services:
 
   sanitize-movies:
     container_name: sanitize-movies
-    image: sanitize:latest
     build:
       context: workers
       dockerfile: dockerfiles/sanitize.Dockerfile
@@ -69,33 +64,56 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  revenue_budget_divider:
-    container_name: revenue_budget_divider
-    image: divider:latest
+  divider:
+    container_name: divider
     build:
       context: workers
       dockerfile: dockerfiles/divider.Dockerfile
     environment:
-      # Rabbit configuration
-      - RABBIT_URL=amqp://guest:guest@rabbitmq:5672/
-
       # Input
       - INPUT_EXCHANGE_NAME=sanitize_movies
       - INPUT_EXCHANGE_TYPE=fanout
-      - INPUT_QUEUE_NAMES=sentiment_analysis
+      - INPUT_QUEUE_NAMES=sentiment_model
       - INPUT_QUEUE_KEYS=
 
       # Output
-      - OUTPUT_EXCHANGE_NAME=revenue_budget_divider
+      - OUTPUT_EXCHANGE_NAME=divider
       - OUTPUT_EXCHANGE_TYPE=direct
-      - OUTPUT_QUEUE_NAMES=revenue_budget_divider
-      - OUTPUT_QUEUE_KEYS=revenue_budget_divider
+      - OUTPUT_QUEUE_NAMES=divider
+      - OUTPUT_QUEUE_KEYS=divider
 
       # Worker
-      - SELECT=id,title,genres,release_date,overview,production_countries,spoken_languages,budget,revenue
+      - SELECT=sentiment,rate_revenue_budget
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
-      # Divider
-      - HANDLER=revenue_budget
+  filter-release_date_since_2000:
+    container_name: filter-release_date_since_2000
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    env_file: workers/.env
+    environment:
+      # Input
+      - INPUT_EXCHANGE_NAME=sanitize_movies
+      - INPUT_EXCHANGE_TYPE=fanout
+      - INPUT_QUEUE_NAMES=filter_release_date_since_2000
+      - INPUT_QUEUE_KEYS=
+
+      # Output
+      - OUTPUT_EXCHANGE_NAME=filter_release_date_since_2000
+      - OUTPUT_EXCHANGE_TYPE=fanout
+      - OUTPUT_QUEUE_NAMES=null
+      - OUTPUT_QUEUE_KEYS=
+
+      # Worker
+      - SELECT=id,title,genres,production_countries,release_date
+
+      # Filter
+      - HANDLER=range
+      - KEY=release_date
+      - VALUE=2000,
     depends_on:
       rabbitmq:
         condition: service_healthy

@@ -3,6 +3,7 @@ package impl
 import (
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"workers/sanitize/config"
 
 	"github.com/op/go-logging"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Sanitize struct {
@@ -34,7 +34,7 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 		return err
 	}
 
-	handler := map[string]func(*Sanitize, amqp.Delivery) (map[string]string, error){
+	handler := map[string]func(*Sanitize, []string) (map[string]string, error){
 		"movies":  handleMovie,
 		"credits": handleCredit,
 		"ratings": handleRating,
@@ -42,7 +42,15 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 
 	log.Infof("Running with handler: %v", con.Handler)
 	for msg := range recvChan {
-		responseFieldMap, err := handler(w, msg)
+		reader := csv.NewReader(strings.NewReader(string(msg.Body)))
+		line, err := reader.Read()
+		if err != nil {
+			log.Errorf("failed to decode message: %v", err)
+			msg.Nack(false, false)
+			continue
+		}
+
+		responseFieldMap, err := handler(w, line)
 		if err != nil {
 			log.Errorf("failed to handle message: %v", err)
 			msg.Nack(false, false)
@@ -60,12 +68,19 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 
 		msg.Ack(false)
 	}
-	log.Info("Recv channel was closed")
 
+	log.Info("recv channel was closed")
 	return nil
 }
 
-func parseNamesFromJson(field string) ([]string, error) {
+func parseNamesFromJson(field string) (names []string) {
+	handlePanic := func() {
+		if recover() != nil {
+			names = nil
+		}
+	}
+	defer handlePanic()
+
 	type Named struct {
 		Name string `json:"name"`
 	}
@@ -74,17 +89,18 @@ func parseNamesFromJson(field string) ([]string, error) {
 
 	var values []Named
 	if err := json.Unmarshal([]byte(field), &values); err != nil {
-		return nil, err
+		return nil
 	}
-	names := make([]string, 0, len(values))
+
+	names = make([]string, 0, len(values))
 	for _, named := range values {
 		names = append(names, named.Name)
 	}
 
-	return names, nil
+	return names
 }
 
-func isValidRow(fields []string) bool {
+func isValidRow(fields map[string]string) bool {
 	for _, value := range fields {
 		if len(value) == 0 {
 			return false
@@ -93,28 +109,22 @@ func isValidRow(fields []string) bool {
 	return true
 }
 
-func handleMovie(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
-	reader := csv.NewReader(strings.NewReader(string(del.Body)))
-	line, err := reader.Read()
-	if err != nil {
-		return nil, err
+func handleMovie(w *Sanitize, line []string) (map[string]string, error) {
+	if len(line) != 24 {
+		return nil, fmt.Errorf("invalid size for csv register, is %v", len(line))
 	}
 
-	if !isValidRow(line) {
+	genres := parseNamesFromJson(line[3])
+	if genres == nil {
 		return nil, nil
 	}
-
-	genres, err := parseNamesFromJson(line[3])
-	if err != nil {
-		return nil, err
+	prodCountries := parseNamesFromJson(line[13])
+	if prodCountries == nil {
+		return nil, nil
 	}
-	prodCountries, err := parseNamesFromJson(line[13])
-	if err != nil {
-		return nil, err
-	}
-	spokLangs, err := parseNamesFromJson(line[17])
-	if err != nil {
-		return nil, err
+	spokLangs := parseNamesFromJson(line[17])
+	if spokLangs == nil {
+		return nil, nil
 	}
 
 	fields := map[string]string{
@@ -127,6 +137,10 @@ func handleMovie(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
 		"genres":               strings.Join(genres, ","),
 		"production_countries": strings.Join(prodCountries, ","),
 		"spoken_languages":     strings.Join(spokLangs, ","),
+	}
+
+	if !isValidRow(fields) {
+		return nil, nil
 	}
 
 	return fields, nil
@@ -142,15 +156,9 @@ func parseTimestamp(timestamp string) (string, error) {
 	return t.Format("2006-01-02 15:04:05"), nil
 }
 
-func handleRating(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
-	reader := csv.NewReader(strings.NewReader(string(del.Body)))
-	line, err := reader.Read()
-	if err != nil {
-		return nil, err
-	}
-
-	if !isValidRow(line) {
-		return nil, nil
+func handleRating(w *Sanitize, line []string) (map[string]string, error) {
+	if len(line) != 4 {
+		return nil, fmt.Errorf("invalid size for csv register, is %v", len(line))
 	}
 
 	timestamp, err := parseTimestamp(line[3])
@@ -164,28 +172,30 @@ func handleRating(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
 		"timestamp": timestamp,
 	}
 
-	return fields, nil
-}
-
-func handleCredit(w *Sanitize, del amqp.Delivery) (map[string]string, error) {
-	reader := csv.NewReader(strings.NewReader(string(del.Body)))
-	line, err := reader.Read()
-	if err != nil {
-		return nil, err
-	}
-
-	if !isValidRow(line) {
+	if !isValidRow(fields) {
 		return nil, nil
 	}
 
-	cast, err := parseNamesFromJson(line[0])
-	if err != nil {
-		return nil, err
+	return fields, nil
+}
+
+func handleCredit(w *Sanitize, line []string) (map[string]string, error) {
+	if len(line) != 3 {
+		return nil, fmt.Errorf("invalid size for csv register, is %v", len(line))
+	}
+
+	cast := parseNamesFromJson(line[0])
+	if cast == nil {
+		return nil, nil
 	}
 
 	fields := map[string]string{
 		"id":   strings.TrimSpace(line[2]),
 		"cast": strings.Join(cast, ","),
+	}
+
+	if !isValidRow(fields) {
+		return nil, nil
 	}
 
 	return fields, nil

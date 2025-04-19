@@ -9,6 +9,7 @@ class Broker:
         self._output_exchange_type = os.getenv("OUTPUT_EXCHANGE_TYPE", "")
         self._output_queue_names = os.getenv("OUTPUT_QUEUE_NAMES", "").split(",")
         self._output_queue_keys = os.getenv("OUTPUT_QUEUE_KEYS", "").split(",")
+        logging.getLogger("pika").setLevel(logging.WARNING)
 
         try:
             conn = pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq"))
