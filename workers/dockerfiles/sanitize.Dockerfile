@@ -4,7 +4,7 @@ WORKDIR /workers
 COPY config ./config
 COPY protocol ./protocol
 COPY rabbit ./rabbit
-COPY go.mod go.sum .
+COPY go.mod go.sum ./
 COPY worker.go .
 
 # Sanitize specific

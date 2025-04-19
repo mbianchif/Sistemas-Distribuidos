@@ -2,6 +2,7 @@ package impl
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -97,5 +98,23 @@ func handleLength(w *Filter, msg map[string]string, con *config.FilterConfig) (m
 }
 
 func handleContains(w *Filter, msg map[string]string, con *config.FilterConfig) (map[string]string, error) {
-	return nil, nil
+	countries, ok := msg[con.Key]
+	if !ok {
+		return nil, fmt.Errorf("key %v is not in message", con.Key)
+	}
+	countryList := strings.Split(countries, ",")
+	countryValueList := strings.Split(con.Value, ",")
+
+	if len(countryValueList) == 0 {
+		return nil, fmt.Errorf("value %v is not a list", con.Value)
+	}
+
+	for _, country := range countryValueList {
+		if !slices.Contains(countryList, country) {
+			fmt.Printf("country %v is not in the list %v", country, countryList)
+			return nil, nil
+		}
+	}
+
+	return msg, nil
 }
