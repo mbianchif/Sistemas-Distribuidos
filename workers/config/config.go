@@ -3,7 +3,10 @@ package config
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
+
+	"github.com/op/go-logging"
 )
 
 type Config struct {
@@ -19,6 +22,15 @@ type Config struct {
 	Select             map[string]struct{}
 }
 
+func configLog(logLevel logging.Level) {
+	backend := logging.NewLogBackend(os.Stderr, "", 0)
+	format := logging.MustStringFormatter(`%{time:2006-01-02 15:04:05}	%{level:.4s}	%{message}`)
+	backendFormatter := logging.NewBackendFormatter(backend, format)
+	backendLeveled := logging.AddModuleLevel(backendFormatter)
+	logging.SetLevel(logLevel, "log")
+	logging.SetBackend(backendLeveled)
+}
+
 func Create() (*Config, error) {
 	url := os.Getenv("RABBIT_URL")
 	if len(url) == 0 {
@@ -30,12 +42,14 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the input exchange name was not provided")
 	}
 
+	validExchangeTypes := []string{"direct", "fanout", "topic", "headers"}
+
 	inputExchangeType := os.Getenv("INPUT_EXCHANGE_TYPE")
-	if len(inputExchangeType) == 0 {
-		return nil, fmt.Errorf("the input exchange name was not provided")
+	if !slices.Contains(validExchangeTypes, inputExchangeType) {
+		return nil, fmt.Errorf("the input exchange type is invalid: %v", inputExchangeType)
 	}
 
-	inputQueuesString := os.Getenv("INPUT_QUEUES")
+	inputQueuesString := os.Getenv("INPUT_QUEUE_NAMES")
 	if len(inputQueuesString) == 0 {
 		return nil, fmt.Errorf("the input queues were not provided")
 	}
@@ -50,11 +64,11 @@ func Create() (*Config, error) {
 	}
 
 	outputExchangeType := os.Getenv("OUTPUT_EXCHANGE_TYPE")
-	if len(outputExchangeName) == 0 {
-		return nil, fmt.Errorf("th output exchange type was not provided")
+	if !slices.Contains(validExchangeTypes, outputExchangeType) {
+		return nil, fmt.Errorf("the output exchange type is invalid: %v", outputExchangeType)
 	}
 
-	outputQueuesString := os.Getenv("OUTPUT_QUEUES")
+	outputQueuesString := os.Getenv("OUTPUT_QUEUE_NAMES")
 	if len(outputQueuesString) == 0 {
 		return nil, fmt.Errorf("the output queues were not provided")
 	}
@@ -68,9 +82,16 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the select were not provided")
 	}
 	selectMap := make(map[string]struct{})
-	for _, field := range strings.Split(selectString, ",") {
+	for field := range strings.SplitSeq(selectString, ",") {
 		selectMap[field] = struct{}{}
 	}
+
+	logLevelVar := strings.ToUpper(os.Getenv("LOG_LEVEL"))
+	logLevel, err := logging.LogLevel(logLevelVar)
+	if err != nil {
+		logLevel = logging.DEBUG
+	}
+	configLog(logLevel)
 
 	return &Config{
 		Url:                url,
