@@ -11,15 +11,16 @@ import (
 
 type Top struct {
 	*workers.Worker
-	top_lits []map[string]string
+	Con     *config.TopConfig
+	top_lit []map[string]string
 }
 
-func New(con *config.TopConfig) (*Top, error) {
-	base, err := workers.New(con.Config)
+func New(con *config.TopConfig, log *logging.Logger) (*Top, error) {
+	base, err := workers.New(con.Config, log)
 	if err != nil {
 		return nil, err
 	}
-	return &Top{base, []map[string]string{}}, nil
+	return &Top{base, con, make([]map[string]string, 0)}, nil
 }
 
 func (w *Top) Run(con *config.TopConfig, log *logging.Logger) error {
@@ -29,6 +30,12 @@ func (w *Top) Run(con *config.TopConfig, log *logging.Logger) error {
 		return err
 	}
 
+	handlers := map[int]func(*Top, []byte) bool{
+		protocol.BATCH: handleBatch,
+		protocol.EOF:   handleEof,
+		protocol.ERROR: handleError,
+	}
+
 	log.Infof("Running")
 	exit := false
 	for !exit {
@@ -36,43 +43,60 @@ func (w *Top) Run(con *config.TopConfig, log *logging.Logger) error {
 		case <-w.SigChan:
 			exit = true
 
-		case msg := <-recvChan:
-			fieldMap, err := protocol.Decode(msg.Body)
-			if err != nil {
-				log.Errorf("failed to decode message: %v", err)
-				msg.Nack(false, false)
-				continue
-			}
-
-			err = handleTop(w, fieldMap, con)
-			if err != nil {
-				log.Errorf("failed to handle message: %v", err)
-				msg.Nack(false, false)
-				continue
-			}
-
-			// if msg EOF publish top
-
-			msg.Ack(false)
+		case del := <-recvChan:
+			kind, data := protocol.ReadDelivery(del)
+			exit = handlers[kind](w, data)
+			del.Ack(false)
 		}
 	}
 
 	return nil
 }
 
-func handleTop(w *Top, fieldMap map[string]string, con *config.TopConfig) error {
+func handleBatch(w *Top, data []byte) bool {
+	batch := protocol.DecodeBatch(data)
 
-	return nil
+	for _, fieldMap := range batch.FieldMaps {
+		err := handleTop(w, fieldMap)
+		if err != nil {
+			w.Log.Errorf("failed to handle message: %v", err)
+			continue
+		}
+	}
+
+	return false
 }
 
-func (w *Top) addMovieToTopList(entry map[string]string, con *config.TopConfig) {
-	w.top_lits = append(w.top_lits, entry)
+func handleEof(w *Top, data []byte) bool {
 
-	sort.Slice(w.top_lits, func(i, j int) bool {
-		return w.top_lits[i][con.Key] > w.top_lits[j][con.Key]
+	w.Log.Debugf("fieldMaps: %v", w.top_lit)
+	body := protocol.NewBatch(w.top_lit).Encode(w.Con.Select)
+	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+
+	body = protocol.DecodeEof(data).Encode()
+	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+
+	return true
+}
+
+func handleError(w *Top, data []byte) bool {
+	w.Log.Error("Received an ERROR message kind")
+	return true
+}
+
+func handleTop(w *Top, fieldMap map[string]string) error {
+	w.top_lit = append(w.top_lit, fieldMap)
+
+	sort.Slice(w.top_lit, func(i, j int) bool {
+		return w.top_lit[i][w.Con.Key] > w.top_lit[j][w.Con.Key]
 	})
 
-	if len(w.top_lits) > con.Amount {
-		w.top_lits = w.top_lits[:con.Amount]
+	if len(w.top_lit) > w.Con.Amount {
+		w.top_lit = w.top_lit[:w.Con.Amount]
 	}
+	return nil
 }
