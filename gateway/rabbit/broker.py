@@ -7,6 +7,7 @@ class Broker:
         logging.getLogger("pika").setLevel(logging.WARNING)
         
         self._outputexchange_name = config.outputExchangeName
+        self._input_queue_name = config.inputQueueNames[0]
 
         try:
             self._conn = pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq"))
@@ -44,10 +45,10 @@ class Broker:
             logging.critical(f"Failed to publish message {e}")
             raise
     
-    def consume(self, queue: str, consumer, callback):
+    def consume(self, consumer, callback):
         try:
             self._chan.basic_consume(
-                    queue="results", 
+                    queue=self._input_queue_name, 
                     on_message_callback=callback,
                     auto_ack=False,
                     exclusive=False,

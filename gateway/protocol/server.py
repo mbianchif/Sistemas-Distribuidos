@@ -64,7 +64,7 @@ class Server:
             while True:
                 #TODO: falta recibir el end del result para poder hacer el break
                 logging.info("Waiting for results...")
-                self._broker.consume(self._broker.inputQueues[0], "", self._handle_result)
+                self._broker.consume("", self._handle_result)
             
     def _handle_result(self, ch, method, properties, body):
         logging.info(f"Received result: {body.decode()}")
