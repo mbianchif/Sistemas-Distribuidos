@@ -3,6 +3,8 @@ package protocol
 import (
 	"bytes"
 	"strconv"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 var name2Id = map[string]int{
@@ -57,7 +59,38 @@ var id2Name = []string{
 	"country",
 }
 
-func Encode(fields map[string]string, filterCols map[string]struct{}) []byte {
+const (
+	BATCH = iota
+	EOF
+	ERROR
+)
+
+/*
+
+1 Tipo
+	- Batch
+		- Payload
+			\n separated
+	- EOF
+*/
+
+func ReadDelivery(del amqp.Delivery) (int, []byte) {
+	body := del.Body
+	if len(body) < 1 {
+		return ERROR, nil
+	}
+	return int(body[0]), body[1:]
+}
+
+type Batch struct {
+	FieldMaps []map[string]string
+}
+
+func NewBatch(fieldMaps []map[string]string) Batch {
+	return Batch{fieldMaps}
+}
+
+func encodeLine(fields map[string]string, filterCols map[string]struct{}) []byte {
 	it := 0
 	bytes := make([]byte, 0, 512)
 	for k, v := range fields {
@@ -82,7 +115,27 @@ func Encode(fields map[string]string, filterCols map[string]struct{}) []byte {
 	return bytes
 }
 
-func Decode(data []byte) (map[string]string, error) {
+func (m Batch) Encode(filterCols map[string]struct{}) []byte {
+	startingBuf := make([]byte, 1, 1024)
+	startingBuf[0] = BATCH
+
+	buf := bytes.NewBuffer(startingBuf)
+	first := true
+
+	for _, fieldMap := range m.FieldMaps {
+		if !first {
+			buf.WriteByte('\n')
+		}
+
+		first = false
+		encoded := encodeLine(fieldMap, filterCols)
+		buf.Write(encoded)
+	}
+
+	return buf.Bytes()
+}
+
+func decodeLine(data []byte) map[string]string {
 	fields := make(map[string]string, 12)
 
 	for kv := range bytes.SplitSeq(data, []byte(";")) {
@@ -100,5 +153,27 @@ func Decode(data []byte) (map[string]string, error) {
 		fields[keyName] = string(pair[1])
 	}
 
-	return fields, nil
+	return fields
+}
+
+func DecodeBatch(data []byte) Batch {
+	lines := bytes.Split(data, []byte("\n"))
+	fieldMaps := make([]map[string]string, 0, len(lines))
+
+	for _, line := range lines {
+		fieldMap := decodeLine(line)
+		fieldMaps = append(fieldMaps, fieldMap)
+	}
+
+	return Batch{fieldMaps}
+}
+
+type Eof struct{}
+
+func (m Eof) Encode() []byte {
+	return []byte{EOF}
+}
+
+func DecodeEof([]byte) Eof {
+	return Eof{}
 }

@@ -9,66 +9,82 @@ import (
 	"workers/protocol"
 
 	"github.com/op/go-logging"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Divider struct {
 	*workers.Worker
+	Con *config.DividerConfig
 }
 
-func New(con *config.DividerConfig) (*Divider, error) {
-	base, err := workers.New(con.Config)
+func New(con *config.DividerConfig, log *logging.Logger) (*Divider, error) {
+	base, err := workers.New(con.Config, log)
 	if err != nil {
 		return nil, err
 	}
-	return &Divider{base}, nil
+	return &Divider{base, con}, nil
 }
 
-func (w *Divider) Run(con *config.DividerConfig, log *logging.Logger) error {
+func (w *Divider) Run() error {
 	inputQueue := w.InputQueues[0]
 	recvChan, err := w.Broker.Consume(inputQueue, "")
 	if err != nil {
 		return err
 	}
 
-	log.Infof("Running")
+	handlers := map[int]func(*Divider, amqp.Delivery, []byte) bool{
+		protocol.BATCH: handleBatch,
+		protocol.EOF:   handleEof,
+		protocol.ERROR: handleError,
+	}
+
+	w.Log.Infof("Running")
 	exit := false
 	for !exit {
 		select {
 		case <-w.SigChan:
 			exit = true
 
-		case msg := <-recvChan:
-			fieldMap, err := protocol.Decode(msg.Body)
-			if err != nil {
-				log.Errorf("failed to decode message: %v", err)
-				msg.Nack(false, false)
-				continue
-			}
-
-			responseFieldMap, err := handleDivide(fieldMap)
-			if err != nil {
-				log.Errorf("failed to handle message: %v", err)
-				msg.Nack(false, false)
-				continue
-			}
-
-			if responseFieldMap != nil {
-				log.Debugf("fieldMap: %v", fieldMap)
-				body := protocol.Encode(responseFieldMap, con.Select)
-				outQKey := con.OutputQueueKeys[0]
-				if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
-					log.Errorf("failed to publish message: %v", err)
-				}
-			}
-
-			msg.Ack(false)
+		case del := <-recvChan:
+			kind, data := protocol.ReadDelivery(del)
+			exit = handlers[kind](w, del, data)
 		}
 	}
 
 	return nil
 }
 
-func handleDivide(msg map[string]string) (map[string]string, error) {
+func handleBatch(w *Divider, del amqp.Delivery, data []byte) bool {
+	batch := protocol.DecodeBatch(data)
+	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
+
+	for _, fieldMap := range batch.FieldMaps {
+		responseFieldMap, err := handleDivider(fieldMap)
+		if err != nil {
+			w.Log.Errorf("failed to handle message: %v", err)
+			del.Nack(false, false)
+			continue
+		}
+
+		if responseFieldMap != nil {
+			responseFieldMaps = append(responseFieldMaps, responseFieldMap)
+		}
+	}
+
+	if len(responseFieldMaps) > 0 {
+		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
+		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
+		outQKey := w.Con.OutputQueueKeys[0]
+		if err := w.Broker.Publish(w.Con.OutputExchangeName, outQKey, body); err != nil {
+			w.Log.Errorf("failed to publish message: %v", err)
+		}
+	}
+
+	del.Ack(false)
+	return false
+}
+
+func handleDivider(msg map[string]string) (map[string]string, error) {
 	revenueStr, ok := msg["revenue"]
 	if !ok {
 		return nil, fmt.Errorf("missing revenue field")
@@ -97,4 +113,20 @@ func handleDivide(msg map[string]string) (map[string]string, error) {
 	msg["rate_revenue_budget"] = strconv.FormatFloat(rate_revenue_budget, 'f', 4, 32)
 
 	return msg, nil
+}
+
+func handleEof(w *Divider, del amqp.Delivery, data []byte) bool {
+	body := protocol.DecodeEof(data).Encode()
+	outQKey := w.Con.OutputQueueKeys[0]
+	if err := w.Broker.Publish(w.Con.OutputExchangeName, outQKey, body); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+
+	del.Ack(false)
+	return true
+}
+
+func handleError(w *Divider, del amqp.Delivery, data []byte) bool {
+	w.Log.Error("Received an ERROR message kind")
+	return true
 }

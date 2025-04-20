@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -13,25 +14,19 @@ import (
 	"workers/sanitize/config"
 
 	"github.com/op/go-logging"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Sanitize struct {
 	*workers.Worker
+	Con     *config.SanitizeConfig
+	Handler func(*Sanitize, []string) (map[string]string, error)
 }
 
-func New(con *config.SanitizeConfig) (*Sanitize, error) {
-	base, err := workers.New(con.Config)
+func New(con *config.SanitizeConfig, log *logging.Logger) (*Sanitize, error) {
+	base, err := workers.New(con.Config, log)
 	if err != nil {
 		return nil, err
-	}
-	return &Sanitize{base}, nil
-}
-
-func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
-	inputQueue := w.InputQueues[0]
-	recvChan, err := w.Broker.Consume(inputQueue, "")
-	if err != nil {
-		return err
 	}
 
 	handler := map[string]func(*Sanitize, []string) (map[string]string, error){
@@ -40,43 +35,74 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 		"ratings": handleRating,
 	}[con.Handler]
 
-	log.Infof("Running with handler: %v", con.Handler)
+	return &Sanitize{base, con, handler}, nil
+}
+
+func (w *Sanitize) Run() error {
+	inputQueue := w.InputQueues[0]
+	recvChan, err := w.Broker.Consume(inputQueue, "")
+	if err != nil {
+		return err
+	}
+
+	handlers := map[int]func(*Sanitize, amqp.Delivery, []byte) bool{
+		protocol.BATCH: handleBatch,
+		protocol.EOF:   handleEof,
+		protocol.ERROR: handleError,
+	}
+
+	w.Log.Infof("Running with handler: %v", w.Con.Handler)
 	exit := false
 	for !exit {
 		select {
 		case <-w.SigChan:
 			exit = true
 
-		case msg := <-recvChan:
-			reader := csv.NewReader(strings.NewReader(string(msg.Body)))
-			line, err := reader.Read()
-			if err != nil {
-				log.Errorf("failed to decode message: %v", err)
-				msg.Nack(false, false)
-				continue
-			}
-
-			responseFieldMap, err := handler(w, line)
-			if err != nil {
-				log.Errorf("failed to handle message: %v", err)
-				msg.Nack(false, false)
-				continue
-			}
-
-			if responseFieldMap != nil {
-				log.Debugf("fieldMap: %v", responseFieldMap)
-				body := protocol.Encode(responseFieldMap, con.Select)
-				outQKey := con.OutputQueueKeys[0]
-				if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
-					log.Errorf("failed to publish message: %v", err)
-				}
-			}
-
-			msg.Ack(false)
+		case del := <-recvChan:
+			kind, data := protocol.ReadDelivery(del)
+			exit = handlers[kind](w, del, data)
 		}
 	}
 
 	return nil
+}
+
+func handleBatch(w *Sanitize, del amqp.Delivery, data []byte) bool {
+	reader := csv.NewReader(strings.NewReader(string(del.Body)))
+	responseFieldMaps := make([]map[string]string, 0)
+	for {
+		line, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			w.Log.Errorf("failed to decode message: %v", err)
+			continue
+		}
+
+		responseFieldMap, err := w.Handler(w, line)
+		if err != nil {
+			w.Log.Errorf("failed to handle message: %v", err)
+			continue
+		}
+
+		if responseFieldMap != nil {
+			responseFieldMaps = append(responseFieldMaps, responseFieldMap)
+		}
+	}
+
+	if len(responseFieldMaps) > 0 {
+		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
+		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
+		outQKey := w.Con.OutputQueueKeys[0]
+		if err := w.Broker.Publish(w.Con.OutputExchangeName, outQKey, body); err != nil {
+			w.Log.Errorf("failed to publish message: %v", err)
+		}
+	}
+
+	del.Ack(false)
+	return false
 }
 
 func parseNamesFromJson(field string) (names []string) {
@@ -205,4 +231,20 @@ func handleCredit(w *Sanitize, line []string) (map[string]string, error) {
 	}
 
 	return fields, nil
+}
+
+func handleEof(w *Sanitize, del amqp.Delivery, data []byte) bool {
+	body := protocol.DecodeEof(data).Encode()
+	outQKey := w.Con.OutputQueueKeys[0]
+	if err := w.Broker.Publish(w.Con.OutputExchangeName, outQKey, body); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+
+	del.Ack(false)
+	return true
+}
+
+func handleError(w *Sanitize, del amqp.Delivery, data []byte) bool {
+	w.Log.Error("Received an ERROR message kind")
+	return true
 }
