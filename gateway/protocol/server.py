@@ -47,8 +47,8 @@ class Server:
                     break
 
                 elif msg.kind == MSG_BATCH:
-                    for line in msg.data:
-                        self._broker.publish(routing_key=filename, body=line)
+                    body = b"\n".join(msg.data)
+                    self._broker.publish(routing_key=filename, body=body)
 
                 elif msg.kind == MSG_ERR:
                     logging.critical("An error occurred, exiting...")

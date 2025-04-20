@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -68,7 +69,7 @@ func (w *Sanitize) Run() error {
 }
 
 func handleBatch(w *Sanitize, del amqp.Delivery, data []byte) bool {
-	reader := csv.NewReader(strings.NewReader(string(del.Body)))
+	reader := csv.NewReader(bytes.NewReader(data))
 	responseFieldMaps := make([]map[string]string, 0)
 	for {
 		line, err := reader.Read()
