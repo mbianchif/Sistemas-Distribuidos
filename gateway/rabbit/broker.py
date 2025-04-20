@@ -40,6 +40,9 @@ class Broker:
 
     def close(self):
         if self._chan and self._chan.is_open:
-            self._chan.close()
+            try:
+                self._chan.close()
+            except:
+                pass
         if self._conn and self._conn.is_open:
             self._conn.close()
