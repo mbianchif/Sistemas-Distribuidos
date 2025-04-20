@@ -23,7 +23,6 @@ services:
       retries: 10
       start_period: 50s
 
-
   gateway:
     container_name: gateway
     build: gateway
@@ -48,6 +47,30 @@ services:
     env_file:
       - workers/.env
       - envs/sanitize/.env.movies
+
+  sanitize-credits-1:
+    container_name: sanitize-credits-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/sanitize.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/sanitize/.env.credits
+
+  sanitize-ratings-1:
+    container_name: sanitize-ratings-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/sanitize.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/sanitize/.env.ratings
 
   # ====================== Filters ======================
 
