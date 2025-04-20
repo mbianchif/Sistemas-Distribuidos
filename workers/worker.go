@@ -7,6 +7,7 @@ import (
 	"workers/config"
 	"workers/rabbit"
 
+	"github.com/op/go-logging"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -15,9 +16,10 @@ type Worker struct {
 	InputQueues  []amqp.Queue
 	OutputQueues []amqp.Queue
 	SigChan      chan os.Signal
+	Log          *logging.Logger
 }
 
-func New(con *config.Config) (*Worker, error) {
+func New(con *config.Config, log *logging.Logger) (*Worker, error) {
 	broker, err := rabbit.New(con.Url)
 	if err != nil {
 		return nil, err
@@ -36,6 +38,7 @@ func New(con *config.Config) (*Worker, error) {
 		inputQueues,
 		outputQueues,
 		sigs,
+		log,
 	}, nil
 }
 

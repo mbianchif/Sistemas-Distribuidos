@@ -1,9 +1,11 @@
 package impl
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -17,21 +19,14 @@ import (
 
 type Sanitize struct {
 	*workers.Worker
+	Con     *config.SanitizeConfig
+	Handler func(*Sanitize, []string) (map[string]string, error)
 }
 
-func New(con *config.SanitizeConfig) (*Sanitize, error) {
-	base, err := workers.New(con.Config)
+func New(con *config.SanitizeConfig, log *logging.Logger) (*Sanitize, error) {
+	base, err := workers.New(con.Config, log)
 	if err != nil {
 		return nil, err
-	}
-	return &Sanitize{base}, nil
-}
-
-func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
-	inputQueue := w.InputQueues[0]
-	recvChan, err := w.Broker.Consume(inputQueue, "")
-	if err != nil {
-		return err
 	}
 
 	handler := map[string]func(*Sanitize, []string) (map[string]string, error){
@@ -40,43 +35,73 @@ func (w *Sanitize) Run(con *config.SanitizeConfig, log *logging.Logger) error {
 		"ratings": handleRating,
 	}[con.Handler]
 
-	log.Infof("Running with handler: %v", con.Handler)
+	return &Sanitize{base, con, handler}, nil
+}
+
+func (w *Sanitize) Run() error {
+	inputQueue := w.InputQueues[0]
+	recvChan, err := w.Broker.Consume(inputQueue, "")
+	if err != nil {
+		return err
+	}
+
+	handlers := map[int]func(*Sanitize, []byte) bool{
+		protocol.BATCH: handleBatch,
+		protocol.EOF:   handleEof,
+		protocol.ERROR: handleError,
+	}
+
+	w.Log.Infof("Running with handler: %v", w.Con.Handler)
 	exit := false
 	for !exit {
 		select {
 		case <-w.SigChan:
 			exit = true
 
-		case msg := <-recvChan:
-			reader := csv.NewReader(strings.NewReader(string(msg.Body)))
-			line, err := reader.Read()
-			if err != nil {
-				log.Errorf("failed to decode message: %v", err)
-				msg.Nack(false, false)
-				continue
-			}
-
-			responseFieldMap, err := handler(w, line)
-			if err != nil {
-				log.Errorf("failed to handle message: %v", err)
-				msg.Nack(false, false)
-				continue
-			}
-
-			if responseFieldMap != nil {
-				log.Debugf("fieldMap: %v", responseFieldMap)
-				body := protocol.Encode(responseFieldMap, con.Select)
-				outQKey := con.OutputQueueKeys[0]
-				if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
-					log.Errorf("failed to publish message: %v", err)
-				}
-			}
-
-			msg.Ack(false)
+		case del := <-recvChan:
+			kind, data := protocol.ReadDelivery(del)
+			exit = handlers[kind](w, data)
+			del.Ack(false)
 		}
 	}
 
 	return nil
+}
+
+func handleBatch(w *Sanitize, data []byte) bool {
+	reader := csv.NewReader(bytes.NewReader(data))
+	responseFieldMaps := make([]map[string]string, 0)
+	for {
+		line, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			w.Log.Errorf("failed to decode message: %v", err)
+			continue
+		}
+
+		responseFieldMap, err := w.Handler(w, line)
+		if err != nil {
+			w.Log.Errorf("failed to handle message: %v", err)
+			continue
+		}
+
+		if responseFieldMap != nil {
+			responseFieldMaps = append(responseFieldMaps, responseFieldMap)
+		}
+	}
+
+	if len(responseFieldMaps) > 0 {
+		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
+		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
+		if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+			w.Log.Errorf("failed to publish message: %v", err)
+		}
+	}
+
+	return false
 }
 
 func parseNamesFromJson(field string) (names []string) {
@@ -205,4 +230,19 @@ func handleCredit(w *Sanitize, line []string) (map[string]string, error) {
 	}
 
 	return fields, nil
+}
+
+func handleEof(w *Sanitize, data []byte) bool {
+	body := protocol.DecodeEof(data).Encode()
+	qKey := w.Con.OutputQueueKeys[0]
+	if err := w.Broker.Publish(w.Con.OutputExchangeName, qKey, body); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+
+	return true
+}
+
+func handleError(w *Sanitize, data []byte) bool {
+	w.Log.Error("Received an ERROR message kind")
+	return true
 }

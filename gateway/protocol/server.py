@@ -6,16 +6,17 @@ from protocol.socket import (
     MSG_FIN,
     MSG_ERR,
 )
+from protocol.sanitize import lines_to_sanitize, fin_to_sanitize
 from rabbit.broker import Broker
 import logging
 import signal
 
 
 class Server:
-    def __init__(self, host: str, port: int, backlog: int = 0):
-        self._lis = CsvTransferListener.bind(host, port, backlog)
+    def __init__(self, config):
+        self._lis = CsvTransferListener.bind(config.host, config.port, config.backlog)
         self._shutdown = False
-        self._broker = Broker()
+        self._broker = Broker(config)
 
         def term_handler(_signum, _stacktrace):
             self._shutdown = True
@@ -24,13 +25,9 @@ class Server:
         signal.signal(signal.SIGTERM, term_handler)
 
     def run(self):
-        while not self._shutdown:
-            conn = self._accept_new_conn()
-            if conn is None:
-                continue
-
-            self._handle_client(conn)
-            conn.close()
+        conn = self._accept_new_conn()
+        self._handle_client(conn)
+        conn.close()
 
         self._lis.close()
         self._broker.close()
@@ -44,11 +41,13 @@ class Server:
                 msg = stream.recv()
                 if msg.kind == MSG_FIN:
                     logging.info(f"{filename} was successfully received")
+                    body = fin_to_sanitize(msg.data)
+                    self._broker.publish(routing_key=filename, body=body)
                     break
 
                 elif msg.kind == MSG_BATCH:
-                    for line in msg.data:
-                        self._broker.publish(routing_key=filename, body=line)
+                    body = lines_to_sanitize(msg.data)
+                    self._broker.publish(routing_key=filename, body=body)
 
                 elif msg.kind == MSG_ERR:
                     logging.critical("An error occurred, exiting...")
@@ -59,6 +58,16 @@ class Server:
                     logging.critical(f"An unknown msg kind was received {msg.kind}")
                     stream.close()
                     return 1
+        
+        for _ in range(5):
+            while True:
+                #TODO: falta recibir el end del result para poder hacer el break
+                logging.info("Waiting for results...")
+                self._broker.consume("", self._handle_result)
+            
+    def _handle_result(self, ch, method, properties, body):
+        logging.info(f"Received result: {body.decode()}")
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def _accept_new_conn(self):
         logging.info(f"Waiting for connections...")

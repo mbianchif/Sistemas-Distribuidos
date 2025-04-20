@@ -1,8 +1,8 @@
 package main
 
 import (
-	"workers/filter/config"
-	impl "workers/filter/impl"
+	"workers/groupby/config"
+	impl "workers/groupby/impl"
 
 	"github.com/op/go-logging"
 )

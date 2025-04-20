@@ -48,7 +48,7 @@ class CsvTransferStream:
             len_bytes = _recv_all(self._skt, 4)
             len = int.from_bytes(len_bytes, "big")
             line = _recv_all(self._skt, len)
-            lines.append(line.decode())
+            lines.append(line)
 
         return Message(msg_kind, lines)
 

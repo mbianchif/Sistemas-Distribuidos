@@ -14,65 +14,76 @@ import (
 
 type Explode struct {
 	*workers.Worker
+	Con *config.ExplodeConfig
 }
 
-func New(con *config.ExplodeConfig) (*Explode, error) {
-	base, err := workers.New(con.Config)
+func New(con *config.ExplodeConfig, log *logging.Logger) (*Explode, error) {
+	base, err := workers.New(con.Config, log)
 	if err != nil {
 		return nil, err
 	}
-	return &Explode{base}, nil
+	return &Explode{base, con}, nil
 }
 
-func (w *Explode) Run(con *config.ExplodeConfig, log *logging.Logger) error {
+func (w *Explode) Run() error {
 	inputQueue := w.InputQueues[0]
 	recvChan, err := w.Broker.Consume(inputQueue, "")
 	if err != nil {
 		return err
 	}
 
-	log.Infof("Running")
+	handlers := map[int]func(*Explode, []byte) bool{
+		protocol.BATCH: handleBatch,
+		protocol.EOF:   handleEof,
+		protocol.ERROR: handleError,
+	}
+
+	w.Log.Infof("Running")
 	exit := false
 	for !exit {
 		select {
 		case <-w.SigChan:
 			exit = true
 
-		case msg := <-recvChan:
-			fieldMap, err := protocol.Decode(msg.Body)
-			if err != nil {
-				log.Errorf("failed to decode message: %v", err)
-				msg.Nack(false, false)
-				continue
-			}
-
-			responseFieldMapSlice, err := handleExplode(w, fieldMap, con)
-			if err != nil {
-				log.Errorf("failed to handle message: %v", err)
-				msg.Nack(false, false)
-				continue
-			}
-
-			for _, responseFieldMap := range responseFieldMapSlice {
-				log.Debugf("fieldMap: %v", responseFieldMap)
-				body := protocol.Encode(responseFieldMap, con.Select)
-				outQKey := con.OutputQueueKeys[0]
-				if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
-					log.Errorf("failed to publish message: %v", err)
-				}
-			}
-
-			msg.Ack(false)
+		case del := <-recvChan:
+			kind, data := protocol.ReadDelivery(del)
+			exit = handlers[kind](w, data)
+			del.Ack(false)
 		}
 	}
 
 	return nil
 }
 
-func handleExplode(w *Explode, fieldMap map[string]string, con *config.ExplodeConfig) ([]map[string]string, error) {
+func handleBatch(w *Explode, data []byte) bool {
+	batch := protocol.DecodeBatch(data)
+	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
+
+	for _, fieldMap := range batch.FieldMaps {
+		responseFieldMapSlice, err := handleExplode(fieldMap, w.Con)
+		if err != nil {
+			w.Log.Errorf("failed to handle message: %v", err)
+			continue
+		}
+
+		responseFieldMaps = append(responseFieldMaps, responseFieldMapSlice...)
+	}
+
+	if len(responseFieldMaps) > 0 {
+		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
+		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
+		if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+			w.Log.Errorf("failed to publish message: %v", err)
+		}
+	}
+
+	return false
+}
+
+func handleExplode(fieldMap map[string]string, con *config.ExplodeConfig) ([]map[string]string, error) {
 	values, ok := fieldMap[con.Key]
 	if !ok {
-		return nil, fmt.Errorf("%v is not a field in the message", con.Key) 
+		return nil, fmt.Errorf("%v is not a field in the message", con.Key)
 	}
 
 	fieldMaps := make([]map[string]string, 0)
@@ -81,6 +92,20 @@ func handleExplode(w *Explode, fieldMap map[string]string, con *config.ExplodeCo
 		expCopy[con.Rename] = value
 		fieldMaps = append(fieldMaps, expCopy)
 	}
-	
+
 	return fieldMaps, nil
+}
+
+func handleEof(w *Explode, data []byte) bool {
+	body := protocol.DecodeEof(data).Encode()
+	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+
+	return true
+}
+
+func handleError(w *Explode, data []byte) bool {
+	w.Log.Error("Received an ERROR message kind")
+	return true
 }

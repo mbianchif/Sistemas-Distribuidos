@@ -40,8 +40,12 @@ func (b *Broker) Init(con *config.Config) ([]amqp.Queue, []amqp.Queue, error) {
 }
 
 func (b *Broker) DeInit() {
-	b.conn.Close()
-	b.ch.Close()
+	if !b.conn.IsClosed() {
+		b.conn.Close()
+	}
+	if !b.ch.IsClosed() {
+		b.ch.Close()
+	}
 }
 
 func (b *Broker) declareSide(exchangeName string, exchangeType string, qNames []string, qKeys []string) ([]amqp.Queue, error) {

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"workers/filter/config"
-	impl "workers/filter/impl"
+	"workers/sink/config"
+	impl "workers/sink/impl"
 
 	"github.com/op/go-logging"
 )
@@ -23,7 +23,7 @@ func main() {
 	}
 	log.Debug("successfull init")
 
-	if err := w.Run(); err != nil {
+	if err := w.Run(con, log); err != nil {
 		log.Criticalf("failed run: %v", err)
 	}
 
