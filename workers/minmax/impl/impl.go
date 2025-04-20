@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"strconv"
 	"workers"
 	"workers/minmax/config"
 	"workers/protocol"
@@ -97,10 +98,22 @@ func handleMinMax(w *MinMax, fieldMap map[string]string) error {
 	if w.min[w.Con.Key] == "" {
 		w.min = fieldMap
 	}
-	if fieldMap[w.Con.Key] > w.max[w.Con.Key] {
+	newValue, err := strconv.ParseFloat(fieldMap[w.Con.Key], 64)
+	if err != nil {
+		return err
+	}
+	maxValue, err := strconv.ParseFloat(w.max[w.Con.Key], 64)
+	if err != nil {
+		return err
+	}
+	minValue, err := strconv.ParseFloat(w.min[w.Con.Key], 64)
+	if err != nil {
+		return err
+	}
+	if newValue > maxValue {
 		w.max = fieldMap
 	}
-	if fieldMap[w.Con.Key] < w.min[w.Con.Key] {
+	if newValue < minValue {
 		w.min = fieldMap
 	}
 	return nil
