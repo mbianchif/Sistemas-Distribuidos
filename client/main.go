@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"client/config"
 	"client/protocol"
@@ -29,7 +28,7 @@ func main() {
 	}
 	configLog(con.LogLevel)
 
-	skt, err := protocol.Connect(con.GatewayHost, con.GatewayPort)
+	skt, err := protocol.NewConnection(con.GatewayHost, con.GatewayPort, log)
 	if err != nil {
 		skt.Close()
 		log.Fatalf("Can't connect with gateway: %v", err)
@@ -53,19 +52,7 @@ func main() {
 			break
 		}
 	}
-	log.Debugf("Se mandó todo")
 
-	// sleep temporal para que el servidor tenga tiempo de leer todo
-	time.Sleep(10 * time.Second)
-
-	// log.Infof("Waiting for results")
-	// for range 5 {
-	// 	id, err := skt.RecvQueryResult(con.Storage)
-	// 	if err != nil {
-	// 		log.Errorf("There was an error receiving query result %d: %v", id, err)
-	// 		continue
-	// 	}
-
-	// 	log.Infof("Query #%d has been successfully received", id)
-	// }
+	log.Infof("Waiting for results")
+	skt.RecvQueryResult(con.Storage)
 }

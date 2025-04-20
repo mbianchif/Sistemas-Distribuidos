@@ -49,9 +49,8 @@ func (w *Sum) Result(con *config.GroupbyConfig) []map[string]string {
 
 		keys := strings.Split(compKey, ",")
 		for i, key := range keys {
-			fieldMap[key] = con.GroupKeys[i]
+			fieldMap[con.GroupKeys[i]] = key
 		}
-
 
 		fieldMap[con.Storage] = strconv.FormatFloat(v, 'f', 4, 64)
 		fieldMaps = append(fieldMaps, fieldMap)

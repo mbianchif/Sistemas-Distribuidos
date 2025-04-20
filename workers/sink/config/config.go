@@ -3,12 +3,13 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"workers/config"
 )
 
 type SinkConfig struct {
 	*config.Config
-	Query string
+	Query int
 }
 
 func Create() (*SinkConfig, error) {
@@ -17,8 +18,8 @@ func Create() (*SinkConfig, error) {
 		return nil, err
 	}
 
-	query := os.Getenv("QUERY")
-	if len(query) == 0 {
+	query, err := strconv.Atoi(os.Getenv("QUERY"))
+	if err != nil {
 		return nil, fmt.Errorf("no query was provided")
 	}
 

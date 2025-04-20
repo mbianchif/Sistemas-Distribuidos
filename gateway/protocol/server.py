@@ -7,10 +7,34 @@ from protocol.socket import (
     MSG_ERR,
 )
 from protocol.sanitize import lines_to_sanitize, fin_to_sanitize
+from protocol.sink import *
 from rabbit.broker import Broker
 import logging
 import signal
 
+def handle_result(conn: CsvTransferStream, ch, method, properties, body):
+    kind, query, data = read_delivery_with_query(body)
+    if kind == BATCH:
+        batch = Batch.decode(data)
+        data = batch.to_result(query)
+        conn.send(data)
+
+    elif kind == EOF:
+        eof = Eof.decode(data)
+        data = eof.to_result(query)
+        conn.send(data)
+        logging.info(f"Query {query} has been succesfully processed")
+
+    elif kind == ERROR:
+        error = Error.decode(data)
+        data = error.to_result(query)
+        conn.send(data)
+        logging.info(f"There has been an error with query {query}")
+
+    else:
+        logging.error(f"Received an unknown data kind {kind}")
+
+    ch.basic_ack(delivery_tag=method.delivery_tag)
 
 class Server:
     def __init__(self, config):
@@ -26,19 +50,20 @@ class Server:
 
     def run(self):
         conn = self._accept_new_conn()
+        self._lis.close()
+
         self._handle_client(conn)
         conn.close()
 
-        self._lis.close()
         self._broker.close()
 
-    def _handle_client(self, stream: CsvTransferStream):
+    def _handle_client(self, conn: CsvTransferStream):
         for _ in range(3):
-            filename = stream.resource()
+            filename = conn.resource()
             logging.info(f"Receiving {filename}")
 
             while True:
-                msg = stream.recv()
+                msg = conn.recv()
                 if msg.kind == MSG_FIN:
                     logging.info(f"{filename} was successfully received")
                     body = fin_to_sanitize(msg.data)
@@ -51,23 +76,14 @@ class Server:
 
                 elif msg.kind == MSG_ERR:
                     logging.critical("An error occurred, exiting...")
-                    stream.close()
                     return 1
 
                 else:
                     logging.critical(f"An unknown msg kind was received {msg.kind}")
-                    stream.close()
                     return 1
         
-        for _ in range(5):
-            while True:
-                #TODO: falta recibir el end del result para poder hacer el break
-                logging.info("Waiting for results...")
-                self._broker.consume("", self._handle_result)
-            
-    def _handle_result(self, ch, method, properties, body):
-        logging.info(f"Received result: {body.decode()}")
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+        logging.info("Waiting for results...")
+        self._broker.consume("", handle_result, conn)
 
     def _accept_new_conn(self):
         logging.info(f"Waiting for connections...")
