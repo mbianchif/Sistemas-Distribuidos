@@ -31,6 +31,7 @@ var name2Id = map[string]int{
 	"rate_revenue_budget": 13,
 	"sentiment":           14,
 	"country":             15,
+	"query":               16,
 }
 
 var id2Name = []string{

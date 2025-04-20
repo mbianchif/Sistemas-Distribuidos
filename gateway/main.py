@@ -16,6 +16,6 @@ def configLogging(level: int):
 if __name__ == "__main__":
     con = Config()
     configLogging(con.log_level)
-    sv = Server(con.host, con.port, con.backlog)
+    sv = Server(con)
     sv.run()
 
