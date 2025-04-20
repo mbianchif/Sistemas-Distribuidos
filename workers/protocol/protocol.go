@@ -28,6 +28,7 @@ var name2Id = map[string]int{
 	// Added
 	"rate_revenue_budget": 13,
 	"sentiment":           14,
+	"query":               15,
 }
 
 var id2Name = []string{

@@ -33,7 +33,6 @@ services:
       rabbitmq:
         condition: service_healthy
 
-
   # ====================== Sanitizers ======================
 
   sanitize-movies-1:
@@ -161,7 +160,7 @@ services:
       - envs/explode/.env.cast
 
   # ====================== Dividers ======================
-    
+
   divider-1:
     container_name: divider-1
     build:
@@ -170,7 +169,7 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    env_file: 
+    env_file:
       - workers/.env
       - envs/divider/.env.divider
 
@@ -187,3 +186,17 @@ services:
     env_file:
       - workers/.env
       - envs/sentiment/.env.sentiment
+
+  # ====================== Sinks ======================
+
+  sink-q1:
+    container_name: sink-q1
+    build:
+      context: workers
+      dockerfile: dockerfiles/sink.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/sink-q1/.env.sink-q1
