@@ -15,7 +15,6 @@ import (
 	"workers/sanitize/config"
 
 	"github.com/op/go-logging"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Sanitize struct {
@@ -46,7 +45,7 @@ func (w *Sanitize) Run() error {
 		return err
 	}
 
-	handlers := map[int]func(*Sanitize, amqp.Delivery, []byte) bool{
+	handlers := map[int]func(*Sanitize, []byte) bool{
 		protocol.BATCH: handleBatch,
 		protocol.EOF:   handleEof,
 		protocol.ERROR: handleError,
@@ -61,14 +60,15 @@ func (w *Sanitize) Run() error {
 
 		case del := <-recvChan:
 			kind, data := protocol.ReadDelivery(del)
-			exit = handlers[kind](w, del, data)
+			exit = handlers[kind](w, data)
+			del.Ack(false)
 		}
 	}
 
 	return nil
 }
 
-func handleBatch(w *Sanitize, del amqp.Delivery, data []byte) bool {
+func handleBatch(w *Sanitize, data []byte) bool {
 	reader := csv.NewReader(bytes.NewReader(data))
 	responseFieldMaps := make([]map[string]string, 0)
 	for {
@@ -96,13 +96,11 @@ func handleBatch(w *Sanitize, del amqp.Delivery, data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
-		outQKey := w.Con.OutputQueueKeys[0]
-		if err := w.Broker.Publish(w.Con.OutputExchangeName, outQKey, body); err != nil {
+		if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
 
-	del.Ack(false)
 	return false
 }
 
@@ -234,18 +232,17 @@ func handleCredit(w *Sanitize, line []string) (map[string]string, error) {
 	return fields, nil
 }
 
-func handleEof(w *Sanitize, del amqp.Delivery, data []byte) bool {
+func handleEof(w *Sanitize, data []byte) bool {
 	body := protocol.DecodeEof(data).Encode()
-	outQKey := w.Con.OutputQueueKeys[0]
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, outQKey, body); err != nil {
+	qKey := w.Con.OutputQueueKeys[0]
+	if err := w.Broker.Publish(w.Con.OutputExchangeName, qKey, body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
-	del.Ack(false)
 	return true
 }
 
-func handleError(w *Sanitize, del amqp.Delivery, data []byte) bool {
+func handleError(w *Sanitize, data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

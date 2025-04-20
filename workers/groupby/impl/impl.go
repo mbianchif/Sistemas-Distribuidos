@@ -6,7 +6,6 @@ import (
 	"workers/protocol"
 
 	"github.com/op/go-logging"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Groupby struct {
@@ -44,7 +43,7 @@ func (w *Groupby) Run() error {
 		return err
 	}
 
-	handlers := map[int]func(*Groupby, amqp.Delivery, []byte) bool{
+	handlers := map[int]func(*Groupby, []byte) bool{
 		protocol.BATCH: handleBatch,
 		protocol.EOF:   handleEof,
 		protocol.ERROR: handleError,
@@ -59,15 +58,15 @@ func (w *Groupby) Run() error {
 
 		case del := <-recvChan:
 			kind, data := protocol.ReadDelivery(del)
-			exit = handlers[kind](w, del, data)
-
+			exit = handlers[kind](w, data)
+			del.Ack(false)
 		}
 	}
 
 	return nil
 }
 
-func handleBatch(w *Groupby, del amqp.Delivery, data []byte) bool {
+func handleBatch(w *Groupby, data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 
 	for _, fieldMap := range batch.FieldMaps {
@@ -78,28 +77,25 @@ func handleBatch(w *Groupby, del amqp.Delivery, data []byte) bool {
 		}
 	}
 
-	del.Ack(false)
 	return false
 }
 
-func handleEof(w *Groupby, del amqp.Delivery, data []byte) bool {
+func handleEof(w *Groupby, data []byte) bool {
 	fieldMaps := w.Handler.Result(w.Con)
 	body := protocol.NewBatch(fieldMaps).Encode(w.Con.Select)
-	outQKey := w.Con.OutputQueueKeys[0]
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, outQKey, body); err != nil {
+	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
 	body = protocol.DecodeEof(data).Encode()
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, outQKey, body); err != nil {
+	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
-	del.Ack(false)
 	return true
 }
 
-func handleError(w *Groupby, del amqp.Delivery, data []byte) bool {
+func handleError(w *Groupby, data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

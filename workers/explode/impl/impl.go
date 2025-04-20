@@ -10,7 +10,6 @@ import (
 	"workers/protocol"
 
 	"github.com/op/go-logging"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Explode struct {
@@ -33,7 +32,7 @@ func (w *Explode) Run() error {
 		return err
 	}
 
-	handlers := map[int]func(*Explode, amqp.Delivery, []byte) bool{
+	handlers := map[int]func(*Explode, []byte) bool{
 		protocol.BATCH: handleBatch,
 		protocol.EOF:   handleEof,
 		protocol.ERROR: handleError,
@@ -48,14 +47,15 @@ func (w *Explode) Run() error {
 
 		case del := <-recvChan:
 			kind, data := protocol.ReadDelivery(del)
-			exit = handlers[kind](w, del, data)
+			exit = handlers[kind](w, data)
+			del.Ack(false)
 		}
 	}
 
 	return nil
 }
 
-func handleBatch(w *Explode, del amqp.Delivery, data []byte) bool {
+func handleBatch(w *Explode, data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
 
@@ -63,27 +63,20 @@ func handleBatch(w *Explode, del amqp.Delivery, data []byte) bool {
 		responseFieldMapSlice, err := handleExplode(fieldMap, w.Con)
 		if err != nil {
 			w.Log.Errorf("failed to handle message: %v", err)
-			del.Nack(false, false)
 			continue
 		}
 
-		if responseFieldMapSlice != nil {
-			for _, responseFieldMap := range responseFieldMapSlice {
-				responseFieldMaps = append(responseFieldMaps, responseFieldMap)
-			}
-		}
+		responseFieldMaps = append(responseFieldMaps, responseFieldMapSlice...)
 	}
 
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
-		outQKey := w.Con.OutputQueueKeys[0]
-		if err := w.Broker.Publish(w.Con.OutputExchangeName, outQKey, body); err != nil {
+		if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
 
-	del.Ack(false)
 	return false
 }
 
@@ -103,18 +96,16 @@ func handleExplode(fieldMap map[string]string, con *config.ExplodeConfig) ([]map
 	return fieldMaps, nil
 }
 
-func handleEof(w *Explode, del amqp.Delivery, data []byte) bool {
+func handleEof(w *Explode, data []byte) bool {
 	body := protocol.DecodeEof(data).Encode()
-	outQKey := w.Con.OutputQueueKeys[0]
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, outQKey, body); err != nil {
+	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
-	del.Ack(false)
 	return true
 }
 
-func handleError(w *Explode, del amqp.Delivery, data []byte) bool {
+func handleError(w *Explode, data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

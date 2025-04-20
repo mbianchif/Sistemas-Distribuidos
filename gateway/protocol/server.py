@@ -6,6 +6,7 @@ from protocol.socket import (
     MSG_FIN,
     MSG_ERR,
 )
+from protocol.sanitize import lines_to_sanitize, fin_to_sanitize
 from rabbit.broker import Broker
 import logging
 import signal
@@ -24,13 +25,9 @@ class Server:
         signal.signal(signal.SIGTERM, term_handler)
 
     def run(self):
-        while not self._shutdown:
-            conn = self._accept_new_conn()
-            if conn is None:
-                continue
-
-            self._handle_client(conn)
-            conn.close()
+        conn = self._accept_new_conn()
+        self._handle_client(conn)
+        conn.close()
 
         self._lis.close()
         self._broker.close()
@@ -44,10 +41,12 @@ class Server:
                 msg = stream.recv()
                 if msg.kind == MSG_FIN:
                     logging.info(f"{filename} was successfully received")
+                    body = fin_to_sanitize(msg.data)
+                    self._broker.publish(routing_key=filename, body=body)
                     break
 
                 elif msg.kind == MSG_BATCH:
-                    body = b"\n".join(msg.data)
+                    body = lines_to_sanitize(msg.data)
                     self._broker.publish(routing_key=filename, body=body)
 
                 elif msg.kind == MSG_ERR:

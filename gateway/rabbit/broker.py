@@ -31,7 +31,7 @@ class Broker:
             logging.critical(f"Failed to connect with RabbitMQ: {e}")
             raise
 
-    def publish(self, routing_key: str, body: str):
+    def publish(self, routing_key: str, body: str | bytes):
         try:
             self._chan.basic_publish(exchange=self._exchange_name, routing_key=routing_key, body=body)
         except Exception as e:

@@ -10,7 +10,6 @@ import (
 	"workers/protocol"
 
 	"github.com/op/go-logging"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Filter struct {
@@ -41,7 +40,7 @@ func (w *Filter) Run() error {
 		return err
 	}
 
-	handlers := map[int]func(*Filter, amqp.Delivery, []byte) bool{
+	handlers := map[int]func(*Filter, []byte) bool{
 		protocol.BATCH: handleBatch,
 		protocol.EOF:   handleEof,
 		protocol.ERROR: handleError,
@@ -56,13 +55,14 @@ func (w *Filter) Run() error {
 
 		case del := <-recvChan:
 			kind, data := protocol.ReadDelivery(del)
-			exit = handlers[kind](w, del, data)
+			exit = handlers[kind](w, data)
+			del.Ack(false)
 		}
 	}
 	return nil
 }
 
-func handleBatch(w *Filter, del amqp.Delivery, data []byte) bool {
+func handleBatch(w *Filter, data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
 
@@ -70,7 +70,6 @@ func handleBatch(w *Filter, del amqp.Delivery, data []byte) bool {
 		responseFieldMap, err := w.Handler(w, fieldMap)
 		if err != nil {
 			w.Log.Errorf("failed to handle message: %v", err)
-			del.Nack(false, false)
 			continue
 		}
 
@@ -82,28 +81,24 @@ func handleBatch(w *Filter, del amqp.Delivery, data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
-		outQKey := w.Con.OutputQueueKeys[0]
-		if err := w.Broker.Publish(w.Con.OutputExchangeName, outQKey, body); err != nil {
+		if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
 
-	del.Ack(false)
 	return false
 }
 
-func handleEof(w *Filter, del amqp.Delivery, data []byte) bool {
+func handleEof(w *Filter, data []byte) bool {
 	body := protocol.DecodeEof(data).Encode()
-	outQKey := w.Con.OutputQueueKeys[0]
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, outQKey, body); err != nil {
+	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
-	del.Ack(false)
 	return true
 }
 
-func handleError(w *Filter, del amqp.Delivery, data []byte) bool {
+func handleError(w *Filter, data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }
