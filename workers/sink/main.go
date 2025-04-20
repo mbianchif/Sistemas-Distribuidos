@@ -16,7 +16,7 @@ func main() {
 	}
 	log.Debug("successfull config")
 
-	w, err := impl.New(con)
+	w, err := impl.New(con, log)
 	if err != nil {
 		w.Close()
 		log.Fatalf("failed init: %v", err)
