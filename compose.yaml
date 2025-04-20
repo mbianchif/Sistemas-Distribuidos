@@ -26,12 +26,13 @@ services:
   gateway:
     container_name: gateway
     build: gateway
-    env_file: gateway/.env
     ports:
       - 9090:9090
     depends_on:
       rabbitmq:
         condition: service_healthy
+    env_file:
+      - envs/gateway/.env.gateway
 
   # ====================== Sanitizers ======================
 
@@ -199,4 +200,4 @@ services:
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sink-q1/.env.sink-q1
+      - envs/sink/.env.sink-q1

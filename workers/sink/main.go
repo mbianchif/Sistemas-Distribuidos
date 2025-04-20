@@ -1,8 +1,8 @@
 package main
 
 import (
-	"workers/sanitize/config"
-	impl "workers/sanitize/impl"
+	"workers/sink/config"
+	impl "workers/sink/impl"
 
 	"github.com/op/go-logging"
 )

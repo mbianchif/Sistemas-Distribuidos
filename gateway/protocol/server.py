@@ -12,10 +12,10 @@ import signal
 
 
 class Server:
-    def __init__(self, host: str, port: int, backlog: int = 0):
-        self._lis = CsvTransferListener.bind(host, port, backlog)
+    def __init__(self, config):
+        self._lis = CsvTransferListener.bind(config.host, config.port, config.backlog)
         self._shutdown = False
-        self._broker = Broker()
+        self._broker = Broker(config)
 
         def term_handler(_signum, _stacktrace):
             self._shutdown = True
@@ -59,6 +59,16 @@ class Server:
                     logging.critical(f"An unknown msg kind was received {msg.kind}")
                     stream.close()
                     return 1
+        
+        for _ in range(5):
+            while True:
+                #TODO: falta recibir el end del result para poder hacer el break
+                logging.info("Waiting for results...")
+                self._broker.consume(self._broker.inputQueues[0], "", self._handle_result)
+            
+    def _handle_result(self, ch, method, properties, body):
+        logging.info(f"Received result: {body.decode()}")
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def _accept_new_conn(self):
         logging.info(f"Waiting for connections...")
