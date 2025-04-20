@@ -28,6 +28,7 @@ var name2Id = map[string]int{
 	// Added
 	"rate_revenue_budget": 13,
 	"sentiment":           14,
+	"country":             15,
 }
 
 var id2Name = []string{
@@ -52,6 +53,8 @@ var id2Name = []string{
 
 	// Added
 	"rate_revenue_budget",
+	"sentiment",
+	"country",
 }
 
 func Encode(fields map[string]string, filterCols map[string]struct{}) []byte {

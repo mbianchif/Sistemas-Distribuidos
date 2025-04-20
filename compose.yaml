@@ -160,6 +160,56 @@ services:
       - workers/.env
       - envs/explode/.env.cast
 
+  # ====================== GroupBys ======================
+
+  groupby-sentiment_mean_rate_revenue_budget-1:
+    container_name: groupby-sentiment_mean_rate_revenue_budget-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/groupby.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/groupby/.env.sentiment_mean_rate_revenue_budget
+
+  groupby-country_sum_budget-1:
+    container_name: groupby-country_sum_budget-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/groupby.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/groupby/.env.country_sum_budget
+
+  groupby-id_actor_count-1:
+    container_name: groupby-id_actor_count-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/groupby.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/groupby/.env.id_actor_count
+
+  groupby-id_title_mean_rating-1:
+    container_name: groupby-id_title_mean_rating-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/groupby.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/groupby/.env.id_title_mean_rating
+
   # ====================== Dividers ======================
     
   divider-1:

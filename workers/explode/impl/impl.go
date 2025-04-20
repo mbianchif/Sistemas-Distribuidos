@@ -46,7 +46,7 @@ func (w *Explode) Run(con *config.ExplodeConfig, log *logging.Logger) error {
 				continue
 			}
 
-			responseFieldMapSlice, err := handleExplode(w, fieldMap, con)
+			responseFieldMapSlice, err := handleExplode(fieldMap, con)
 			if err != nil {
 				log.Errorf("failed to handle message: %v", err)
 				msg.Nack(false, false)
@@ -69,7 +69,7 @@ func (w *Explode) Run(con *config.ExplodeConfig, log *logging.Logger) error {
 	return nil
 }
 
-func handleExplode(w *Explode, fieldMap map[string]string, con *config.ExplodeConfig) ([]map[string]string, error) {
+func handleExplode(fieldMap map[string]string, con *config.ExplodeConfig) ([]map[string]string, error) {
 	values, ok := fieldMap[con.Key]
 	if !ok {
 		return nil, fmt.Errorf("%v is not a field in the message", con.Key) 
