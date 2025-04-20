@@ -2,6 +2,7 @@ package impl
 
 import (
 	"sort"
+	"strconv"
 	"workers"
 	"workers/protocol"
 	"workers/top/config"
@@ -89,10 +90,16 @@ func handleError(w *Top, data []byte) bool {
 }
 
 func handleTop(w *Top, fieldMap map[string]string) error {
+	_, err := strconv.ParseFloat(fieldMap[w.Con.Key], 64)
+	if err != nil {
+		return err
+	}
 	w.top_lit = append(w.top_lit, fieldMap)
 
 	sort.Slice(w.top_lit, func(i, j int) bool {
-		return w.top_lit[i][w.Con.Key] > w.top_lit[j][w.Con.Key]
+		vi, _ := strconv.ParseFloat(w.top_lit[i][w.Con.Key], 64)
+		vj, _ := strconv.ParseFloat(w.top_lit[j][w.Con.Key], 64)
+		return vi > vj
 	})
 
 	if len(w.top_lit) > w.Con.Amount {
