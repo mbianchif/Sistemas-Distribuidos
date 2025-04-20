@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"sort"
 	"workers"
 	"workers/protocol"
 	"workers/top/config"
@@ -62,4 +63,16 @@ func (w *Top) Run(con *config.TopConfig, log *logging.Logger) error {
 func handleTop(w *Top, fieldMap map[string]string, con *config.TopConfig) error {
 
 	return nil
+}
+
+func (w *Top) addMovieToTopList(entry map[string]string, con *config.TopConfig) {
+	w.top_lits = append(w.top_lits, entry)
+
+	sort.Slice(w.top_lits, func(i, j int) bool {
+		return w.top_lits[i][con.Key] > w.top_lits[j][con.Key]
+	})
+
+	if len(w.top_lits) > con.Amount {
+		w.top_lits = w.top_lits[:con.Amount]
+	}
 }
