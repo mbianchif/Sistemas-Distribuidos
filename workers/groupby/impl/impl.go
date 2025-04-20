@@ -1,7 +1,6 @@
 package impl
 
 import (
-	"fmt"
 	"workers"
 	"workers/groupby/config"
 	"workers/protocol"
