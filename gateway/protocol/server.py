@@ -33,6 +33,7 @@ class Server:
             conn.close()
 
         self._lis.close()
+        self._broker.close()
 
     def _handle_client(self, stream: CsvTransferStream):
         for _ in range(3):
@@ -44,6 +45,7 @@ class Server:
                 if msg.kind == MSG_FIN:
                     logging.info(f"{filename} was successfully received")
                     break
+
                 elif msg.kind == MSG_BATCH:
                     for line in msg.data:
                         self._broker.publish(routing_key=filename, body=line)
@@ -52,6 +54,7 @@ class Server:
                     logging.critical("An error occurred, exiting...")
                     stream.close()
                     return 1
+
                 else:
                     logging.critical(f"An unknown msg kind was received {msg.kind}")
                     stream.close()

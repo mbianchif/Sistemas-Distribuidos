@@ -26,4 +26,7 @@ func main() {
 	if err := w.Run(con, log); err != nil {
 		log.Criticalf("failed run: %v", err)
 	}
+
+	log.Infof("Terminating...")
+	w.Close()
 }

@@ -37,34 +37,40 @@ func (w *Sentiment) Run(con *config.SentimentConfig, log *logging.Logger) error 
 	}
 
 	log.Infof("Running")
-	for msg := range recvChan {
-		fieldMap, err := protocol.Decode(msg.Body)
-		if err != nil {
-			log.Errorf("failed to decode message: %v", err)
-			msg.Nack(false, false)
-			continue
-		}
+	exit := false
+	for !exit {
+		select {
+		case <-w.SigChan:
+			exit = true
 
-		responseFieldMap, err := handleSentiment(w, fieldMap)
-		if err != nil {
-			log.Errorf("failed to handle message: %v", err)
-			msg.Nack(false, false)
-			continue
-		}
-
-		if responseFieldMap != nil {
-			log.Debugf("fieldMap: %v", responseFieldMap)
-			body := protocol.Encode(responseFieldMap, con.Select)
-			outQKey := con.OutputQueueKeys[0]
-			if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
-				log.Errorf("failed to publish message: %v", err)
+		case msg := <-recvChan:
+			fieldMap, err := protocol.Decode(msg.Body)
+			if err != nil {
+				log.Errorf("failed to decode message: %v", err)
+				msg.Nack(false, false)
+				continue
 			}
-		}
 
-		msg.Ack(false)
+			responseFieldMap, err := handleSentiment(w, fieldMap)
+			if err != nil {
+				log.Errorf("failed to handle message: %v", err)
+				msg.Nack(false, false)
+				continue
+			}
+
+			if responseFieldMap != nil {
+				log.Debugf("fieldMap: %v", responseFieldMap)
+				body := protocol.Encode(responseFieldMap, con.Select)
+				outQKey := con.OutputQueueKeys[0]
+				if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
+					log.Errorf("failed to publish message: %v", err)
+				}
+			}
+
+			msg.Ack(false)
+		}
 	}
 
-	log.Info("recv channel was closed")
 	return nil
 }
 

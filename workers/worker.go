@@ -1,6 +1,9 @@
 package workers
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
 	"workers/config"
 	"workers/rabbit"
 
@@ -11,6 +14,7 @@ type Worker struct {
 	Broker       *rabbit.Broker
 	InputQueues  []amqp.Queue
 	OutputQueues []amqp.Queue
+	SigChan      chan os.Signal
 }
 
 func New(con *config.Config) (*Worker, error) {
@@ -24,13 +28,18 @@ func New(con *config.Config) (*Worker, error) {
 		return nil, err
 	}
 
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM)
+
 	return &Worker{
 		broker,
 		inputQueues,
 		outputQueues,
+		sigs,
 	}, nil
 }
 
 func (w *Worker) Close() {
 	w.Broker.DeInit()
+	close(w.SigChan)
 }

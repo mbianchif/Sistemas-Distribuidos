@@ -32,41 +32,47 @@ func (w *Filter) Run(con *config.FilterConfig, log *logging.Logger) error {
 		return err
 	}
 
-	log.Infof("Running with handler: %v", con.Handler)
 	handler := map[string]func(*Filter, map[string]string, *config.FilterConfig) (map[string]string, error){
 		"range":    handleRange,
 		"contains": handleContains,
 		"length":   handleLength,
 	}[con.Handler]
 
-	for msg := range recvChan {
-		fieldMap, err := protocol.Decode(msg.Body)
-		if err != nil {
-			log.Errorf("failed to decode message: %v", err)
-			msg.Nack(false, false)
-			continue
-		}
+	log.Infof("Running with handler: %v", con.Handler)
+	exit := false
+	for !exit {
+		select {
+		case <-w.SigChan:
+			exit = true
 
-		responseFieldMap, err := handler(w, fieldMap, con)
-		if err != nil {
-			log.Errorf("failed to handle message: %v", err)
-			msg.Nack(false, false)
-			continue
-		}
-
-		if responseFieldMap != nil {
-			log.Debugf("fieldMap: %v", fieldMap)
-			body := protocol.Encode(responseFieldMap, con.Select)
-			outQKey := con.OutputQueueKeys[0]
-			if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
-				log.Errorf("failed to publish message: %v", err)
+		case msg := <-recvChan:
+			fieldMap, err := protocol.Decode(msg.Body)
+			if err != nil {
+				log.Errorf("failed to decode message: %v", err)
+				msg.Nack(false, false)
+				continue
 			}
-		}
 
-		msg.Ack(false)
+			responseFieldMap, err := handler(w, fieldMap, con)
+			if err != nil {
+				log.Errorf("failed to handle message: %v", err)
+				msg.Nack(false, false)
+				continue
+			}
+
+			if responseFieldMap != nil {
+				log.Debugf("fieldMap: %v", fieldMap)
+				body := protocol.Encode(responseFieldMap, con.Select)
+				outQKey := con.OutputQueueKeys[0]
+				if err := w.Broker.Publish(con.OutputExchangeName, outQKey, body); err != nil {
+					log.Errorf("failed to publish message: %v", err)
+				}
+			}
+
+			msg.Ack(false)
+		}
 	}
 
-	log.Info("recv channel was closed")
 	return nil
 }
 

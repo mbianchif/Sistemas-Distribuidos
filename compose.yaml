@@ -1,5 +1,16 @@
 name: moviesanalyzer
 services:
+  client:
+    container_name: client
+    build: client
+    env_file: client/.env
+    volumes:
+      - .data:/data
+    depends_on:
+      - gateway
+
+  # ====================== Rabbit - Gateway ======================
+
   rabbitmq:
     container_name: rabbitmq
     image: rabbitmq:management
@@ -12,6 +23,7 @@ services:
       retries: 10
       start_period: 50s
 
+
   gateway:
     container_name: gateway
     build: gateway
@@ -22,14 +34,6 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  client:
-    container_name: client
-    build: client
-    env_file: client/.env
-    volumes:
-      - .data:/data
-    depends_on:
-      - gateway
 
   # ====================== Sanitizers ======================
 
