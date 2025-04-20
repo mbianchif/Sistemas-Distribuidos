@@ -2,7 +2,6 @@ package impl
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -104,12 +103,13 @@ func handleLength(w *Filter, msg map[string]string, con *config.FilterConfig) (m
 	if err != nil {
 		return nil, fmt.Errorf("given length is not a number")
 	}
-	countries, ok := msg[con.Key]
+
+	values, ok := msg[con.Key]
 	if !ok {
 		return nil, fmt.Errorf("key %v is not in message", con.Key)
 	}
-	countryList := strings.Split(countries, ",")
-	if len(countryList) != length {
+
+	if strings.Count(values, ",")+1 != length {
 		return nil, nil
 	}
 
@@ -117,20 +117,18 @@ func handleLength(w *Filter, msg map[string]string, con *config.FilterConfig) (m
 }
 
 func handleContains(w *Filter, msg map[string]string, con *config.FilterConfig) (map[string]string, error) {
-	countries, ok := msg[con.Key]
+	values, ok := msg[con.Key]
 	if !ok {
 		return nil, fmt.Errorf("key %v is not in message", con.Key)
 	}
-	countryList := strings.Split(countries, ",")
-	countryValueList := strings.Split(con.Value, ",")
 
-	if len(countryValueList) == 0 {
-		return nil, fmt.Errorf("value %v is not a list", con.Value)
+	valueSet := make(map[string]struct{})
+	for value := range strings.SplitSeq(values, ",") {
+		valueSet[value] = struct{}{}
 	}
 
-	for _, country := range countryValueList {
-		if !slices.Contains(countryList, country) {
-			fmt.Printf("country %v is not in the list %v", country, countryList)
+	for key := range strings.SplitSeq(con.Value, ",") {
+		if _, ok := valueSet[key]; !ok {
 			return nil, nil
 		}
 	}
