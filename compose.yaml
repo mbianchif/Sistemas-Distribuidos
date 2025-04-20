@@ -111,6 +111,32 @@ services:
       - workers/.env
       - envs/filter/.env.release_date_upto_2010
 
+  # ====================== Explodes ======================
+
+  explode-production_countries-1:
+    container_name: explode-production_countries-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/explode.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/explode/.env.production_countries
+
+  explode-cast-1:
+    container_name: explode-cast-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/explode.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/explode/.env.cast
+
   # ====================== Dividers ======================
     
   divider-1:
