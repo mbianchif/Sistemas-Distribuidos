@@ -20,7 +20,6 @@ type Config struct {
 	OutputQueueNames   []string
 	OutputQueueKeys    []string
 	Select             map[string]struct{}
-	Producer           string
 }
 
 func configLog(logLevel logging.Level) {
@@ -63,7 +62,7 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the input queue names were not provided")
 	}
 
-	inputQueueKeysString := os.Getenv("INPUT_QUEUE_KEY")
+	inputQueueKeysString := os.Getenv("INPUT_QUEUE_KEYS")
 	inputQueueKeys := strings.Split(inputQueueKeysString, ",")
 	if len(inputQueueNames) != len(inputQueueKeys) {
 		return nil, fmt.Errorf("the length of input queue names and input queue keys don't match (names: %v, keys: %v)", len(inputQueueNames), len(inputQueueKeys))
@@ -104,11 +103,6 @@ func Create() (*Config, error) {
 		selectMap[field] = struct{}{}
 	}
 
-	producer := os.Getenv("PRODUCER")
-	if len(producer) == 0 {
-		return nil, fmt.Errorf("the producer was not provided")
-	}
-
 	logLevelVar := strings.ToUpper(os.Getenv("LOG_LEVEL"))
 	logLevel, err := logging.LogLevel(logLevelVar)
 	if err != nil {
@@ -120,13 +114,12 @@ func Create() (*Config, error) {
 		Url:                url,
 		InputExchangeNames: inputExchangeNames,
 		InputExchangeTypes: inputExchangeTypes,
-		InputQueueNames:     inputQueueNames,
-		InputQueueKeys:      inputQueueKeys,
+		InputQueueNames:    inputQueueNames,
+		InputQueueKeys:     inputQueueKeys,
 		OutputExchangeName: outputExchangeName,
 		OutputExchangeType: outputExchangeType,
 		OutputQueueNames:   outputQueueNames,
 		OutputQueueKeys:    outputQueueKeys,
 		Select:             selectMap,
-		Producer:           producer,
 	}, nil
 }

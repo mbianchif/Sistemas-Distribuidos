@@ -147,7 +147,13 @@ func (m Batch) EncodeWithQuery(filterCols map[string]struct{}, query int) []byte
 	return m.encodeWithStartingBuffer(filterCols, startingBuf)
 }
 
-func decodeLine(data []byte) map[string]string {
+func (m Batch) EncodeForPersistance() []byte {
+	startingBuf := make([]byte, 0, 1024)
+	encoded := m.encodeWithStartingBuffer(nil, startingBuf)
+	return append(encoded, "\n"...)
+}
+
+func DecodeLine(data []byte) map[string]string {
 	fields := make(map[string]string, 12)
 
 	for kv := range bytes.SplitSeq(data, []byte(";")) {
@@ -173,7 +179,7 @@ func DecodeBatch(data []byte) Batch {
 	fieldMaps := make([]map[string]string, 0, len(lines))
 
 	for _, line := range lines {
-		fieldMap := decodeLine(line)
+		fieldMap := DecodeLine(line)
 		fieldMaps = append(fieldMaps, fieldMap)
 	}
 
