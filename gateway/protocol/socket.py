@@ -52,8 +52,8 @@ class CsvTransferStream:
 
         return Message(msg_kind, lines)
 
-    def send(self):
-        pass
+    def send(self, data: bytearray):
+        self._skt.sendall(data)
 
     def close(self):
         self._skt.close()

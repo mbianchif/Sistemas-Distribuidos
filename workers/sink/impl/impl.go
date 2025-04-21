@@ -10,8 +10,7 @@ import (
 
 type Sink struct {
 	*workers.Worker
-	Con     *config.SinkConfig
-	Handler func(*Sink, map[string]string) (map[string]string, error)
+	Con *config.SinkConfig
 }
 
 func New(con *config.SinkConfig, log *logging.Logger) (*Sink, error) {
@@ -19,14 +18,7 @@ func New(con *config.SinkConfig, log *logging.Logger) (*Sink, error) {
 	if err != nil {
 		return nil, err
 	}
-	handler := map[string]func(*Sink, map[string]string) (map[string]string, error){
-		"1": handleFirstQuery,
-		"2": handleSecondQuery,
-		"3": handleThirdQuery,
-		"4": handleFourthQuery,
-		"5": handleFifthQuery,
-	}[con.Query]
-	return &Sink{base, con, handler}, nil
+	return &Sink{base, con}, nil
 }
 
 func (w *Sink) Run(con *config.SinkConfig, log *logging.Logger) error {
@@ -43,7 +35,6 @@ func (w *Sink) Run(con *config.SinkConfig, log *logging.Logger) error {
 	}
 
 	log.Infof("Running with Sink-q%v", con.Query)
-
 	exit := false
 	for !exit {
 		select {
@@ -62,23 +53,11 @@ func (w *Sink) Run(con *config.SinkConfig, log *logging.Logger) error {
 
 func handleBatch(w *Sink, data []byte) bool {
 	batch := protocol.DecodeBatch(data)
-	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
-
-	for _, fieldMap := range batch.FieldMaps {
-		responseFieldMap, err := w.Handler(w, fieldMap)
-		if err != nil {
-			w.Log.Errorf("failed to handle message: %v", err)
-			continue
-		}
-
-		if responseFieldMap != nil {
-			responseFieldMaps = append(responseFieldMaps, responseFieldMap)
-		}
-	}
+	responseFieldMaps := batch.FieldMaps
 
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
-		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
+		body := protocol.NewBatch(responseFieldMaps).EncodeWithQuery(w.Con.Select, w.Con.Query)
 		if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
@@ -88,7 +67,7 @@ func handleBatch(w *Sink, data []byte) bool {
 }
 
 func handleEof(w *Sink, data []byte) bool {
-	body := protocol.DecodeEof(data).Encode()
+	body := protocol.DecodeEof(data).EncodeWithQuery(w.Con.Query)
 	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
@@ -99,29 +78,4 @@ func handleEof(w *Sink, data []byte) bool {
 func handleError(w *Sink, data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
-}
-
-func handleFirstQuery(w *Sink, msg map[string]string) (map[string]string, error) {
-	msg["query"] = "1"
-	return msg, nil
-}
-
-func handleSecondQuery(w *Sink, msg map[string]string) (map[string]string, error) {
-	msg["query"] = "2"
-	return msg, nil
-}
-
-func handleThirdQuery(w *Sink, msg map[string]string) (map[string]string, error) {
-	msg["query"] = "3"
-	return msg, nil
-}
-
-func handleFourthQuery(w *Sink, msg map[string]string) (map[string]string, error) {
-	msg["query"] = "4"
-	return msg, nil
-}
-
-func handleFifthQuery(w *Sink, msg map[string]string) (map[string]string, error) {
-	msg["query"] = "5"
-	return msg, nil
 }

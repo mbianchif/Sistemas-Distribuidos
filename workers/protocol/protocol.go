@@ -58,6 +58,7 @@ var id2Name = []string{
 	"rate_revenue_budget",
 	"sentiment",
 	"country",
+	"query",
 }
 
 const (
@@ -116,10 +117,7 @@ func encodeLine(fields map[string]string, filterCols map[string]struct{}) []byte
 	return bytes
 }
 
-func (m Batch) Encode(filterCols map[string]struct{}) []byte {
-	startingBuf := make([]byte, 1, 1024)
-	startingBuf[0] = BATCH
-
+func (m Batch) encodeWithStartingBuffer(filterCols map[string]struct{}, startingBuf []byte) []byte {
 	buf := bytes.NewBuffer(startingBuf)
 	first := true
 
@@ -134,6 +132,19 @@ func (m Batch) Encode(filterCols map[string]struct{}) []byte {
 	}
 
 	return buf.Bytes()
+}
+
+func (m Batch) Encode(filterCols map[string]struct{}) []byte {
+	startingBuf := make([]byte, 1, 1024)
+	startingBuf[0] = BATCH
+	return m.encodeWithStartingBuffer(filterCols, startingBuf)
+}
+
+func (m Batch) EncodeWithQuery(filterCols map[string]struct{}, query int) []byte {
+	startingBuf := make([]byte, 2, 1024)
+	startingBuf[0] = BATCH
+	startingBuf[1] = byte(query)
+	return m.encodeWithStartingBuffer(filterCols, startingBuf)
 }
 
 func decodeLine(data []byte) map[string]string {
@@ -173,6 +184,10 @@ type Eof struct{}
 
 func (m Eof) Encode() []byte {
 	return []byte{EOF}
+}
+
+func (m Eof) EncodeWithQuery(query int) []byte {
+	return []byte{EOF, byte(query)}
 }
 
 func DecodeEof([]byte) Eof {

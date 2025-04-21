@@ -9,7 +9,7 @@ import (
 
 type tuple struct {
 	sum float64
-	n int
+	n   int
 }
 
 type Mean struct {
@@ -48,7 +48,6 @@ func (w *Mean) Add(fieldMap map[string]string, con *config.GroupbyConfig) error 
 		w.state[compKey] = tuple{tup.sum + sumValue, tup.n + 1}
 	}
 
-	fmt.Println(w.state)
 	return nil
 }
 
@@ -59,12 +58,13 @@ func (w *Mean) Result(con *config.GroupbyConfig) []map[string]string {
 
 		keys := strings.Split(compKey, ",")
 		for i, key := range keys {
-			fieldMap[key] = con.GroupKeys[i]
+			fieldMap[con.GroupKeys[i]] = key
 		}
 
-		fieldMap[con.Storage] = strconv.FormatFloat(v.sum / float64(v.n), 'f', 4, 64)
+		fieldMap[con.Storage] = strconv.FormatFloat(v.sum/float64(v.n), 'f', 4, 64)
 		fieldMaps = append(fieldMaps, fieldMap)
 	}
 
+	fmt.Println(fieldMaps)
 	return fieldMaps
 }

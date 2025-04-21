@@ -38,7 +38,7 @@ func (w *Count) Result(con *config.GroupbyConfig) []map[string]string {
 
 		keys := strings.Split(compKey, ",")
 		for i, key := range keys {
-			fieldMap[key] = con.GroupKeys[i]
+			fieldMap[con.GroupKeys[i]] = key
 		}
 
 		fieldMap[con.Storage] = strconv.Itoa(v)
