@@ -35,7 +35,10 @@ func (w *Sentiment) Run() error {
 }
 
 func (w *Sentiment) Batch(data []byte) bool {
-	batch := protocol.DecodeBatch(data)
+	batch, err := protocol.DecodeBatch(data)
+	if err != nil {
+		w.Log.Fatal("failed to decode batch: %v", err)
+	}
 	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
 
 	for _, fieldMap := range batch.FieldMaps {

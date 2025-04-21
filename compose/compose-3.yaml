@@ -1,0 +1,143 @@
+name: moviesanalyzer
+services:
+  client:
+    container_name: client
+    build: client
+    env_file: client/.env
+    volumes:
+      - .data:/data
+    depends_on:
+      - gateway
+
+  # ====================== Rabbit - Gateway ======================
+
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:management
+    ports:
+      - 15672:15672
+    healthcheck:
+      test: rabbitmq-diagnostics check_port_connectivity
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 50s
+
+  gateway:
+    container_name: gateway
+    build: gateway
+    ports:
+      - 9090:9090
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - envs/gateway/.env.gateway
+
+  # ====================== Sanitizers ======================
+
+  sanitize-movies-1:
+    container_name: sanitize-movies-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/sanitize.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/sanitize/.env.movies
+
+  sanitize-ratings-1:
+    container_name: sanitize-ratings-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/sanitize.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/sanitize/.env.ratings
+
+  # ====================== Filters ======================
+
+  filter-release_date_since_2000-1:
+    container_name: filter-release_date_since_2000-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.release_date_since_2000
+
+  filter-production_countries_argentina-1:
+    container_name: filter-production_countries_argentina-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.production_countries_argentina
+    
+  # ====================== Join ======================
+
+  join-id_movieid-1:
+    container_name: join-id_movieId-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/join.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/join/.env.id_movieId
+
+  # ====================== GroupBys ======================
+
+  groupby-id_title_mean_rating-1:
+    container_name: groupby-id_title_mean_rating-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/groupby.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/groupby/.env.id_title_mean_rating
+
+# ====================== MinMax ======================
+
+  minmax-rating-1:
+    container_name: minmax-rating-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/minmax.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/minmax/.env.rating
+
+  # ====================== Sinks ======================
+
+  sink-3-1:
+    container_name: sink-3-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/sink.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/sink/.env.3

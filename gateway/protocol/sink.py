@@ -25,7 +25,8 @@ name2id = {
     "rate_revenue_budget": 13,
     "sentiment": 14,
     "country": 15,
-    "query": 16,
+    "actor": 16,
+    "count": 17,
 }
 
 # ID to field name mapping
@@ -39,7 +40,7 @@ ERROR = 2
 _query_columns = {
     1: ["title", "genres"],
     2: ["country", "budget"],
-    3: ["title", "genres"],
+    3: ["title", "rating"],
     4: ["actor", "count"],
     5: ["sentiment", "rate_revenue_budget"],
 }

@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bytes"
+	"fmt"
 	"strconv"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -31,7 +32,8 @@ var name2Id = map[string]int{
 	"rate_revenue_budget": 13,
 	"sentiment":           14,
 	"country":             15,
-	"query":               16,
+	"actor":               16,
+	"count":               17,
 }
 
 var id2Name = []string{
@@ -58,7 +60,8 @@ var id2Name = []string{
 	"rate_revenue_budget",
 	"sentiment",
 	"country",
-	"query",
+	"actor",
+	"count",
 }
 
 const (
@@ -153,7 +156,7 @@ func (m Batch) EncodeForPersistance() []byte {
 	return append(encoded, "\n"...)
 }
 
-func DecodeLine(data []byte) map[string]string {
+func DecodeLine(data []byte) (map[string]string, error) {
 	fields := make(map[string]string, 12)
 
 	for kv := range bytes.SplitSeq(data, []byte(";")) {
@@ -167,23 +170,31 @@ func DecodeLine(data []byte) map[string]string {
 			continue
 		}
 
+		if keyNum > len(id2Name) {
+			return nil, fmt.Errorf("%v field is not supported by the protocol, must add", err)
+		}
+
 		keyName := id2Name[keyNum]
 		fields[keyName] = string(pair[1])
 	}
 
-	return fields
+	return fields, nil
 }
 
-func DecodeBatch(data []byte) Batch {
+func DecodeBatch(data []byte) (*Batch, error) {
 	lines := bytes.Split(data, []byte("\n"))
 	fieldMaps := make([]map[string]string, 0, len(lines))
 
 	for _, line := range lines {
-		fieldMap := DecodeLine(line)
+		fieldMap, err := DecodeLine(line)
+		if err != nil {
+			return nil, err
+		}
+
 		fieldMaps = append(fieldMaps, fieldMap)
 	}
 
-	return Batch{fieldMaps}
+	return &Batch{fieldMaps}, nil
 }
 
 type Eof struct{}

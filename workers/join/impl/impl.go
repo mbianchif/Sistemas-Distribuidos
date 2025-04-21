@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"workers"
 	"workers/join/config"
 	"workers/protocol"
@@ -50,7 +49,11 @@ func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
 	for i := range con.NShards {
 		ch := make(chan tuple)
 		chans = append(chans, ch)
-		go spawn_file_persistor(w, ch, i)
+		go func(i int) {
+			if err := spawn_file_persistor(w, ch, i); err != nil {
+				w.Log.Errorf("error in spawn_file_persistor: %v", err)
+			}
+		}(i)
 	}
 
 	w.chans = chans
@@ -88,7 +91,11 @@ func load(w *Join, fp *os.File, fieldMaps []map[string]string) ([]map[string]str
 				return nil, err
 			}
 
-			left := protocol.DecodeLine(line)
+			left, err := protocol.DecodeLine(line)
+			if err != nil {
+				w.Log.Fatalf("failed to decode line: %v", err)
+			}
+
 			valueLeft, ok := left[w.Con.LeftKey]
 			if !ok {
 				w.Log.Errorf("key %v was not found in left side", w.Con.LeftKey)
@@ -98,6 +105,7 @@ func load(w *Join, fp *os.File, fieldMaps []map[string]string) ([]map[string]str
 			valueRight, ok := right[w.Con.RightKey]
 			if !ok {
 				w.Log.Errorf("key %v was not found in right side", w.Con.RightKey)
+				continue
 			}
 
 			if valueLeft == valueRight {
@@ -112,8 +120,8 @@ func load(w *Join, fp *os.File, fieldMaps []map[string]string) ([]map[string]str
 }
 
 func spawn_file_persistor(w *Join, ch chan tuple, i int) error {
-	path := "/tmp/storage/" + strconv.Itoa(i) + ".csv"
-	fp, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	path := fmt.Sprintf("/%d.csv", i)
+	fp, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("the file %v could not be created %v", i, err)
 	}
@@ -123,15 +131,14 @@ func spawn_file_persistor(w *Join, ch chan tuple, i int) error {
 	for tup := range ch {
 		switch tup.kind {
 		case STORE:
-			w.Log.Debugf("STORE %v", tup.fields)
-			store(writer, tup.fields)
+			if err := store(writer, tup.fields); err != nil {
+				w.Log.Errorf("there was an error storing in the file: %v", err)
+			}
 
 		case LOAD:
 			fieldMaps, err := load(w, fp, tup.fields)
-			w.Log.Debugf("LOAD %v", tup.fields)
 			if err != nil {
-				w.Log.Errorf("there was an error loading up field maps %v", err)
-				continue
+				w.Log.Errorf("there was an error loading up field maps: %v", err)
 			}
 
 			ch <- tuple{LOAD, fieldMaps}
@@ -179,6 +186,7 @@ func (w *Join) Eof(data []byte) bool {
 
 func (w *Join) Error(data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
+	w.readingLeft = false
 	return true
 }
 
@@ -190,12 +198,13 @@ func keyHash(field string, mod int) int {
 	return acc % mod
 }
 
-func shard(w *Join, fieldMaps []map[string]string) map[int][]map[string]string {
+func shard(w *Join, fieldMaps []map[string]string, key string) map[int][]map[string]string {
 	shards := make(map[int][]map[string]string, w.Con.NShards)
 
 	for _, fieldMap := range fieldMaps {
-		key, ok := fieldMap[w.Con.LeftKey]
+		key, ok := fieldMap[key]
 		if !ok {
+			w.Log.Errorf("fieldMap: %v", fieldMap)
 			w.Log.Errorf("left key %v was not found in field map", w.Con.LeftKey)
 			continue
 		}
@@ -208,8 +217,11 @@ func shard(w *Join, fieldMaps []map[string]string) map[int][]map[string]string {
 }
 
 func handleLeft(w *Join, data []byte) error {
-	batch := protocol.DecodeBatch(data)
-	shards := shard(w, batch.FieldMaps)
+	batch, err := protocol.DecodeBatch(data)
+	if err != nil {
+		w.Log.Fatalf("failed to decode line: %v", err)
+	}
+	shards := shard(w, batch.FieldMaps, w.Con.LeftKey)
 
 	for i, shard := range shards {
 		w.chans[i] <- tuple{STORE, shard}
@@ -219,8 +231,11 @@ func handleLeft(w *Join, data []byte) error {
 }
 
 func handleRight(w *Join, data []byte) error {
-	batch := protocol.DecodeBatch(data)
-	shards := shard(w, batch.FieldMaps)
+	batch, err := protocol.DecodeBatch(data)
+	if err != nil {
+		w.Log.Fatalf("failed to decode batch: %v", err)
+	}
+	shards := shard(w, batch.FieldMaps, w.Con.RightKey)
 
 	for i, shard := range shards {
 		w.chans[i] <- tuple{LOAD, shard}
@@ -229,11 +244,12 @@ func handleRight(w *Join, data []byte) error {
 	for i := range shards {
 		resultTuples := <-w.chans[i]
 		responseFieldMaps := resultTuples.fields
-
-		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
-		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
-		if err := w.Broker.Publish("", body); err != nil {
-			w.Log.Errorf("failed to publish message: %v", err)
+		if len(responseFieldMaps) > 0 {
+			w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
+			body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
+			if err := w.Broker.Publish("", body); err != nil {
+				w.Log.Errorf("failed to publish message: %v", err)
+			}
 		}
 	}
 

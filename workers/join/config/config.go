@@ -30,7 +30,7 @@ func Create() (*JoinConfig, error) {
 		return nil, fmt.Errorf("no right key was provided")
 	}
 
-	shards, err := strconv.Atoi(os.Getenv("shards"))
+	shards, err := strconv.Atoi(os.Getenv("SHARDS"))
 	if err != nil {
 		return nil, fmt.Errorf("invalid shard value was given")
 	}

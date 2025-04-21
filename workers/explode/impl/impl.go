@@ -30,7 +30,10 @@ func (w *Explode) Run() error {
 }
 
 func (w *Explode) Batch(data []byte) bool {
-	batch := protocol.DecodeBatch(data)
+	batch, err := protocol.DecodeBatch(data)
+	if err != nil {
+		w.Log.Fatal("failed to decode line: %v", err)
+	}
 	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
 
 	for _, fieldMap := range batch.FieldMaps {

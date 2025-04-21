@@ -29,7 +29,10 @@ func (w *Top) Run() error {
 }
 
 func (w *Top) Batch(data []byte) bool {
-	batch := protocol.DecodeBatch(data)
+	batch, err := protocol.DecodeBatch(data)
+	if err != nil {
+		w.Log.Fatal("failed to decode batch: %v", err)
+	}
 
 	for _, fieldMap := range batch.FieldMaps {
 		err := handleTop(w, fieldMap)
@@ -43,13 +46,16 @@ func (w *Top) Batch(data []byte) bool {
 }
 
 func (w *Top) Eof(data []byte) bool {
-	w.Log.Debugf("fieldMaps: %v", w.top_lit)
-	body := protocol.NewBatch(w.top_lit).Encode(w.Con.Select)
-	if err := w.Broker.Publish("", body); err != nil {
-		w.Log.Errorf("failed to publish message: %v", err)
+	responseFieldMaps := w.top_lit
+	if len(responseFieldMaps) > 0 {
+		w.Log.Debugf("fieldMaps: %v", w.top_lit)
+		body := protocol.NewBatch(w.top_lit).Encode(w.Con.Select)
+		if err := w.Broker.Publish("", body); err != nil {
+			w.Log.Errorf("failed to publish message: %v", err)
+		}
 	}
 
-	body = protocol.DecodeEof(data).Encode()
+	body := protocol.DecodeEof(data).Encode()
 	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}

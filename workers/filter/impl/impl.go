@@ -38,7 +38,10 @@ func (w *Filter) Run() error {
 }
 
 func (w *Filter) Batch(data []byte) bool {
-	batch := protocol.DecodeBatch(data)
+	batch, err := protocol.DecodeBatch(data)
+	if err != nil {
+		w.Log.Fatalf("failed to decode batch: %v", err)
+	}
 	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
 
 	for _, fieldMap := range batch.FieldMaps {

@@ -26,7 +26,10 @@ func (w *Sink) Run() error {
 }
 
 func (w *Sink) Batch(data []byte) bool {
-	batch := protocol.DecodeBatch(data)
+	batch, err := protocol.DecodeBatch(data)
+	if err != nil {
+		w.Log.Fatal("failed to decode batch: %v", err)
+	}
 	responseFieldMaps := batch.FieldMaps
 
 	if len(responseFieldMaps) > 0 {

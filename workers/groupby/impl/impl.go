@@ -41,7 +41,10 @@ func (w *Groupby) Run() error {
 }
 
 func (w *Groupby) Batch(data []byte) bool {
-	batch := protocol.DecodeBatch(data)
+	batch, err := protocol.DecodeBatch(data)
+	if err != nil {
+		w.Log.Fatalf("failed to decode batch: %v", err)
+	}
 
 	for _, fieldMap := range batch.FieldMaps {
 		err := w.Handler.Add(fieldMap, w.Con)
@@ -55,13 +58,16 @@ func (w *Groupby) Batch(data []byte) bool {
 }
 
 func (w *Groupby) Eof(data []byte) bool {
-	fieldMaps := w.Handler.Result(w.Con)
-	body := protocol.NewBatch(fieldMaps).Encode(w.Con.Select)
-	if err := w.Broker.Publish("", body); err != nil {
-		w.Log.Errorf("failed to publish message: %v", err)
+	responseFieldMaps := w.Handler.Result(w.Con)
+	if len(responseFieldMaps) > 0 {
+		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
+		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
+		if err := w.Broker.Publish("", body); err != nil {
+			w.Log.Errorf("failed to publish message: %v", err)
+		}
 	}
 
-	body = protocol.DecodeEof(data).Encode()
+	body := protocol.DecodeEof(data).Encode()
 	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}

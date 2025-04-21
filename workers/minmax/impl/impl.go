@@ -35,7 +35,10 @@ func (w *MinMax) Run() error {
 }
 
 func (w *MinMax) Batch(data []byte) bool {
-	batch := protocol.DecodeBatch(data)
+	batch, err := protocol.DecodeBatch(data)
+	if err != nil {
+		w.Log.Fatal("failed to decode batch: %v", err)
+	}
 
 	for _, fieldMap := range batch.FieldMaps {
 		err := handleMinMax(w, fieldMap)
