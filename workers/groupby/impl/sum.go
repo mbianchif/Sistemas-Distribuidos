@@ -9,11 +9,11 @@ import (
 
 type Sum struct {
 	*Groupby
-	state map[string]float64
+	state map[string]int
 }
 
 func NewSum(w *Groupby) GroupbyHandler {
-	return &Sum{w, make(map[string]float64)}
+	return &Sum{w, make(map[string]int)}
 }
 
 func (w *Sum) Add(fieldMap map[string]string, con *config.GroupbyConfig) error {
@@ -22,7 +22,7 @@ func (w *Sum) Add(fieldMap map[string]string, con *config.GroupbyConfig) error {
 		return fmt.Errorf("value %v was not found", con.AggKey)
 	}
 
-	sumValue, err := strconv.ParseFloat(sumValueStr, 64)
+	sumValue, err := strconv.Atoi(sumValueStr)
 	if err != nil {
 		return fmt.Errorf("the sum value is not numerical %v", sumValueStr)
 	}
@@ -38,7 +38,6 @@ func (w *Sum) Add(fieldMap map[string]string, con *config.GroupbyConfig) error {
 
 	compKey := strings.Join(keys, ",")
 	w.state[compKey] += sumValue
-	fmt.Println(w.state)
 	return nil
 }
 
@@ -52,7 +51,7 @@ func (w *Sum) Result(con *config.GroupbyConfig) []map[string]string {
 			fieldMap[con.GroupKeys[i]] = key
 		}
 
-		fieldMap[con.Storage] = strconv.FormatFloat(v, 'f', 4, 64)
+		fieldMap[con.Storage] = strconv.Itoa(v)
 		fieldMaps = append(fieldMaps, fieldMap)
 	}
 

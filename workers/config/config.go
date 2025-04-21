@@ -27,7 +27,7 @@ func configLog(logLevel logging.Level) {
 	format := logging.MustStringFormatter(`%{time:2006-01-02 15:04:05}	%{level:.4s}	%{message}`)
 	backendFormatter := logging.NewBackendFormatter(backend, format)
 	backendLeveled := logging.AddModuleLevel(backendFormatter)
-	logging.SetLevel(logLevel, "log")
+	backendLeveled.SetLevel(logLevel, "log")
 	logging.SetBackend(backendLeveled)
 }
 

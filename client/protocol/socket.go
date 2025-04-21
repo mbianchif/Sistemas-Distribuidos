@@ -110,11 +110,6 @@ func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int, n
 	return writer.Flush()
 }
 
-type tuple struct {
-	kind int
-	data []byte
-}
-
 func writeAll(w *bufio.Writer, data []byte) error {
 	total := 0
 	for total < len(data) {
@@ -127,7 +122,7 @@ func writeAll(w *bufio.Writer, data []byte) error {
 	return nil
 }
 
-func spawn_file_handler(s *CsvTransferStream, query int, ch <-chan tuple, storage string) error {
+func spawn_file_handler(s *CsvTransferStream, query int, ch <-chan []byte, storage string) error {
 	if strings.Contains(storage, "0") {
 		return fmt.Errorf("una pena")
 	}
@@ -139,23 +134,13 @@ func spawn_file_handler(s *CsvTransferStream, query int, ch <-chan tuple, storag
 	// defer fp.Close()
 
 	// writer := bufio.NewWriterSize(fp, 1<<12)
-	for tup := range ch {
-		if tup.kind == MSG_ERR {
-			s.log.Errorf("an error occurred with query %v", query)
-			break
-
-		} else if tup.kind == MSG_EOF {
-			s.log.Infof("query %v is ready!")
-			break
-
-		} else if tup.kind == MSG_BATCH {
-			for line := range bytes.SplitSeq(tup.data, []byte("\n")) {
-				s.log.Infof("query %v, line: `%s`", query, line)
-			}
-			// writeAll(writer, tup.data)
-			// writeAll(writer, []byte("\n"))
-			// writer.Flush()
+	for data := range ch {
+		for line := range bytes.SplitSeq(data, []byte("\n")) {
+			s.log.Infof("query %v, line: `%s`", query, line)
 		}
+		// data = append(data, []byte("\n")...)
+		// writeAll(writer, data)
+		// writer.Flush()
 	}
 
 	return nil
@@ -164,9 +149,9 @@ func spawn_file_handler(s *CsvTransferStream, query int, ch <-chan tuple, storag
 func (s *CsvTransferStream) RecvQueryResult(storage string) {
 	queryCount := 5
 
-	chans := make(map[int]chan<- tuple, queryCount)
+	chans := make(map[int]chan<- []byte, queryCount)
 	for i := 1; i <= queryCount; i++ {
-		ch := make(chan tuple)
+		ch := make(chan []byte)
 		chans[i] = ch
 		go func(i int) {
 			spawn_file_handler(s, i, ch, storage)
@@ -186,7 +171,13 @@ func (s *CsvTransferStream) RecvQueryResult(storage string) {
 		dataLength := binary.BigEndian.Uint32(header[:4])
 		kind := int(header[4])
 		query := int(header[5])
-		if kind != MSG_BATCH {
+		if kind == MSG_EOF {
+			s.log.Infof("query %v is ready!")
+			done[query] = struct{}{}
+			close(chans[query])
+			continue
+		} else if kind == MSG_ERR {
+			s.log.Errorf("an error occurred with query %v", query)
 			done[query] = struct{}{}
 			close(chans[query])
 			continue
@@ -198,7 +189,7 @@ func (s *CsvTransferStream) RecvQueryResult(storage string) {
 			continue
 		}
 
-		chans[query] <- tuple{kind, data}
+		chans[query] <- data
 	}
 }
 
