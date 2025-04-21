@@ -48,7 +48,6 @@ func (w *Mean) Add(fieldMap map[string]string, con *config.GroupbyConfig) error 
 		w.state[compKey] = tuple{tup.sum + sumValue, tup.n + 1}
 	}
 
-	fmt.Println(w.state)
 	return nil
 }
 
@@ -66,5 +65,6 @@ func (w *Mean) Result(con *config.GroupbyConfig) []map[string]string {
 		fieldMaps = append(fieldMaps, fieldMap)
 	}
 
+	fmt.Println(fieldMaps)
 	return fieldMaps
 }

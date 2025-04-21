@@ -149,7 +149,9 @@ func spawn_file_handler(s *CsvTransferStream, query int, ch <-chan tuple, storag
 			break
 
 		} else if tup.kind == MSG_BATCH {
-			s.log.Infof("query %v, line: %s", query, tup.data)
+			for line := range bytes.SplitSeq(tup.data, []byte("\n")) {
+				s.log.Infof("query %v, line: `%s`", query, line)
+			}
 			// writeAll(writer, tup.data)
 			// writeAll(writer, []byte("\n"))
 			// writer.Flush()

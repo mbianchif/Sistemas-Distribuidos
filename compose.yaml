@@ -250,4 +250,16 @@ services:
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sink/.env.sink-q1
+      - envs/sink/.env.q1
+
+  sink-q5:
+    container_name: sink-q5
+    build:
+      context: workers
+      dockerfile: dockerfiles/sink.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/sink/.env.q5

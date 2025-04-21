@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 
 # Field name to ID mapping
 name2id = {
@@ -47,7 +47,7 @@ _query_columns = {
 def read_delivery_with_query(body: bytes) -> tuple[int, int, Optional[bytes]]:
     if len(body) < 2:
         return ERROR, -1, None
-    return body[0], int(body[1]), body[2:]
+    return body[0], body[1], body[2:]
 
 class Batch:
     def __init__(self, field_maps: List[Dict[str, str]]):
@@ -55,7 +55,7 @@ class Batch:
 
     @staticmethod
     def decode(data: bytes) -> "Batch":
-        lines = data.split(b"\n")
+        lines = data.splitlines()
         field_maps = [decode_line(line) for line in lines if line]
         return Batch(field_maps)
 
@@ -72,11 +72,15 @@ class Batch:
             
             first = False
             value = field_map[col]
+
+            if "," in value:
+                value = "[" + value + "]"
+            
             line.extend(value.encode())
 
         return line
 
-    def to_result(self, query: int) -> Tuple[int, bytearray]:
+    def to_result(self, query: int) -> bytearray:
         data = bytearray([0] * 4 + [BATCH, query])
         first = True
 
@@ -89,7 +93,7 @@ class Batch:
             data.extend(line_bytes)
 
         data_length = len(data) - 6
-        data[0:4] = data_length.to_bytes(4, "big")
+        data[:4] = data_length.to_bytes(4, "big")
         return data
 
 def decode_line(data: bytes) -> Dict[str, str]:
@@ -98,9 +102,9 @@ def decode_line(data: bytes) -> Dict[str, str]:
         if b"=" not in kv:
             continue
 
-        key_raw, val = kv.split(b"=", 1)
+        key_id, val = kv.split(b"=", 1)
         try:
-            key_num = int(key_raw)
+            key_num = int(key_id)
             key_name = id2name[key_num]
             fields[key_name] = val.decode("utf-8")
         except (ValueError, IndexError):
