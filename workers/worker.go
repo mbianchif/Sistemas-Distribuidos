@@ -75,7 +75,7 @@ func (base *Worker) Run(w IWorker) error {
 			if !ok {
 				base.Log.Errorf("received an unknown message type %v", kind)
 			} else {
-				handle(producer, data)
+				exit = handle(producer, data)
 			}
 
 			del.Ack(false)
