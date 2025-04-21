@@ -69,7 +69,6 @@ func handleBatch(w *Top, data []byte) bool {
 }
 
 func handleEof(w *Top, data []byte) bool {
-
 	w.Log.Debugf("fieldMaps: %v", w.top_lit)
 	body := protocol.NewBatch(w.top_lit).Encode(w.Con.Select)
 	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
