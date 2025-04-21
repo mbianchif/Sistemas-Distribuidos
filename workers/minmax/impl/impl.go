@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"fmt"
 	"strconv"
 	"workers"
 	"workers/minmax/config"
@@ -9,11 +10,16 @@ import (
 	"github.com/op/go-logging"
 )
 
+type tuple struct {
+	fieldMap map[string]string
+	value    float64
+}
+
 type MinMax struct {
 	*workers.Worker
 	Con *config.MinMaxConfig
-	min map[string]string
-	max map[string]string
+	min tuple
+	max tuple
 }
 
 func New(con *config.MinMaxConfig, log *logging.Logger) (*MinMax, error) {
@@ -21,40 +27,14 @@ func New(con *config.MinMaxConfig, log *logging.Logger) (*MinMax, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &MinMax{base, con, make(map[string]string), make(map[string]string)}, nil
+	return &MinMax{base, con, tuple{nil, 0}, tuple{nil, 0}}, nil
 }
 
-func (w *MinMax) Run(con *config.MinMaxConfig, log *logging.Logger) error {
-	inputQueue := w.InputQueues[0]
-	recvChan, err := w.Broker.Consume(inputQueue, "")
-	if err != nil {
-		return err
-	}
-
-	handlers := map[int]func(*MinMax, []byte) bool{
-		protocol.BATCH: handleBatch,
-		protocol.EOF:   handleEof,
-		protocol.ERROR: handleError,
-	}
-
-	log.Infof("Running")
-	exit := false
-	for !exit {
-		select {
-		case <-w.SigChan:
-			exit = true
-
-		case del := <-recvChan:
-			kind, data := protocol.ReadDelivery(del)
-			exit = handlers[kind](w, data)
-			del.Ack(false)
-		}
-	}
-
-	return nil
+func (w *MinMax) Run() error {
+	return w.Worker.Run(w)
 }
 
-func handleBatch(w *MinMax, data []byte) bool {
+func (w *MinMax) Batch(producer string, data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 
 	for _, fieldMap := range batch.FieldMaps {
@@ -68,53 +48,56 @@ func handleBatch(w *MinMax, data []byte) bool {
 	return false
 }
 
-func handleEof(w *MinMax, data []byte) bool {
-	responseFieldMaps := make([]map[string]string, 0, 2)
-	responseFieldMaps = append(responseFieldMaps, w.min)
-	responseFieldMaps = append(responseFieldMaps, w.max)
+func (w *MinMax) Eof(producer string, data []byte) bool {
+	responseFieldMaps := []map[string]string{
+		w.min.fieldMap,
+		w.max.fieldMap,
+	}
+
 	w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 	body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
 	body = protocol.DecodeEof(data).Encode()
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
 	return true
 }
 
-func handleError(w *MinMax, data []byte) bool {
+func (w *MinMax) Error(producer string, data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }
 
 func handleMinMax(w *MinMax, fieldMap map[string]string) error {
-	if w.max[w.Con.Key] == "" {
-		w.max = fieldMap
+	if _, ok := fieldMap[w.Con.Key]; !ok {
+		return fmt.Errorf("key %v was not found in the field map", w.Con.Key)
 	}
-	if w.min[w.Con.Key] == "" {
-		w.min = fieldMap
-	}
-	newValue, err := strconv.ParseFloat(fieldMap[w.Con.Key], 64)
+
+	value, err := strconv.ParseFloat(fieldMap[w.Con.Key], 64)
 	if err != nil {
 		return err
 	}
-	maxValue, err := strconv.ParseFloat(w.max[w.Con.Key], 64)
-	if err != nil {
-		return err
+
+	if w.max.fieldMap == nil {
+		w.max = tuple{fieldMap, value}
 	}
-	minValue, err := strconv.ParseFloat(w.min[w.Con.Key], 64)
-	if err != nil {
-		return err
+	if w.min.fieldMap == nil {
+		w.min = tuple{fieldMap, value}
 	}
-	if newValue > maxValue {
-		w.max = fieldMap
+
+
+	if value > w.max.value {
+		w.max = tuple{fieldMap, value}
 	}
-	if newValue < minValue {
-		w.min = fieldMap
+
+	if value < w.min.value {
+		w.min = tuple{fieldMap, value}
 	}
+
 	return nil
 }

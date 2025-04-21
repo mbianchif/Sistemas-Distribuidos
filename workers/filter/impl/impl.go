@@ -34,35 +34,10 @@ func New(con *config.FilterConfig, log *logging.Logger) (*Filter, error) {
 }
 
 func (w *Filter) Run() error {
-	inputQueue := w.InputQueues[0]
-	recvChan, err := w.Broker.Consume(inputQueue, "")
-	if err != nil {
-		return err
-	}
-
-	handlers := map[int]func(*Filter, []byte) bool{
-		protocol.BATCH: handleBatch,
-		protocol.EOF:   handleEof,
-		protocol.ERROR: handleError,
-	}
-
-	w.Log.Infof("Running with handler: %v", w.Con.Handler)
-	exit := false
-	for !exit {
-		select {
-		case <-w.SigChan:
-			exit = true
-
-		case del := <-recvChan:
-			kind, data := protocol.ReadDelivery(del)
-			exit = handlers[kind](w, data)
-			del.Ack(false)
-		}
-	}
-	return nil
+	return w.Worker.Run(w)
 }
 
-func handleBatch(w *Filter, data []byte) bool {
+func (w *Filter) Batch(producer string, data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
 
@@ -81,7 +56,7 @@ func handleBatch(w *Filter, data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
-		if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+		if err := w.Broker.Publish("", body); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -89,16 +64,15 @@ func handleBatch(w *Filter, data []byte) bool {
 	return false
 }
 
-func handleEof(w *Filter, data []byte) bool {
+func (w *Filter) Eof(producer string, data []byte) bool {
 	body := protocol.DecodeEof(data).Encode()
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
-
 	return true
 }
 
-func handleError(w *Filter, data []byte) bool {
+func (w *Filter) Error(producer string, data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

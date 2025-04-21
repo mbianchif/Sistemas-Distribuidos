@@ -48,10 +48,64 @@ services:
       - workers/.env
       - envs/sanitize/.env.movies
 
+  sanitize-credits-1:
+    container_name: sanitize-credits-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/sanitize.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/sanitize/.env.credits
+
+  # ====================== Filters ======================
+
+  filter-release_date_since_2000-1:
+    container_name: filter-release_date_since_2000-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.release_date_since_2000
+
+  # ====================== Join ======================
+
+  join-id_id-1:
+    container_name: join-id_id-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/join.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/join/.env.id_id
+
+  # ====================== Explodes ======================
+
+  explode-cast-1:
+    container_name: explode-cast-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/explode.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/explode/.env.cast
+
   # ====================== GroupBys ======================
 
-  groupby-sentiment_mean_rate_revenue_budget-1:
-    container_name: groupby-sentiment_mean_rate_revenue_budget-1
+  groupby-id_actor_count-1:
+    container_name: groupby-id_actor_count-1
     build:
       context: workers
       dockerfile: dockerfiles/groupby.Dockerfile
@@ -60,40 +114,26 @@ services:
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/groupby/.env.sentiment_mean_rate_revenue_budget
+      - envs/groupby/.env.id_actor_count
 
-  # ====================== Dividers ======================
+# ====================== Tops ======================
 
-  divider-revenue_budget-1:
-    container_name: divider-1
+  top-10_count-1:
+    container_name: top-10_count-1
     build:
       context: workers
-      dockerfile: dockerfiles/divider.Dockerfile
+      dockerfile: dockerfiles/top.Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/divider/.env.revenue_budget
-
-  # ====================== Sentiments ======================
-
-  sentiment-overview-1:
-    container_name: sentiment-overview-1
-    build:
-      context: workers
-      dockerfile: dockerfiles/sentiment.Dockerfile
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    env_file:
-      - workers/.env
-      - envs/sentiment/.env.overview
+      - envs/top/.env.10_count
 
   # ====================== Sinks ======================
 
-  sink-5-1:
-    container_name: sink-5-1
+  sink-4-1:
+    container_name: sink-4-1
     build:
       context: workers
       dockerfile: dockerfiles/sink.Dockerfile
@@ -102,4 +142,4 @@ services:
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sink/.env.5
+      - envs/sink/.env.4

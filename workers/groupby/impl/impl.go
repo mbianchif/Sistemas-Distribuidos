@@ -37,36 +37,10 @@ func New(con *config.GroupbyConfig, log *logging.Logger) (*Groupby, error) {
 }
 
 func (w *Groupby) Run() error {
-	inputQueue := w.InputQueues[0]
-	recvChan, err := w.Broker.Consume(inputQueue, "")
-	if err != nil {
-		return err
-	}
-
-	handlers := map[int]func(*Groupby, []byte) bool{
-		protocol.BATCH: handleBatch,
-		protocol.EOF:   handleEof,
-		protocol.ERROR: handleError,
-	}
-
-	w.Log.Infof("Running with aggregator: %v", w.Con.Aggregator)
-	exit := false
-	for !exit {
-		select {
-		case <-w.SigChan:
-			exit = true
-
-		case del := <-recvChan:
-			kind, data := protocol.ReadDelivery(del)
-			exit = handlers[kind](w, data)
-			del.Ack(false)
-		}
-	}
-
-	return nil
+	return w.Worker.Run(w)
 }
 
-func handleBatch(w *Groupby, data []byte) bool {
+func (w *Groupby) Batch(producer string, data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 
 	for _, fieldMap := range batch.FieldMaps {
@@ -80,22 +54,22 @@ func handleBatch(w *Groupby, data []byte) bool {
 	return false
 }
 
-func handleEof(w *Groupby, data []byte) bool {
+func (w *Groupby) Eof(producer string, data []byte) bool {
 	fieldMaps := w.Handler.Result(w.Con)
 	body := protocol.NewBatch(fieldMaps).Encode(w.Con.Select)
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
 	body = protocol.DecodeEof(data).Encode()
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
 	return true
 }
 
-func handleError(w *Groupby, data []byte) bool {
+func (w *Groupby) Error(producer string, data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

@@ -4,14 +4,15 @@ import (
 	"workers/config"
 )
 
-type DividerConfig struct {
+type JoinConfig struct {
 	*config.Config
 }
 
-func Create() (*DividerConfig, error) {
+func Create() (*JoinConfig, error) {
 	con, err := config.Create()
 	if err != nil {
 		return nil, err
 	}
-	return &DividerConfig{con}, nil
+
+	return &JoinConfig{con}, nil
 }

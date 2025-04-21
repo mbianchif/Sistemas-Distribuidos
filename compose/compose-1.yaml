@@ -88,8 +88,8 @@ services:
 
   # ====================== Sinks ======================
 
-  sink-q1:
-    container_name: sink-q1
+  sink-1-1:
+    container_name: sink-1-1
     build:
       context: workers
       dockerfile: dockerfiles/sink.Dockerfile
@@ -98,4 +98,4 @@ services:
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sink/.env.q1
+      - envs/sink/.env.1

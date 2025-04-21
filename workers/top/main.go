@@ -23,7 +23,7 @@ func main() {
 	}
 	log.Debug("successfull init")
 
-	if err := w.Run(con, log); err != nil {
+	if err := w.Run(); err != nil {
 		log.Criticalf("failed run: %v", err)
 	}
 

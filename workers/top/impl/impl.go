@@ -24,37 +24,11 @@ func New(con *config.TopConfig, log *logging.Logger) (*Top, error) {
 	return &Top{base, con, make([]map[string]string, 0)}, nil
 }
 
-func (w *Top) Run(con *config.TopConfig, log *logging.Logger) error {
-	inputQueue := w.InputQueues[0]
-	recvChan, err := w.Broker.Consume(inputQueue, "")
-	if err != nil {
-		return err
-	}
-
-	handlers := map[int]func(*Top, []byte) bool{
-		protocol.BATCH: handleBatch,
-		protocol.EOF:   handleEof,
-		protocol.ERROR: handleError,
-	}
-
-	log.Infof("Running")
-	exit := false
-	for !exit {
-		select {
-		case <-w.SigChan:
-			exit = true
-
-		case del := <-recvChan:
-			kind, data := protocol.ReadDelivery(del)
-			exit = handlers[kind](w, data)
-			del.Ack(false)
-		}
-	}
-
-	return nil
+func (w *Top) Run() error {
+	return w.Worker.Run(w)
 }
 
-func handleBatch(w *Top, data []byte) bool {
+func (w *Top) Batch(producer string, data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 
 	for _, fieldMap := range batch.FieldMaps {
@@ -68,22 +42,22 @@ func handleBatch(w *Top, data []byte) bool {
 	return false
 }
 
-func handleEof(w *Top, data []byte) bool {
+func (w *Top) Eof(producer string, data []byte) bool {
 	w.Log.Debugf("fieldMaps: %v", w.top_lit)
 	body := protocol.NewBatch(w.top_lit).Encode(w.Con.Select)
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
 	body = protocol.DecodeEof(data).Encode()
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
 	return true
 }
 
-func handleError(w *Top, data []byte) bool {
+func (w *Top) Error(producer string, data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

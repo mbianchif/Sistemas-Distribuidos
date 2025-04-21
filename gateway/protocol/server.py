@@ -50,6 +50,9 @@ class Server:
 
     def run(self):
         conn = self._accept_new_conn()
+        if not conn:
+            return
+
         self._lis.close()
 
         self._handle_client(conn)

@@ -11,15 +11,16 @@ import (
 
 type Config struct {
 	Url                string
-	InputExchangeName  string
-	InputExchangeType  string
-	InputQueues        []string
-	InputQueueKeys     []string
+	InputExchangeNames []string
+	InputExchangeTypes []string
+	InputQueueName     string
+	InputQueueKey      string
 	OutputExchangeName string
 	OutputExchangeType string
-	OutputQueues       []string
+	OutputQueueNames   []string
 	OutputQueueKeys    []string
 	Select             map[string]struct{}
+	Producer           string
 }
 
 func configLog(logLevel logging.Level) {
@@ -37,29 +38,31 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the rabbitmq url was not provided")
 	}
 
-	inputExchangeName := os.Getenv("INPUT_EXCHANGE_NAME")
-	if len(inputExchangeName) == 0 {
-		return nil, fmt.Errorf("the input exchange name was not provided")
+	inputExchangeNamesString := os.Getenv("INPUT_EXCHANGE_NAMES")
+	inputExchangeNames := strings.Split(inputExchangeNamesString, ",")
+	if len(inputExchangeNames) == 0 {
+		return nil, fmt.Errorf("the input exchange names were not provided")
 	}
 
 	validExchangeTypes := []string{"direct", "fanout", "topic", "headers"}
-
-	inputExchangeType := os.Getenv("INPUT_EXCHANGE_TYPE")
-	if !slices.Contains(validExchangeTypes, inputExchangeType) {
-		return nil, fmt.Errorf("the input exchange type is invalid: %v", inputExchangeType)
+	inputExchangeTypesString := os.Getenv("INPUT_EXCHANGE_TYPES")
+	inputExchangeTypes := strings.Split(inputExchangeTypesString, ",")
+	for _, t := range inputExchangeTypes {
+		if !slices.Contains(validExchangeTypes, t) {
+			return nil, fmt.Errorf("the input exchange types is invalid: %v", t)
+		}
 	}
 
-	inputQueueNamesString := os.Getenv("INPUT_QUEUE_NAMES")
-	if len(inputQueueNamesString) == 0 {
-		return nil, fmt.Errorf("the input queues were not provided")
+	if len(inputExchangeNames) != len(inputExchangeTypes) {
+		return nil, fmt.Errorf("the length of input exchange names and input exchange types don't match (names: %v, types: %v)", len(inputExchangeNames), len(inputExchangeTypes))
 	}
-	inputQueueNames := strings.Split(inputQueueNamesString, ",")
 
-	inputQueueKeysString := os.Getenv("INPUT_QUEUE_KEYS")
-	inputQueueKeys := strings.Split(inputQueueKeysString, ",")
-	if len(inputQueueNames) != len(inputQueueKeys) {
-		return nil, fmt.Errorf("length for input queue names and keys don't match (names: %v, keys: %v)", len(inputQueueNames), len(inputQueueKeys))
+	inputQueueName := os.Getenv("INPUT_QUEUE_NAME")
+	if len(inputQueueName) == 0 {
+		return nil, fmt.Errorf("the input queue was not provided")
 	}
+
+	inputQueueKey := os.Getenv("INPUT_QUEUE_KEY")
 
 	outputExchangeName := os.Getenv("OUTPUT_EXCHANGE_NAME")
 	if len(outputExchangeName) == 0 {
@@ -80,7 +83,7 @@ func Create() (*Config, error) {
 	outputQueueKeysString := os.Getenv("OUTPUT_QUEUE_KEYS")
 	outputQueueKeys := strings.Split(outputQueueKeysString, ",")
 	if len(outputQueueNames) != len(outputQueueKeys) {
-		return nil, fmt.Errorf("length for output queue names and keys don't match (names: %v, keys: %v)", len(outputQueueNames), len(outputQueueKeys))
+		return nil, fmt.Errorf("the length of output queue names and ouput keys don't match (names: %v, keys: %v)", len(outputQueueNames), len(outputQueueKeys))
 	}
 
 	selectString := os.Getenv("SELECT")
@@ -92,6 +95,11 @@ func Create() (*Config, error) {
 		selectMap[field] = struct{}{}
 	}
 
+	producer := os.Getenv("PRODUCER")
+	if len(producer) == 0 {
+		return nil, fmt.Errorf("the producer was not provided")
+	}
+
 	logLevelVar := strings.ToUpper(os.Getenv("LOG_LEVEL"))
 	logLevel, err := logging.LogLevel(logLevelVar)
 	if err != nil {
@@ -101,14 +109,15 @@ func Create() (*Config, error) {
 
 	return &Config{
 		Url:                url,
-		InputExchangeName:  inputExchangeName,
-		InputExchangeType:  inputExchangeType,
-		InputQueues:        inputQueueNames,
-		InputQueueKeys:     inputQueueKeys,
+		InputExchangeNames: inputExchangeNames,
+		InputExchangeTypes: inputExchangeTypes,
+		InputQueueName:     inputQueueName,
+		InputQueueKey:      inputQueueKey,
 		OutputExchangeName: outputExchangeName,
 		OutputExchangeType: outputExchangeType,
-		OutputQueues:       outputQueueNames,
+		OutputQueueNames:   outputQueueNames,
 		OutputQueueKeys:    outputQueueKeys,
 		Select:             selectMap,
+		Producer:           producer,
 	}, nil
 }

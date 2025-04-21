@@ -1,8 +1,8 @@
 package main
 
 import (
-	"workers/sink/config"
-	impl "workers/sink/impl"
+	"workers/join/config"
+	impl "workers/join/impl"
 
 	"github.com/op/go-logging"
 )

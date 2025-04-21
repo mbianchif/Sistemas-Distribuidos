@@ -39,36 +39,10 @@ func New(con *config.SanitizeConfig, log *logging.Logger) (*Sanitize, error) {
 }
 
 func (w *Sanitize) Run() error {
-	inputQueue := w.InputQueues[0]
-	recvChan, err := w.Broker.Consume(inputQueue, "")
-	if err != nil {
-		return err
-	}
-
-	handlers := map[int]func(*Sanitize, []byte) bool{
-		protocol.BATCH: handleBatch,
-		protocol.EOF:   handleEof,
-		protocol.ERROR: handleError,
-	}
-
-	w.Log.Infof("Running with handler: %v", w.Con.Handler)
-	exit := false
-	for !exit {
-		select {
-		case <-w.SigChan:
-			exit = true
-
-		case del := <-recvChan:
-			kind, data := protocol.ReadDelivery(del)
-			exit = handlers[kind](w, data)
-			del.Ack(false)
-		}
-	}
-
-	return nil
+	return w.Worker.Run(w)
 }
 
-func handleBatch(w *Sanitize, data []byte) bool {
+func (w *Sanitize) Batch(producer string, data []byte) bool {
 	reader := csv.NewReader(bytes.NewReader(data))
 	responseFieldMaps := make([]map[string]string, 0)
 	for {
@@ -96,7 +70,7 @@ func handleBatch(w *Sanitize, data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
-		if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+		if err := w.Broker.Publish("", body); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -232,17 +206,16 @@ func handleCredit(w *Sanitize, line []string) (map[string]string, error) {
 	return fields, nil
 }
 
-func handleEof(w *Sanitize, data []byte) bool {
+func (w *Sanitize) Eof(producer string, data []byte) bool {
 	body := protocol.DecodeEof(data).Encode()
 	qKey := w.Con.OutputQueueKeys[0]
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, qKey, body); err != nil {
+	if err := w.Broker.Publish(qKey, body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
-
 	return true
 }
 
-func handleError(w *Sanitize, data []byte) bool {
+func (w *Sanitize) Error(producer string, data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

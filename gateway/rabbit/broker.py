@@ -3,20 +3,31 @@ import logging
 from functools import partial
 
 
-
 class Broker:
     def __init__(self, config):
         logging.getLogger("pika").setLevel(logging.WARNING)
-        
+
         self._outputexchange_name = config.outputExchangeName
         self._input_queue_name = config.inputQueueNames[0]
 
         try:
-            self._conn = pika.BlockingConnection(pika.ConnectionParameters(host="rabbitmq"))
+            self._conn = pika.BlockingConnection(
+                pika.ConnectionParameters(host="rabbitmq")
+            )
             self._chan = self._conn.channel()
 
-            self.inputQueues = self._declare_side(config.inputExchangeName, config.inputExchangeType, config.inputQueueNames, config.inputQueueKeys)
-            self.outputQueues = self._declare_side(self._outputexchange_name, config.outputExchangeType, config.outputQueueNames, config.outputQueueKeys)
+            self.inputQueues = self._declare_side(
+                config.inputExchangeName,
+                config.inputExchangeType,
+                config.inputQueueNames,
+                config.inputQueueKeys,
+            )
+            self.outputQueues = self._declare_side(
+                self._outputexchange_name,
+                config.outputExchangeType,
+                config.outputQueueNames,
+                config.outputQueueKeys,
+            )
         except Exception as e:
             logging.critical(f"Failed to connect with RabbitMQ: {e}")
             raise
@@ -42,20 +53,25 @@ class Broker:
 
     def publish(self, routing_key: str, body: str | bytes):
         try:
-            self._chan.basic_publish(exchange=self._outputexchange_name, routing_key=routing_key, body=body)
+            self._chan.basic_publish(
+                exchange=self._outputexchange_name,
+                routing_key=routing_key,
+                body=body,
+                properties=pika.BasicProperties(headers={"producer": "gateway"}),
+            )
         except Exception as e:
             logging.critical(f"Failed to publish message {e}")
             raise
-    
+
     def consume(self, consumer, callback, conn):
         try:
             self._chan.basic_consume(
-                    queue=self._input_queue_name, 
-                    on_message_callback=partial(callback, conn),
-                    auto_ack=False,
-                    exclusive=False,
-                    consumer_tag=consumer,
-                )
+                queue=self._input_queue_name,
+                on_message_callback=partial(callback, conn),
+                auto_ack=False,
+                exclusive=False,
+                consumer_tag=consumer,
+            )
             self._chan.start_consuming()
         except Exception as e:
             logging.critical(f"Failed to consume message {e}")

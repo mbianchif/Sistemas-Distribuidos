@@ -26,36 +26,10 @@ func New(con *config.ExplodeConfig, log *logging.Logger) (*Explode, error) {
 }
 
 func (w *Explode) Run() error {
-	inputQueue := w.InputQueues[0]
-	recvChan, err := w.Broker.Consume(inputQueue, "")
-	if err != nil {
-		return err
-	}
-
-	handlers := map[int]func(*Explode, []byte) bool{
-		protocol.BATCH: handleBatch,
-		protocol.EOF:   handleEof,
-		protocol.ERROR: handleError,
-	}
-
-	w.Log.Infof("Running")
-	exit := false
-	for !exit {
-		select {
-		case <-w.SigChan:
-			exit = true
-
-		case del := <-recvChan:
-			kind, data := protocol.ReadDelivery(del)
-			exit = handlers[kind](w, data)
-			del.Ack(false)
-		}
-	}
-
-	return nil
+	return w.Worker.Run(w)
 }
 
-func handleBatch(w *Explode, data []byte) bool {
+func (w *Explode) Batch(producer string, data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
 
@@ -72,7 +46,7 @@ func handleBatch(w *Explode, data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
-		if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+		if err := w.Broker.Publish("", body); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -96,16 +70,16 @@ func handleExplode(fieldMap map[string]string, con *config.ExplodeConfig) ([]map
 	return fieldMaps, nil
 }
 
-func handleEof(w *Explode, data []byte) bool {
+func (w *Explode) Eof(producer string, data []byte) bool {
 	body := protocol.DecodeEof(data).Encode()
-	if err := w.Broker.Publish(w.Con.OutputExchangeName, "", body); err != nil {
+	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
 	return true
 }
 
-func handleError(w *Explode, data []byte) bool {
+func (w *Explode) Error(producer string, data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

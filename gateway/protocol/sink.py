@@ -44,9 +44,9 @@ _query_columns = {
     5: ["sentiment", "rate_revenue_budget"],
 }
 
-def read_delivery_with_query(body: bytes) -> tuple[int, int, Optional[bytes]]:
+def read_delivery_with_query(body: bytes) -> tuple[int, int, bytes]:
     if len(body) < 2:
-        return ERROR, -1, None
+        return ERROR, -1, bytes()
     return body[0], body[1], body[2:]
 
 class Batch:
