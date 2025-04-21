@@ -34,7 +34,7 @@ func (w *MinMax) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *MinMax) Batch(producer string, data []byte) bool {
+func (w *MinMax) Batch(data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 
 	for _, fieldMap := range batch.FieldMaps {
@@ -48,7 +48,7 @@ func (w *MinMax) Batch(producer string, data []byte) bool {
 	return false
 }
 
-func (w *MinMax) Eof(producer string, data []byte) bool {
+func (w *MinMax) Eof(data []byte) bool {
 	responseFieldMaps := []map[string]string{
 		w.min.fieldMap,
 		w.max.fieldMap,
@@ -68,7 +68,7 @@ func (w *MinMax) Eof(producer string, data []byte) bool {
 	return true
 }
 
-func (w *MinMax) Error(producer string, data []byte) bool {
+func (w *MinMax) Error(data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }
@@ -89,7 +89,6 @@ func handleMinMax(w *MinMax, fieldMap map[string]string) error {
 	if w.min.fieldMap == nil {
 		w.min = tuple{fieldMap, value}
 	}
-
 
 	if value > w.max.value {
 		w.max = tuple{fieldMap, value}

@@ -28,7 +28,7 @@ func (w *Divider) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Divider) Batch(producer string, data []byte) bool {
+func (w *Divider) Batch(data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
 
@@ -85,7 +85,7 @@ func handleDivider(fieldMap map[string]string) (map[string]string, error) {
 	return fieldMap, nil
 }
 
-func (w *Divider) Eof(producer string, data []byte) bool {
+func (w *Divider) Eof(data []byte) bool {
 	body := protocol.DecodeEof(data).Encode()
 	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
@@ -93,7 +93,7 @@ func (w *Divider) Eof(producer string, data []byte) bool {
 	return true
 }
 
-func (w *Divider) Error(producer string, data []byte) bool {
+func (w *Divider) Error(data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

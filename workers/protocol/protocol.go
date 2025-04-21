@@ -76,18 +76,12 @@ const (
 	- EOF
 */
 
-func ReadDelivery(del amqp.Delivery) (int, string, []byte) {
+func ReadDelivery(del amqp.Delivery) (int, []byte) {
 	body := del.Body
 	if len(body) < 1 {
-		return ERROR, "", nil
+		return ERROR, nil
 	}
-
-	producer, ok := del.Headers["producer"]
-	if !ok {
-		return -1, "", nil
-	}
-
-	return int(body[0]), producer.(string), body[1:]
+	return int(body[0]), body[1:]
 }
 
 type Batch struct {

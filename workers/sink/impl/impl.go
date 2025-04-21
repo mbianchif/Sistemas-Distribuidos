@@ -25,7 +25,7 @@ func (w *Sink) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Sink) Batch(producer string, data []byte) bool {
+func (w *Sink) Batch(data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 	responseFieldMaps := batch.FieldMaps
 
@@ -40,7 +40,7 @@ func (w *Sink) Batch(producer string, data []byte) bool {
 	return false
 }
 
-func (w *Sink) Eof(producer string, data []byte) bool {
+func (w *Sink) Eof(data []byte) bool {
 	body := protocol.DecodeEof(data).EncodeWithQuery(w.Con.Query)
 	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
@@ -48,7 +48,7 @@ func (w *Sink) Eof(producer string, data []byte) bool {
 	return true
 }
 
-func (w *Sink) Error(producer string, data []byte) bool {
+func (w *Sink) Error(data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

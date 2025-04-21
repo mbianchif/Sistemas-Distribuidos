@@ -34,7 +34,7 @@ func (w *Sentiment) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Sentiment) Batch(producer string, data []byte) bool {
+func (w *Sentiment) Batch(data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
 
@@ -83,7 +83,7 @@ func handleSentiment(w *Sentiment, fieldMap map[string]string) (map[string]strin
 	return fieldMap, nil
 }
 
-func (w *Sentiment) Eof(producer string, data []byte) bool {
+func (w *Sentiment) Eof(data []byte) bool {
 	body := protocol.DecodeEof(data).Encode()
 	outQKey := w.Con.OutputQueueKeys[0]
 	if err := w.Broker.Publish(outQKey, body); err != nil {
@@ -93,7 +93,7 @@ func (w *Sentiment) Eof(producer string, data []byte) bool {
 	return true
 }
 
-func (w *Sentiment) Error(producer string, data []byte) bool {
+func (w *Sentiment) Error(data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

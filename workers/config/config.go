@@ -13,8 +13,8 @@ type Config struct {
 	Url                string
 	InputExchangeNames []string
 	InputExchangeTypes []string
-	InputQueueName     string
-	InputQueueKey      string
+	InputQueueNames    []string
+	InputQueueKeys     []string
 	OutputExchangeName string
 	OutputExchangeType string
 	OutputQueueNames   []string
@@ -57,12 +57,21 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the length of input exchange names and input exchange types don't match (names: %v, types: %v)", len(inputExchangeNames), len(inputExchangeTypes))
 	}
 
-	inputQueueName := os.Getenv("INPUT_QUEUE_NAME")
-	if len(inputQueueName) == 0 {
-		return nil, fmt.Errorf("the input queue was not provided")
+	inputQueueNamesString := os.Getenv("INPUT_QUEUE_NAMES")
+	inputQueueNames := strings.Split(inputQueueNamesString, ",")
+	if len(inputQueueNames) == 0 {
+		return nil, fmt.Errorf("the input queue names were not provided")
 	}
 
-	inputQueueKey := os.Getenv("INPUT_QUEUE_KEY")
+	inputQueueKeysString := os.Getenv("INPUT_QUEUE_KEY")
+	inputQueueKeys := strings.Split(inputQueueKeysString, ",")
+	if len(inputQueueNames) != len(inputQueueKeys) {
+		return nil, fmt.Errorf("the length of input queue names and input queue keys don't match (names: %v, keys: %v)", len(inputQueueNames), len(inputQueueKeys))
+	}
+
+	if len(inputExchangeNames) != len(inputQueueNames) {
+		return nil, fmt.Errorf("the length of input exchange names and input queue names don't match (exchange: %v, queues: %v)", len(inputExchangeNames), len(inputQueueNames))
+	}
 
 	outputExchangeName := os.Getenv("OUTPUT_EXCHANGE_NAME")
 	if len(outputExchangeName) == 0 {
@@ -111,8 +120,8 @@ func Create() (*Config, error) {
 		Url:                url,
 		InputExchangeNames: inputExchangeNames,
 		InputExchangeTypes: inputExchangeTypes,
-		InputQueueName:     inputQueueName,
-		InputQueueKey:      inputQueueKey,
+		InputQueueNames:     inputQueueNames,
+		InputQueueKeys:      inputQueueKeys,
 		OutputExchangeName: outputExchangeName,
 		OutputExchangeType: outputExchangeType,
 		OutputQueueNames:   outputQueueNames,

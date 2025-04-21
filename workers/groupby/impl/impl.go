@@ -40,7 +40,7 @@ func (w *Groupby) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Groupby) Batch(producer string, data []byte) bool {
+func (w *Groupby) Batch(data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 
 	for _, fieldMap := range batch.FieldMaps {
@@ -54,7 +54,7 @@ func (w *Groupby) Batch(producer string, data []byte) bool {
 	return false
 }
 
-func (w *Groupby) Eof(producer string, data []byte) bool {
+func (w *Groupby) Eof(data []byte) bool {
 	fieldMaps := w.Handler.Result(w.Con)
 	body := protocol.NewBatch(fieldMaps).Encode(w.Con.Select)
 	if err := w.Broker.Publish("", body); err != nil {
@@ -69,7 +69,7 @@ func (w *Groupby) Eof(producer string, data []byte) bool {
 	return true
 }
 
-func (w *Groupby) Error(producer string, data []byte) bool {
+func (w *Groupby) Error(data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

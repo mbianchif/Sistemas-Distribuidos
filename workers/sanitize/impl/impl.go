@@ -42,7 +42,7 @@ func (w *Sanitize) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Sanitize) Batch(producer string, data []byte) bool {
+func (w *Sanitize) Batch(data []byte) bool {
 	reader := csv.NewReader(bytes.NewReader(data))
 	responseFieldMaps := make([]map[string]string, 0)
 	for {
@@ -206,7 +206,7 @@ func handleCredit(w *Sanitize, line []string) (map[string]string, error) {
 	return fields, nil
 }
 
-func (w *Sanitize) Eof(producer string, data []byte) bool {
+func (w *Sanitize) Eof(data []byte) bool {
 	body := protocol.DecodeEof(data).Encode()
 	qKey := w.Con.OutputQueueKeys[0]
 	if err := w.Broker.Publish(qKey, body); err != nil {
@@ -215,7 +215,7 @@ func (w *Sanitize) Eof(producer string, data []byte) bool {
 	return true
 }
 
-func (w *Sanitize) Error(producer string, data []byte) bool {
+func (w *Sanitize) Error(data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

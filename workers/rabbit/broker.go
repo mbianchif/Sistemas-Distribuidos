@@ -27,14 +27,15 @@ func New(con *config.Config) (*Broker, error) {
 	return &Broker{conn, ch, con}, nil
 }
 
-func (b *Broker) Init() error {
-	if err := b.declareInput(); err != nil {
-		return err
+func (b *Broker) Init() ([]amqp.Queue, error) {
+	inputQueues, err := b.declareInput()
+	if err != nil {
+		return nil, err
 	}
 	if err := b.declareOutput(); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return inputQueues, nil
 }
 
 func (b *Broker) DeInit() {
@@ -46,32 +47,43 @@ func (b *Broker) DeInit() {
 	}
 }
 
-func (b *Broker) declareInput() error {
+func (b *Broker) declareInput() ([]amqp.Queue, error) {
 	exchangeNames := b.con.InputExchangeNames
 	exchangeTypes := b.con.InputExchangeTypes
-	qName := b.con.InputQueueName
-	qKey := b.con.InputQueueKey
+	qNames := b.con.InputQueueNames
+	qKeys := b.con.InputQueueKeys
 
 	if len(exchangeNames) != len(exchangeTypes) {
-		return fmt.Errorf("config failed to check len(InputExchangeNames) == len(InputExchangeTypes)")
+		return nil, fmt.Errorf("config failed to check len(InputExchangeNames) == len(InputExchangeTypes)")
 	}
 
-	q, err := b.queueDeclare(qName)
-	if err != nil {
-		return err
+	if len(qNames) != len(qKeys) {
+		return nil, fmt.Errorf("config failed to check len(InputQueueNames) == len(InputQueueKeys)")
 	}
 
+	if len(exchangeNames) != len(qNames) {
+		return nil, fmt.Errorf("config failed to check len(InputExchangeNames) == len(InputQueueNames)")
+	}
+
+	inputQueues := make([]amqp.Queue, 0, len(qNames))
 	for i := range exchangeNames {
 		if err := b.exchangeDeclare(exchangeNames[i], exchangeTypes[i]); err != nil {
-			return err
+			return nil, err
 		}
 
-		if err := b.queueBind(q, qKey, exchangeNames[i]); err != nil {
-			return err
+		q, err := b.queueDeclare(qNames[i])
+		if err != nil {
+			return nil, err
 		}
+
+		if err := b.queueBind(q, qKeys[i], exchangeNames[i]); err != nil {
+			return nil, err
+		}
+
+		inputQueues = append(inputQueues, q)
 	}
 
-	return nil
+	return inputQueues, nil
 }
 
 func (b *Broker) declareOutput() error {
@@ -135,9 +147,9 @@ func (b *Broker) queueBind(q amqp.Queue, key string, exchangeName string) error 
 	)
 }
 
-func (b *Broker) Consume(consumer string) (<-chan amqp.Delivery, error) {
+func (b *Broker) Consume(q amqp.Queue, consumer string) (<-chan amqp.Delivery, error) {
 	return b.ch.Consume(
-		b.con.InputQueueName,
+		q.Name,
 		consumer,
 		false, // auto-ack
 		false, // exclusive
@@ -156,8 +168,5 @@ func (b *Broker) Publish(key string, body []byte) error {
 		amqp.Publishing{
 			ContentType: "application/octet-stream",
 			Body:        body,
-			Headers: amqp.Table {
-				"producer": b.con.Producer,
-			},
 		})
 }

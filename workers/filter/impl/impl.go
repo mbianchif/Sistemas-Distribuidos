@@ -37,7 +37,7 @@ func (w *Filter) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Filter) Batch(producer string, data []byte) bool {
+func (w *Filter) Batch(data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
 
@@ -64,7 +64,7 @@ func (w *Filter) Batch(producer string, data []byte) bool {
 	return false
 }
 
-func (w *Filter) Eof(producer string, data []byte) bool {
+func (w *Filter) Eof(data []byte) bool {
 	body := protocol.DecodeEof(data).Encode()
 	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
@@ -72,7 +72,7 @@ func (w *Filter) Eof(producer string, data []byte) bool {
 	return true
 }
 
-func (w *Filter) Error(producer string, data []byte) bool {
+func (w *Filter) Error(data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

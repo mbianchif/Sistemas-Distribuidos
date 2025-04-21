@@ -24,16 +24,15 @@ func (w *Join) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Join) Batch(producer string, data []byte) bool {
+func (w *Join) Batch(data []byte) bool {
 	return false
 }
 
-func (w *Join) Eof(producer string, data []byte) bool {
+func (w *Join) Eof(data []byte) bool {
 	return true
 }
 
-func (w *Join) Error(producer string, data []byte) bool {
+func (w *Join) Error(data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }
-

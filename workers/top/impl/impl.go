@@ -28,7 +28,7 @@ func (w *Top) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Top) Batch(producer string, data []byte) bool {
+func (w *Top) Batch(data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 
 	for _, fieldMap := range batch.FieldMaps {
@@ -42,7 +42,7 @@ func (w *Top) Batch(producer string, data []byte) bool {
 	return false
 }
 
-func (w *Top) Eof(producer string, data []byte) bool {
+func (w *Top) Eof(data []byte) bool {
 	w.Log.Debugf("fieldMaps: %v", w.top_lit)
 	body := protocol.NewBatch(w.top_lit).Encode(w.Con.Select)
 	if err := w.Broker.Publish("", body); err != nil {
@@ -57,7 +57,7 @@ func (w *Top) Eof(producer string, data []byte) bool {
 	return true
 }
 
-func (w *Top) Error(producer string, data []byte) bool {
+func (w *Top) Error(data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

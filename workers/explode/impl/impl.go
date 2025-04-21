@@ -29,7 +29,7 @@ func (w *Explode) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Explode) Batch(producer string, data []byte) bool {
+func (w *Explode) Batch(data []byte) bool {
 	batch := protocol.DecodeBatch(data)
 	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
 
@@ -70,7 +70,7 @@ func handleExplode(fieldMap map[string]string, con *config.ExplodeConfig) ([]map
 	return fieldMaps, nil
 }
 
-func (w *Explode) Eof(producer string, data []byte) bool {
+func (w *Explode) Eof(data []byte) bool {
 	body := protocol.DecodeEof(data).Encode()
 	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
@@ -79,7 +79,7 @@ func (w *Explode) Eof(producer string, data []byte) bool {
 	return true
 }
 
-func (w *Explode) Error(producer string, data []byte) bool {
+func (w *Explode) Error(data []byte) bool {
 	w.Log.Error("Received an ERROR message kind")
 	return true
 }

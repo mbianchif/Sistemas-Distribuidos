@@ -57,7 +57,6 @@ class Broker:
                 exchange=self._outputexchange_name,
                 routing_key=routing_key,
                 body=body,
-                properties=pika.BasicProperties(headers={"producer": "gateway"}),
             )
         except Exception as e:
             logging.critical(f"Failed to publish message {e}")
