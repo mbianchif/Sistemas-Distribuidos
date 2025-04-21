@@ -61,7 +61,7 @@ class Server:
         self._broker.close()
 
     def _handle_client(self, conn: CsvTransferStream):
-        for _ in range(3):
+        for _ in range(2):#TODO: CAMBIAR A 3!!!!!!!!! 
             filename = conn.resource()
             logging.info(f"Receiving {filename}")
 

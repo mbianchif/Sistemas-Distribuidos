@@ -47,6 +47,7 @@ func (w *Filter) Batch(data []byte) bool {
 	for _, fieldMap := range batch.FieldMaps {
 		responseFieldMap, err := w.Handler(w, fieldMap)
 		if err != nil {
+			w.Log.Errorf("recv fieldMap: %v", fieldMap)
 			w.Log.Errorf("failed to handle message: %v", err)
 			continue
 		}

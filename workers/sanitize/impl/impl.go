@@ -3,8 +3,6 @@ package impl
 import (
 	"bytes"
 	"encoding/csv"
-	"encoding/json"
-	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -20,7 +18,7 @@ import (
 type Sanitize struct {
 	*workers.Worker
 	Con     *config.SanitizeConfig
-	Handler func(*Sanitize, []string) (map[string]string, error)
+	Handler func(*Sanitize, []string) map[string]string
 }
 
 func New(con *config.SanitizeConfig, log *logging.Logger) (*Sanitize, error) {
@@ -29,7 +27,7 @@ func New(con *config.SanitizeConfig, log *logging.Logger) (*Sanitize, error) {
 		return nil, err
 	}
 
-	handler := map[string]func(*Sanitize, []string) (map[string]string, error){
+	handler := map[string]func(*Sanitize, []string) map[string]string{
 		"movies":  handleMovie,
 		"credits": handleCredit,
 		"ratings": handleRating,
@@ -56,11 +54,7 @@ func (w *Sanitize) Batch(data []byte) bool {
 			continue
 		}
 
-		responseFieldMap, err := w.Handler(w, line)
-		if err != nil {
-			w.Log.Errorf("failed to handle message: %v", err)
-			continue
-		}
+		responseFieldMap := w.Handler(w, line)
 
 		if responseFieldMap != nil {
 			responseFieldMaps = append(responseFieldMaps, responseFieldMap)
@@ -78,28 +72,26 @@ func (w *Sanitize) Batch(data []byte) bool {
 	return false
 }
 
-func parseNamesFromJson(field string) (names []string) {
-	handlePanic := func() {
-		if recover() != nil {
-			names = nil
+func parseNamesFromJson(field string) []string {
+	subStr := "'name': '"
+	names := make([]string, 0)
+
+	for {
+		start := strings.Index(field, subStr)
+		if start == -1 {
+			break
 		}
-	}
-	defer handlePanic()
+		start += len(subStr)
+		field = field[start:]
 
-	type Named struct {
-		Name string `json:"name"`
-	}
+		end := strings.Index(field, "'")
+		if end == -1 {
+			break
+		}
+		name := field[:end]
+		names = append(names, name)
 
-	field = strings.ReplaceAll(field, "'", "\"")
-
-	var values []Named
-	if err := json.Unmarshal([]byte(field), &values); err != nil {
-		return nil
-	}
-
-	names = make([]string, 0, len(values))
-	for _, named := range values {
-		names = append(names, named.Name)
+		field = field[end+1:]
 	}
 
 	return names
@@ -114,22 +106,22 @@ func isValidRow(fields map[string]string) bool {
 	return true
 }
 
-func handleMovie(w *Sanitize, line []string) (map[string]string, error) {
+func handleMovie(w *Sanitize, line []string) map[string]string {
 	if len(line) != 24 {
-		return nil, fmt.Errorf("invalid size for csv register, is %v", len(line))
+		return nil
 	}
 
 	genres := parseNamesFromJson(line[3])
 	if genres == nil {
-		return nil, nil
+		return nil
 	}
 	prodCountries := parseNamesFromJson(line[13])
 	if prodCountries == nil {
-		return nil, nil
+		return nil
 	}
 	spokLangs := parseNamesFromJson(line[17])
 	if spokLangs == nil {
-		return nil, nil
+		return nil
 	}
 
 	fields := map[string]string{
@@ -145,10 +137,10 @@ func handleMovie(w *Sanitize, line []string) (map[string]string, error) {
 	}
 
 	if !isValidRow(fields) {
-		return nil, nil
+		return nil
 	}
 
-	return fields, nil
+	return fields
 }
 
 func parseTimestamp(timestamp string) (string, error) {
@@ -161,14 +153,14 @@ func parseTimestamp(timestamp string) (string, error) {
 	return t.Format("2006-01-02 15:04:05"), nil
 }
 
-func handleRating(w *Sanitize, line []string) (map[string]string, error) {
+func handleRating(w *Sanitize, line []string) map[string]string {
 	if len(line) != 4 {
-		return nil, fmt.Errorf("invalid size for csv register, is %v", len(line))
+		return nil
 	}
 
 	timestamp, err := parseTimestamp(line[3])
 	if err != nil {
-		return nil, err
+		return nil
 	}
 
 	fields := map[string]string{
@@ -178,20 +170,20 @@ func handleRating(w *Sanitize, line []string) (map[string]string, error) {
 	}
 
 	if !isValidRow(fields) {
-		return nil, nil
+		return nil
 	}
 
-	return fields, nil
+	return fields
 }
 
-func handleCredit(w *Sanitize, line []string) (map[string]string, error) {
+func handleCredit(w *Sanitize, line []string) map[string]string {
 	if len(line) != 3 {
-		return nil, fmt.Errorf("invalid size for csv register, is %v", len(line))
+		return nil
 	}
 
 	cast := parseNamesFromJson(line[0])
 	if cast == nil {
-		return nil, nil
+		return nil
 	}
 
 	fields := map[string]string{
@@ -200,16 +192,15 @@ func handleCredit(w *Sanitize, line []string) (map[string]string, error) {
 	}
 
 	if !isValidRow(fields) {
-		return nil, nil
+		return nil
 	}
 
-	return fields, nil
+	return fields
 }
 
 func (w *Sanitize) Eof(data []byte) bool {
 	body := protocol.DecodeEof(data).Encode()
-	qKey := w.Con.OutputQueueKeys[0]
-	if err := w.Broker.Publish(qKey, body); err != nil {
+	if err := w.Broker.Publish("", body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 	return true

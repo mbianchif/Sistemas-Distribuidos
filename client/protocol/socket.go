@@ -172,7 +172,7 @@ func (s *CsvTransferStream) RecvQueryResult(storage string) {
 		kind := int(header[4])
 		query := int(header[5])
 		if kind == MSG_EOF {
-			s.log.Infof("query %v is ready!")
+			s.log.Infof("query %v is ready!", query)
 			done[query] = struct{}{}
 			close(chans[query])
 			continue
