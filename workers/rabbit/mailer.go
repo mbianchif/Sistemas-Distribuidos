@@ -31,6 +31,8 @@ func (m *Mailer) Init() ([]amqp.Queue, error) {
 	}
 
 	m.senders = m.initSenders(outputQFmts)
+	m.broker.log.Infof("inputQs: %v", inputQs)
+	m.broker.log.Infof("outputQs: %v", m.senders)
 	return inputQs, nil
 }
 
