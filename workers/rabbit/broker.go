@@ -170,3 +170,16 @@ func (b *Broker) Publish(key string, body []byte) error {
 			Body:        body,
 		})
 }
+
+func (b *Broker) PublishWithHeaders(key string, body []byte, headers amqp.Table) error {
+	return b.ch.Publish(
+		b.con.OutputExchangeName,
+		key,
+		false, // mandatory
+		false, // immediate
+		amqp.Publishing{
+			ContentType: "application/octet-stream",
+			Body:        body,
+			Headers:     headers,
+		})
+}
