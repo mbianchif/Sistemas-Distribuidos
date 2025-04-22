@@ -43,20 +43,14 @@ func (w *Sanitize) Run() error {
 func (w *Sanitize) Batch(data []byte) bool {
 	reader := csv.NewReader(bytes.NewReader(data))
 	responseFieldMaps := make([]map[string]string, 0)
+
 	for {
 		line, err := reader.Read()
 		if err == io.EOF {
 			break
 		}
 
-		if err != nil {
-			w.Log.Errorf("failed to decode message: %v", err)
-			continue
-		}
-
-		responseFieldMap := w.Handler(w, line)
-
-		if responseFieldMap != nil {
+		if responseFieldMap := w.Handler(w, line); responseFieldMap != nil {
 			responseFieldMaps = append(responseFieldMaps, responseFieldMap)
 		}
 	}
@@ -111,6 +105,15 @@ func handleMovie(w *Sanitize, line []string) map[string]string {
 		return nil
 	}
 
+	for _, i := range []int{2, 3, 5, 9, 13, 14, 15, 17, 20} {
+		if len(line[i]) != len(strings.TrimSpace(line[i])) {
+			return nil
+		}
+	}
+
+	// Replace all new lines in overview
+	line[9] = strings.ReplaceAll(line[9], "\n", " ")
+
 	genres := parseNamesFromJson(line[3])
 	if genres == nil {
 		return nil
@@ -124,23 +127,23 @@ func handleMovie(w *Sanitize, line []string) map[string]string {
 		return nil
 	}
 
-	fields := map[string]string{
-		"id":                   strings.TrimSpace(line[5]),
-		"title":                strings.TrimSpace(line[20]),
-		"release_date":         strings.TrimSpace(line[14]),
-		"overview":             strings.TrimSpace(line[9]),
-		"budget":               strings.TrimSpace(line[2]),
-		"revenue":              strings.TrimSpace(line[15]),
+	fieldMap := map[string]string{
+		"id":                   line[5],
+		"title":                line[20],
+		"release_date":         line[14],
+		"overview":             line[9],
+		"budget":               line[2],
+		"revenue":              line[15],
 		"genres":               strings.Join(genres, ","),
 		"production_countries": strings.Join(prodCountries, ","),
 		"spoken_languages":     strings.Join(spokLangs, ","),
 	}
 
-	if !isValidRow(fields) {
+	if !isValidRow(fieldMap) {
 		return nil
 	}
 
-	return fields
+	return fieldMap
 }
 
 func parseTimestamp(timestamp string) (string, error) {
@@ -158,14 +161,20 @@ func handleRating(w *Sanitize, line []string) map[string]string {
 		return nil
 	}
 
+	for _, i := range []int{1, 2, 3} {
+		if len(line[i]) != len(strings.TrimSpace(line[i])) {
+			return nil
+		}
+	}
+
 	timestamp, err := parseTimestamp(line[3])
 	if err != nil {
 		return nil
 	}
 
 	fields := map[string]string{
-		"movieId":   strings.TrimSpace(line[1]),
-		"rating":    strings.TrimSpace(line[2]),
+		"movieId":   line[1],
+		"rating":    line[2],
 		"timestamp": timestamp,
 	}
 
@@ -181,13 +190,19 @@ func handleCredit(w *Sanitize, line []string) map[string]string {
 		return nil
 	}
 
+	for _, i := range []int{0, 2} {
+		if len(line[i]) != len(strings.TrimSpace(line[i])) {
+			return nil
+		}
+	}
+
 	cast := parseNamesFromJson(line[0])
 	if cast == nil {
 		return nil
 	}
 
 	fields := map[string]string{
-		"id":   strings.TrimSpace(line[2]),
+		"id":   line[2],
 		"cast": strings.Join(cast, ","),
 	}
 

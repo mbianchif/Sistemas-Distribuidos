@@ -106,6 +106,10 @@ func encodeLine(fields map[string]string, filterCols map[string]struct{}) []byte
 			}
 		}
 
+		if _, ok := name2Id[k]; !ok {
+			panic(fmt.Sprintf("field %v is not supported by protocol, must add", k))
+		}
+
 		kId := strconv.Itoa(name2Id[k])
 		bytes = append(bytes, []byte(kId)...)
 		bytes = append(bytes, '=')
