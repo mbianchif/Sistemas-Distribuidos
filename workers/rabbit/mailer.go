@@ -19,16 +19,24 @@ func NewMailer(con *config.Config, log *logging.Logger) (*Mailer, error) {
 		return nil, err
 	}
 
-	senders, err := broker.Init()
+	return &Mailer{nil, broker}, inputQs, nil
+}
+
+func (m *Mailer) Init() ([][]amqp.Queue, error) {
+	inputQs, outputQs, err := m.broker.Init()
 	if err != nil {
 		return nil, err
 	}
 
-	return &Mailer{senders, broker}, nil
+	m.senders = m.initSenders(outputQs)
+	return inputQs, nil
 }
 
-func (m *Mailer) Init() ([]amqp.Queue, error) {
-	return nil, nil
+func (m *Mailer) initSenders(outputQs []amqp.Queue) []Sender {
+	delTypes := m.broker.con.OutputDeliveryTypes
+	senders := make([]Sender, 0, len(delTypes))
+
+	return senders
 }
 
 func (m *Mailer) DeInit() {
