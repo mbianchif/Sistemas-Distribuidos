@@ -104,6 +104,10 @@ func (base *Worker) PublishEof(eof protocol.Eof) error {
 	return base.Mailer.PublishEof(eof)
 }
 
+func (base *Worker) PublishEofWithQuery(eof protocol.Eof, query int) error {
+	return base.Mailer.PublishEofWithQuery(eof, query)
+}
+
 func (base *Worker) PublishError(erro protocol.Error) error {
 	return base.Mailer.PublishError(erro)
 }

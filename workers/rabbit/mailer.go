@@ -92,6 +92,15 @@ func (m *Mailer) PublishEof(eof protocol.Eof) error {
 	return nil
 }
 
+func (m *Mailer) PublishEofWithQuery(eof protocol.Eof, query int) error {
+	for _, sender := range m.senders {
+		if err := sender.EofWithQuery(eof, query); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (m *Mailer) PublishError(erro protocol.Error) error {
 	for _, sender := range m.senders {
 		if err := sender.Error(erro); err != nil {

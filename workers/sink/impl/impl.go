@@ -45,7 +45,7 @@ func (w *Sink) Batch(data []byte) bool {
 
 func (w *Sink) Eof(data []byte) bool {
 	eof := protocol.DecodeEof(data)
-	if err := w.PublishEof(eof); err != nil {
+	if err := w.PublishEofWithQuery(eof, w.Con.Query); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 	return true

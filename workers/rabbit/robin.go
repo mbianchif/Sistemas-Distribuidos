@@ -43,6 +43,11 @@ func (s *SenderRobin) Eof(eof protocol.Eof) error {
 	return s.broadcast(body)
 }
 
+func (s *SenderRobin) EofWithQuery(eof protocol.Eof, query int) error {
+	body := eof.EncodeWithQuery(query)
+	return s.broadcast(body)
+}
+
 func (s *SenderRobin) Error(erro protocol.Error) error {
 	body := erro.Encode()
 	return s.broadcast(body)

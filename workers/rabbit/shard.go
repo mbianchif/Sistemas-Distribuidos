@@ -84,6 +84,11 @@ func (s *SenderShard) Eof(eof protocol.Eof) error {
 	return s.broadcast(body)
 }
 
+func (s *SenderShard) EofWithQuery(eof protocol.Eof, query int) error {
+	body := eof.EncodeWithQuery(query)
+	return s.broadcast(body)
+}
+
 func (s *SenderShard) Error(erro protocol.Error) error {
 	body := erro.Encode()
 	return s.broadcast(body)
