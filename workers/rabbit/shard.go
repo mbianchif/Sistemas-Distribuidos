@@ -15,7 +15,9 @@ type SenderShard struct {
 	n      int
 }
 
-func NewShard(broker *Broker, fmt string, )
+func NewShard(broker *Broker, fmt string, key string, n int) *SenderShard {
+	return &SenderShard{broker, fmt, key, n}
+}
 
 func keyHash(field string, mod int) int {
 	acc := 0

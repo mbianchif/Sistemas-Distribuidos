@@ -76,12 +76,18 @@ func Create() (*Config, error) {
 	outputQueueNames := strings.Split(outputQueueNamesString, ",")
 
 	// OUTPUT_DELIVERY_TYPES
-	validDeliveryTypes := []string{"robin", "shard"}
 	outputDeliveryTypes := strings.Split(os.Getenv("OUTPUT_DELIVERY_TYPES"), ",")
 	for _, delType := range outputDeliveryTypes {
-		if !slices.Contains(validDeliveryTypes, delType) {
-			return nil, fmt.Errorf("inavlid delivery type %v", delType)
+		if delType == "robin" {
+			continue
 		}
+
+		shardParts := strings.Split(delType, ":")
+		if len(shardParts) == 2 && shardParts[0] == "shard" && len(shardParts) > 0 {
+			continue
+		}
+
+		return nil, fmt.Errorf("inavlid delivery type %v", delType)
 	}
 
 	if len(outputDeliveryTypes) != len(outputQueueNames) {

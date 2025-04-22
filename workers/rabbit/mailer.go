@@ -1,6 +1,8 @@
 package rabbit
 
 import (
+	"strings"
+
 	"workers/config"
 	"workers/protocol"
 
@@ -44,7 +46,9 @@ func (m *Mailer) initSenders(outputQFmts []string) []Sender {
 		case "robin":
 			sender = NewRobin(m.broker, outputQFmts[i], qCopies[i])
 		case "shard":
-			sender = NewShard(m.broker, outputQFmts[i], qCopies[i])
+			parts := strings.Split(delTypes[i], ":")
+			key := parts[1]
+			sender = NewShard(m.broker, outputQFmts[i], key, qCopies[i])
 		}
 
 		senders = append(senders, sender)
