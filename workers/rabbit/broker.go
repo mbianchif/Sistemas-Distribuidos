@@ -29,17 +29,18 @@ func NewBroker(con *config.Config, log *logging.Logger) (*Broker, error) {
 	return &Broker{conn, ch, con, log}, nil
 }
 
-func (b *Broker) Init() ([]amqp.Queue, error) {
+func (b *Broker) Init() ([]amqp.Queue, []amqp.Queue, error) {
 	inputQs, err := b.initInput()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	if err:= b.initOutput(); err != nil {
-		return inputQs, err
+	outputQs, err := b.initOutput()
+	if err != nil {
+		return inputQs, nil, err
 	}
 
-	return inputQs, nil
+	return inputQs, outputQs, nil
 }
 
 func (b *Broker) DeInit() {
@@ -80,12 +81,35 @@ func (b *Broker) initInput() ([]amqp.Queue, error) {
 	return qs, nil
 }
 
-func (b *Broker) initOutput() error {
-	exchangename := b.con.OutputExchangeName
+func (b *Broker) initOutput() ([]amqp.Queue, error) {
+	exchangeName := b.con.OutputExchangeName
 	qNames := b.con.OutputQueueNames
-	delTypes := b.con.OutputDeliveryTypes
+	qCopies := b.con.OutputCopies
 
-	return nil
+	if err := b.exchangeDeclare(exchangeName, "direct"); err != nil {
+		return nil, err
+	}
+
+	qs := make([]amqp.Queue, 0, len(qNames))
+	for i := range qNames {
+		nameFmt := qNames[i] + "-%d"
+		for id := range qCopies[i] {
+			qName := fmt.Sprintf(nameFmt, id)
+
+			q, err := b.queueDeclare(qName)
+			if err != nil {
+				return nil, err
+			}
+
+			if err := b.queueBind(q, q.Name, exchangeName); err != nil {
+				return nil, err
+			}
+			
+			qs = append(qs, q)
+		}
+	}
+
+	return qs, nil
 }
 
 func (b *Broker) exchangeDeclare(name string, kind string) error {
