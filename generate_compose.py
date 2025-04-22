@@ -33,6 +33,15 @@ def generate_docker_compose(
     join_id_id
 ):
     docker_compose = """services:
+  client:
+    container_name: client
+    build: client
+    env_file: client/.env
+    volumes:
+      - .data:/data
+    depends_on:
+      - gateway
+      
   rabbitmq:
     container_name: rabbitmq
     image: rabbitmq:management
