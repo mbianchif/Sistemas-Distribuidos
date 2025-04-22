@@ -23,6 +23,7 @@ func (m *Mailer) PublishBatch(batch protocol.Batch, filterCols map[string]struct
 
 type sender interface {
 	Batch(protocol.Batch, map[string]struct{}) error
+	Eof(protocol.Eof) error
 }
 
 type senderDirect struct {
@@ -42,9 +43,26 @@ func (s senderDirect) Batch(batch protocol.Batch, filterCols map[string]struct{}
 	key := s.nextKey()
 	body := batch.Encode(filterCols)
 	headers := amqp.Table{
-
+		"type": protocol.BATCH,
 	}
 	return s.broker.PublishWithHeaders(key, body, headers)
+}
+
+func (s senderDirect) Eof(eof protocol.Eof) error {
+	body := eof.Encode()
+	headers := amqp.Table{
+		"type": protocol.EOF,
+	}
+
+	for range s.n {
+		key := s.nextKey()
+		if err := s.broker.PublishWithHeaders(key, body, headers); err != nil {
+			// TODO: log
+			continue
+		}
+	}
+
+	return nil
 }
 
 type senderShard struct {
