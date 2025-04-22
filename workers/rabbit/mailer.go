@@ -1,13 +1,18 @@
 package rabbit
 
 import (
+	"workers/config"
 	"workers/protocol"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Mailer struct {
-	senders []rabbit.Sender
+	senders []Sender
+}
+
+func NewMailer(con *config.Config) *Mailer {
+	return nil
 }
 
 func (m *Mailer) PublishBatch(batch protocol.Batch, filterCols map[string]struct{}) error {
@@ -44,5 +49,3 @@ func (m *Mailer) broadcast(body []byte, headers amqp.Table) error {
 	}
 	return nil
 }
-
-

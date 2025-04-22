@@ -4,13 +4,12 @@ import (
 	"fmt"
 
 	"workers/protocol"
-	"workers/rabbit"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type senderShard struct {
-	broker *rabbit.Broker
+	broker *Broker
 	fmt    string
 	key    string
 	n      int
