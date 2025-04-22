@@ -94,6 +94,7 @@ func (b *Broker) initOutput() ([][]amqp.Queue, error) {
 	for i := range qNames {
 		copyQs := make([]amqp.Queue, 0, len(qNames[i]))
 		nameFmt := qNames[i] + "-%d"
+
 		for id := range qCopies[i] {
 			qName := fmt.Sprintf(nameFmt, id)
 
