@@ -8,12 +8,14 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type senderShard struct {
+type SenderShard struct {
 	broker *Broker
 	fmt    string
 	key    string
 	n      int
 }
+
+func NewShard(broker *Broker, fmt string, )
 
 func keyHash(field string, mod int) int {
 	acc := 0
@@ -23,7 +25,7 @@ func keyHash(field string, mod int) int {
 	return acc % mod
 }
 
-func (s senderShard) shard(fieldMaps []map[string]string) (map[int][]map[string]string, error) {
+func (s SenderShard) shard(fieldMaps []map[string]string) (map[int][]map[string]string, error) {
 	shards := make(map[int][]map[string]string, s.n)
 
 	for _, fieldMap := range fieldMaps {
@@ -39,7 +41,7 @@ func (s senderShard) shard(fieldMaps []map[string]string) (map[int][]map[string]
 	return shards, nil
 }
 
-func (s senderShard) Batch(batch protocol.Batch, filterCols map[string]struct{}) error {
+func (s SenderShard) Batch(batch protocol.Batch, filterCols map[string]struct{}) error {
 	shards, err := s.shard(batch.FieldMaps)
 	if err != nil {
 		return err
@@ -60,7 +62,7 @@ func (s senderShard) Batch(batch protocol.Batch, filterCols map[string]struct{})
 	return nil
 }
 
-func (s senderShard) Eof(eof protocol.Eof) error {
+func (s SenderShard) Eof(eof protocol.Eof) error {
 	body := eof.Encode()
 	headers := amqp.Table{
 		"type": protocol.EOF,
@@ -68,7 +70,7 @@ func (s senderShard) Eof(eof protocol.Eof) error {
 	return s.broadcast(body, headers)
 }
 
-func (s senderShard) Error(erro protocol.Error) error {
+func (s SenderShard) Error(erro protocol.Error) error {
 	body := erro.Encode()
 	headers := amqp.Table{
 		"type": protocol.ERROR,
@@ -76,7 +78,7 @@ func (s senderShard) Error(erro protocol.Error) error {
 	return s.broadcast(body, headers)
 }
 
-func (s senderShard) broadcast(body []byte, headers amqp.Table) error {
+func (s SenderShard) broadcast(body []byte, headers amqp.Table) error {
 	for i := range s.n {
 		key := fmt.Sprintf(s.fmt, i)
 		if err := s.broker.PublishWithHeaders(key, body, headers); err != nil {

@@ -20,10 +20,13 @@ INPUT_QUEUE_NAMES=join-sanitize-id_id,join-filter-id_id
 OUTPUT_EXCHANGE_NAME=join-id_id
 OUTPUT_QUEUE_NAMES=explode-cast
     # hay que appendear -%d a la hora de crear las colas y enviar mensajes
-OUTPUT_DELIVERY_TYPES=direct
+OUTPUT_DELIVERY_TYPES=robin
     # este no tiene nada que ver con el tipo de exchange, esto es para saber
     # como mandar los mensajes a las copias, estos 2 ultimos campos tienen
     # que tener la misma cantidad de campos
+    #
+    # Ejemplo de shard
+    # OUTPUT_DELIVERY_TYPES=shard:id
 
 LOG_LEVEL=DEBUG
 SELECT=id,title,cast

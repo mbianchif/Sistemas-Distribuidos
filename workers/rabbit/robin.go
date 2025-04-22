@@ -8,20 +8,24 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type senderDirect struct {
+type SenderRobin struct {
 	broker *Broker
 	fmt    string
 	i      int
 	n      int
 }
 
-func (s senderDirect) nextKey() string {
+func NewRobin(broker *Broker, fmt string, n int) *SenderRobin {
+	return &SenderRobin{broker, fmt, 0, n}
+}
+
+func (s SenderRobin) nextKey() string {
 	key := fmt.Sprintf(s.fmt, s.i)
 	s.i = (s.i + 1) % s.n
 	return key
 }
 
-func (s senderDirect) Batch(batch protocol.Batch, filterCols map[string]struct{}) error {
+func (s SenderRobin) Batch(batch protocol.Batch, filterCols map[string]struct{}) error {
 	key := s.nextKey()
 	body := batch.Encode(filterCols)
 	headers := amqp.Table{
@@ -30,7 +34,7 @@ func (s senderDirect) Batch(batch protocol.Batch, filterCols map[string]struct{}
 	return s.broker.PublishWithHeaders(key, body, headers)
 }
 
-func (s senderDirect) Eof(eof protocol.Eof) error {
+func (s SenderRobin) Eof(eof protocol.Eof) error {
 	body := eof.Encode()
 	headers := amqp.Table{
 		"type": protocol.EOF,
@@ -38,7 +42,7 @@ func (s senderDirect) Eof(eof protocol.Eof) error {
 	return s.broadcast(body, headers)
 }
 
-func (s senderDirect) Error(erro protocol.Error) error {
+func (s SenderRobin) Error(erro protocol.Error) error {
 	body := erro.Encode()
 	headers := amqp.Table{
 		"type": protocol.ERROR,
@@ -46,7 +50,7 @@ func (s senderDirect) Error(erro protocol.Error) error {
 	return s.broadcast(body, headers)
 }
 
-func (s senderDirect) broadcast(body []byte, headers amqp.Table) error {
+func (s SenderRobin) broadcast(body []byte, headers amqp.Table) error {
 	for i := range s.n {
 		key := fmt.Sprintf(s.fmt, i)
 		if err := s.broker.PublishWithHeaders(key, body, headers); err != nil {

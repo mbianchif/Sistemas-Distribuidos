@@ -32,18 +32,22 @@ func (m *Mailer) Init() ([]amqp.Queue, error) {
 	return inputQs, nil
 }
 
-func (m *Mailer) initSenders(outputQs [][]amqp.Queue) []Sender {
+func (m *Mailer) initSenders(outputQFmts []string) []Sender {
 	delTypes := m.broker.con.OutputDeliveryTypes
+	qCopies := m.broker.con.OutputCopies
 	senders := make([]Sender, 0, len(delTypes))
 
-	for i := range outputQs {
-		copyQs := outputQs[i]
+	for i := range outputQFmts {
+		var sender Sender
+
 		switch delTypes[i] {
-		case "direct":
-			sender := SenderDirect{}
+		case "robin":
+			sender = NewRobin(m.broker, outputQFmts[i], qCopies[i])
 		case "shard":
+			sender = NewShard(m.broker, outputQFmts[i], qCopies[i])
 		}
 
+		senders = append(senders, sender)
 	}
 
 	return senders

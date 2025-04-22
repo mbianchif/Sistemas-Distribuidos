@@ -76,7 +76,7 @@ func Create() (*Config, error) {
 	outputQueueNames := strings.Split(outputQueueNamesString, ",")
 
 	// OUTPUT_DELIVERY_TYPES
-	validDeliveryTypes := []string{"direct", "shard"}
+	validDeliveryTypes := []string{"robin", "shard"}
 	outputDeliveryTypes := strings.Split(os.Getenv("OUTPUT_DELIVERY_TYPES"), ",")
 	for _, delType := range outputDeliveryTypes {
 		if !slices.Contains(validDeliveryTypes, delType) {
