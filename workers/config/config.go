@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -83,7 +82,7 @@ func Create() (*Config, error) {
 		}
 
 		shardParts := strings.Split(delType, ":")
-		if len(shardParts) == 2 && shardParts[0] == "shard" && len(shardParts) > 0 {
+		if len(shardParts) == 2 && shardParts[0] == "shard" && len(shardParts[1]) > 0 {
 			continue
 		}
 

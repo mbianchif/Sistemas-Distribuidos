@@ -49,14 +49,14 @@ func (w *Top) Eof(data []byte) bool {
 	responseFieldMaps := w.top_lit
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", w.top_lit)
-		body := protocol.NewBatch(w.top_lit).Encode(w.Con.Select)
-		if err := w.Broker.Publish("", body); err != nil {
+		batch := protocol.NewBatch(w.top_lit)
+		if err := w.PublishBatch(batch); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
 
-	body := protocol.DecodeEof(data).Encode()
-	if err := w.Broker.Publish("", body); err != nil {
+	eof := protocol.DecodeEof(data)
+	if err := w.PublishEof(eof); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 

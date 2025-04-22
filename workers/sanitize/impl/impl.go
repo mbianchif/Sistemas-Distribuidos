@@ -57,8 +57,8 @@ func (w *Sanitize) Batch(data []byte) bool {
 
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
-		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
-		if err := w.Broker.Publish("", body); err != nil {
+		batch := protocol.NewBatch(responseFieldMaps)
+		if err := w.PublishBatch(batch); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -214,8 +214,8 @@ func handleCredit(w *Sanitize, line []string) map[string]string {
 }
 
 func (w *Sanitize) Eof(data []byte) bool {
-	body := protocol.DecodeEof(data).Encode()
-	if err := w.Broker.Publish("", body); err != nil {
+	eof := protocol.DecodeEof(data)
+	if err := w.PublishEof(eof); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 	return true

@@ -5,7 +5,7 @@ import (
 
 	"workers/protocol"
 
-	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/op/go-logging"
 )
 
 type SenderShard struct {
@@ -13,10 +13,11 @@ type SenderShard struct {
 	fmt    string
 	key    string
 	n      int
+	log    *logging.Logger
 }
 
-func NewShard(broker *Broker, fmt string, key string, n int) *SenderShard {
-	return &SenderShard{broker, fmt, key, n}
+func NewShard(broker *Broker, fmt string, key string, n int, log *logging.Logger) *SenderShard {
+	return &SenderShard{broker, fmt, key, n, log}
 }
 
 func keyHash(field string, mod int) int {
@@ -27,7 +28,7 @@ func keyHash(field string, mod int) int {
 	return acc % mod
 }
 
-func (s SenderShard) shard(fieldMaps []map[string]string) (map[int][]map[string]string, error) {
+func (s *SenderShard) shard(fieldMaps []map[string]string) (map[int][]map[string]string, error) {
 	shards := make(map[int][]map[string]string, s.n)
 
 	for _, fieldMap := range fieldMaps {
@@ -43,20 +44,17 @@ func (s SenderShard) shard(fieldMaps []map[string]string) (map[int][]map[string]
 	return shards, nil
 }
 
-func (s SenderShard) Batch(batch protocol.Batch, filterCols map[string]struct{}) error {
+func (s *SenderShard) Batch(batch protocol.Batch, filterCols map[string]struct{}) error {
 	shards, err := s.shard(batch.FieldMaps)
 	if err != nil {
 		return err
-	}
-	headers := amqp.Table{
-		"type": protocol.BATCH,
 	}
 
 	for i, shard := range shards {
 		key := fmt.Sprintf(s.fmt, i)
 		body := protocol.NewBatch(shard).Encode(filterCols)
-		if err := s.broker.PublishWithHeaders(key, body, headers); err != nil {
-			// TODO: log
+		if err := s.broker.Publish(key, body); err != nil {
+			s.log.Errorf("error while publishing sharded message to %v", i)
 			continue
 		}
 	}
@@ -64,30 +62,39 @@ func (s SenderShard) Batch(batch protocol.Batch, filterCols map[string]struct{})
 	return nil
 }
 
-func (s SenderShard) Eof(eof protocol.Eof) error {
-	body := eof.Encode()
-	headers := amqp.Table{
-		"type": protocol.EOF,
+func (s *SenderShard) BatchWithQuery(batch protocol.Batch, filterCols map[string]struct{}, query int) error {
+	shards, err := s.shard(batch.FieldMaps)
+	if err != nil {
+		return err
 	}
-	return s.broadcast(body, headers)
-}
 
-func (s SenderShard) Error(erro protocol.Error) error {
-	body := erro.Encode()
-	headers := amqp.Table{
-		"type": protocol.ERROR,
-	}
-	return s.broadcast(body, headers)
-}
-
-func (s SenderShard) broadcast(body []byte, headers amqp.Table) error {
-	for i := range s.n {
+	for i, shard := range shards {
 		key := fmt.Sprintf(s.fmt, i)
-		if err := s.broker.PublishWithHeaders(key, body, headers); err != nil {
-			// TODO: log
-			continue
+		body := protocol.NewBatch(shard).EncodeWithQuery(filterCols, query)
+		if err := s.broker.Publish(key, body); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func (s *SenderShard) Eof(eof protocol.Eof) error {
+	body := eof.Encode()
+	return s.broadcast(body)
+}
+
+func (s *SenderShard) Error(erro protocol.Error) error {
+	body := erro.Encode()
+	return s.broadcast(body)
+}
+
+func (s *SenderShard) broadcast(body []byte) error {
+	for i := range s.n {
+		key := fmt.Sprintf(s.fmt, i)
+		if err := s.broker.Publish(key, body); err != nil {
+			return err
+		}
+	}
 	return nil
 }

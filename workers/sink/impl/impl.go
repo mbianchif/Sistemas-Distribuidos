@@ -34,8 +34,8 @@ func (w *Sink) Batch(data []byte) bool {
 
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
-		body := protocol.NewBatch(responseFieldMaps).EncodeWithQuery(w.Con.Select, w.Con.Query)
-		if err := w.Broker.Publish("", body); err != nil {
+		batch := protocol.NewBatch(responseFieldMaps)
+		if err := w.PublishBatchWithQuery(batch, w.Con.Query); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -44,8 +44,8 @@ func (w *Sink) Batch(data []byte) bool {
 }
 
 func (w *Sink) Eof(data []byte) bool {
-	body := protocol.DecodeEof(data).EncodeWithQuery(w.Con.Query)
-	if err := w.Broker.Publish("", body); err != nil {
+	eof := protocol.DecodeEof(data)
+	if err := w.PublishEof(eof); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 	return true

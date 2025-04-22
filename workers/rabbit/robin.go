@@ -5,7 +5,7 @@ import (
 
 	"workers/protocol"
 
-	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/op/go-logging"
 )
 
 type SenderRobin struct {
@@ -13,51 +13,47 @@ type SenderRobin struct {
 	fmt    string
 	i      int
 	n      int
+	log    *logging.Logger
 }
 
-func NewRobin(broker *Broker, fmt string, n int) *SenderRobin {
-	return &SenderRobin{broker, fmt, 0, n}
+func NewRobin(broker *Broker, fmt string, n int, log *logging.Logger) *SenderRobin {
+	return &SenderRobin{broker, fmt, 0, n, log}
 }
 
-func (s SenderRobin) nextKey() string {
+func (s *SenderRobin) nextKey() string {
 	key := fmt.Sprintf(s.fmt, s.i)
 	s.i = (s.i + 1) % s.n
 	return key
 }
 
-func (s SenderRobin) Batch(batch protocol.Batch, filterCols map[string]struct{}) error {
+func (s *SenderRobin) Batch(batch protocol.Batch, filterCols map[string]struct{}) error {
 	key := s.nextKey()
 	body := batch.Encode(filterCols)
-	headers := amqp.Table{
-		"type": protocol.BATCH,
-	}
-	return s.broker.PublishWithHeaders(key, body, headers)
+	return s.broker.Publish(key, body)
 }
 
-func (s SenderRobin) Eof(eof protocol.Eof) error {
+func (s *SenderRobin) BatchWithQuery(batch protocol.Batch, filterCols map[string]struct{}, query int) error {
+	key := s.nextKey()
+	body := batch.EncodeWithQuery(filterCols, query)
+	return s.broker.Publish(key, body)
+}
+
+func (s *SenderRobin) Eof(eof protocol.Eof) error {
 	body := eof.Encode()
-	headers := amqp.Table{
-		"type": protocol.EOF,
-	}
-	return s.broadcast(body, headers)
+	return s.broadcast(body)
 }
 
-func (s SenderRobin) Error(erro protocol.Error) error {
+func (s *SenderRobin) Error(erro protocol.Error) error {
 	body := erro.Encode()
-	headers := amqp.Table{
-		"type": protocol.ERROR,
-	}
-	return s.broadcast(body, headers)
+	return s.broadcast(body)
 }
 
-func (s SenderRobin) broadcast(body []byte, headers amqp.Table) error {
+func (s *SenderRobin) broadcast(body []byte) error {
 	for i := range s.n {
 		key := fmt.Sprintf(s.fmt, i)
-		if err := s.broker.PublishWithHeaders(key, body, headers); err != nil {
-			// TODO: log
-			continue
+		if err := s.broker.Publish(key, body); err != nil {
+			return err
 		}
 	}
-
 	return nil
 }

@@ -35,12 +35,12 @@ func (b *Broker) Init() ([]amqp.Queue, []string, error) {
 		return nil, nil, err
 	}
 
-	outputQs, err := b.initOutput()
+	outputQFmts, err := b.initOutput()
 	if err != nil {
 		return inputQs, nil, err
 	}
 
-	return inputQs, outputQs, nil
+	return inputQs, outputQFmts, nil
 }
 
 func (b *Broker) DeInit() {
@@ -167,18 +167,5 @@ func (b *Broker) Publish(key string, body []byte) error {
 		amqp.Publishing{
 			ContentType: "application/octet-stream",
 			Body:        body,
-		})
-}
-
-func (b *Broker) PublishWithHeaders(key string, body []byte, headers amqp.Table) error {
-	return b.ch.Publish(
-		b.con.OutputExchangeName,
-		key,
-		false, // mandatory
-		false, // immediate
-		amqp.Publishing{
-			ContentType: "application/octet-stream",
-			Body:        body,
-			Headers:     headers,
 		})
 }

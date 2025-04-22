@@ -48,8 +48,8 @@ func (w *Explode) Batch(data []byte) bool {
 
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
-		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
-		if err := w.Broker.Publish("", body); err != nil {
+		body := protocol.NewBatch(responseFieldMaps)
+		if err := w.PublishBatch(body); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -74,8 +74,8 @@ func handleExplode(fieldMap map[string]string, con *config.ExplodeConfig) ([]map
 }
 
 func (w *Explode) Eof(data []byte) bool {
-	body := protocol.DecodeEof(data).Encode()
-	if err := w.Broker.Publish("", body); err != nil {
+	eof := protocol.DecodeEof(data)
+	if err := w.PublishEof(eof); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 

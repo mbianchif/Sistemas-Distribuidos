@@ -1,8 +1,5 @@
-# .env
-RABBIT_URL=amqp://guest@guest.fi.uba.ar
-
 # compose
-ID=1
+ID=0
     # debe ser numerico, es tambien el numero de copia, siempre
     # existe el id=0, porque debe haber un nodo de cada tipo
     # por lo menos

@@ -33,6 +33,9 @@ func New(con *config.Config, log *logging.Logger) (*Worker, error) {
 	}
 
 	inputQueues, err := mailer.Init()
+	if err != nil {
+		return nil, err
+	}
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM)
@@ -87,6 +90,22 @@ func (base *Worker) Run(w IWorker) error {
 	}
 
 	return nil
+}
+
+func (base *Worker) PublishBatch(batch protocol.Batch) error {
+	return base.Mailer.PublishBatch(batch)
+}
+
+func (base *Worker) PublishBatchWithQuery(batch protocol.Batch, query int) error {
+	return base.Mailer.PublishBatchWithQuery(batch, query)
+}
+
+func (base *Worker) PublishEof(eof protocol.Eof) error {
+	return base.Mailer.PublishEof(eof)
+}
+
+func (base *Worker) PublishError(erro protocol.Error) error {
+	return base.Mailer.PublishError(erro)
 }
 
 func (w *Worker) Close() {

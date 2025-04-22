@@ -49,8 +49,8 @@ func (w *Divider) Batch(data []byte) bool {
 
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
-		body := protocol.NewBatch(responseFieldMaps).Encode(w.Con.Select)
-		if err := w.Broker.Publish("", body); err != nil {
+		batch := protocol.NewBatch(responseFieldMaps)
+		if err := w.PublishBatch(batch); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -89,8 +89,8 @@ func handleDivider(fieldMap map[string]string) (map[string]string, error) {
 }
 
 func (w *Divider) Eof(data []byte) bool {
-	body := protocol.DecodeEof(data).Encode()
-	if err := w.Broker.Publish("", body); err != nil {
+	body := protocol.DecodeEof(data)
+	if err := w.PublishEof(body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 	return true

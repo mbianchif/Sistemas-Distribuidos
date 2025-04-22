@@ -25,12 +25,12 @@ func NewMailer(con *config.Config, log *logging.Logger) (*Mailer, error) {
 }
 
 func (m *Mailer) Init() ([]amqp.Queue, error) {
-	inputQs, outputQs, err := m.broker.Init()
+	inputQs, outputQFmts, err := m.broker.Init()
 	if err != nil {
 		return nil, err
 	}
 
-	m.senders = m.initSenders(outputQs)
+	m.senders = m.initSenders(outputQFmts)
 	return inputQs, nil
 }
 
@@ -41,14 +41,12 @@ func (m *Mailer) initSenders(outputQFmts []string) []Sender {
 
 	for i := range outputQFmts {
 		var sender Sender
-
-		switch delTypes[i] {
-		case "robin":
-			sender = NewRobin(m.broker, outputQFmts[i], qCopies[i])
-		case "shard":
+		if delTypes[i] == "robin" {
+			sender = NewRobin(m.broker, outputQFmts[i], qCopies[i], m.broker.log)
+		} else {
 			parts := strings.Split(delTypes[i], ":")
 			key := parts[1]
-			sender = NewShard(m.broker, outputQFmts[i], key, qCopies[i])
+			sender = NewShard(m.broker, outputQFmts[i], key, qCopies[i], m.broker.log)
 		}
 
 		senders = append(senders, sender)
@@ -65,9 +63,18 @@ func (m *Mailer) Consume(q amqp.Queue) (<-chan amqp.Delivery, error) {
 	return m.broker.Consume(q, "")
 }
 
-func (m *Mailer) PublishBatch(batch protocol.Batch, filterCols map[string]struct{}) error {
+func (m *Mailer) PublishBatch(batch protocol.Batch) error {
 	for _, sender := range m.senders {
-		if err := sender.Batch(batch, filterCols); err != nil {
+		if err := sender.Batch(batch, m.broker.con.Select); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Mailer) PublishBatchWithQuery(batch protocol.Batch, query int) error {
+	for _, sender := range m.senders {
+		if err := sender.BatchWithQuery(batch, m.broker.con.Select, query); err != nil {
 			return err
 		}
 	}
@@ -75,25 +82,17 @@ func (m *Mailer) PublishBatch(batch protocol.Batch, filterCols map[string]struct
 }
 
 func (m *Mailer) PublishEof(eof protocol.Eof) error {
-	body := eof.Encode()
-	headers := amqp.Table{
-		"type": protocol.EOF,
+	for _, sender := range m.senders {
+		if err := sender.Eof(eof); err != nil {
+			return err
+		}
 	}
-
-	return m.broadcast(body, headers)
+	return nil
 }
 
 func (m *Mailer) PublishError(erro protocol.Error) error {
-	body := erro.Encode()
-	headers := amqp.Table{
-		"type": protocol.ERROR,
-	}
-	return m.broadcast(body, headers)
-}
-
-func (m *Mailer) broadcast(body []byte, headers amqp.Table) error {
 	for _, sender := range m.senders {
-		if err := sender.Broadcast(body, headers); err != nil {
+		if err := sender.Error(erro); err != nil {
 			return err
 		}
 	}
