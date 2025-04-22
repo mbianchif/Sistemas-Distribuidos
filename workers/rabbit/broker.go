@@ -1,6 +1,7 @@
 package rabbit
 
 import (
+	"fmt"
 	"workers/config"
 
 	"github.com/op/go-logging"
@@ -34,6 +35,10 @@ func (b *Broker) Init() ([]amqp.Queue, error) {
 		return nil, err
 	}
 
+	if err:= b.initOutput(); err != nil {
+		return inputQs, err
+	}
+
 	return inputQs, nil
 }
 
@@ -46,28 +51,41 @@ func (b *Broker) DeInit() {
 	}
 }
 
-func (b *Broker) initInputExchange() error {
-	for _, exchangeName := range b.con.InputExchangeNames {
-		if err := b.exchangeDeclare(exchangeName, "direct"); err != nil {
-			return err
-		}
-	}
-	return nil
-}
+func (b *Broker) initInput() ([]amqp.Queue, error) {
+	exchangeNames := b.con.InputExchangeNames
+	qNames := b.con.InputQueueNames
 
-func (b *Broker) initInputQueues() ([]amqp.Queue, error) {
 	qs := make([]amqp.Queue, 0, len(b.con.InputQueueNames))
+	for i := range b.con.InputExchangeNames {
+		if err := b.exchangeDeclare(exchangeNames[i], "direct"); err != nil {
+			return nil, err
+		}
 
-	for _, qName := range b.con.InputQueueNames {
-		nameFmt := qName + "-%d"
-		q, err := b.queueDeclare(nameFmt)
+		// Build queue name
+		nameFmt := qNames[i] + "-%d"
+		qName := fmt.Sprintf(nameFmt, b.con.Id)
+
+		q, err := b.queueDeclare(qName)
 		if err != nil {
 			return nil, err
 		}
+
+		if err := b.queueBind(q, q.Name, exchangeNames[i]); err != nil {
+			return nil, err
+		}
+
 		qs = append(qs, q)
 	}
 
 	return qs, nil
+}
+
+func (b *Broker) initOutput() error {
+	exchangename := b.con.OutputExchangeName
+	qNames := b.con.OutputQueueNames
+	delTypes := b.con.OutputDeliveryTypes
+
+	return nil
 }
 
 func (b *Broker) exchangeDeclare(name string, kind string) error {
