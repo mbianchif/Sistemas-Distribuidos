@@ -4,15 +4,39 @@ import (
 	"workers/config"
 	"workers/protocol"
 
+	"github.com/op/go-logging"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Mailer struct {
 	senders []Sender
+	broker  *Broker
 }
 
-func NewMailer(con *config.Config) *Mailer {
-	return nil
+func NewMailer(con *config.Config, log *logging.Logger) (*Mailer, error) {
+	broker, err := NewBroker(con, log)
+	if err != nil {
+		return nil, err
+	}
+
+	senders, err := broker.Init()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Mailer{senders, broker}, nil
+}
+
+func (m *Mailer) Init() ([]amqp.Queue, error) {
+	return nil, nil
+}
+
+func (m *Mailer) DeInit() {
+	m.broker.DeInit()
+}
+
+func (m *Mailer) Consume(q amqp.Queue) (<-chan amqp.Delivery, error) {
+	return m.broker.Consume(q, "")
 }
 
 func (m *Mailer) PublishBatch(batch protocol.Batch, filterCols map[string]struct{}) error {

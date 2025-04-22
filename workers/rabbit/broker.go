@@ -1,9 +1,9 @@
 package rabbit
 
 import (
-	"fmt"
 	"workers/config"
 
+	"github.com/op/go-logging"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -11,9 +11,10 @@ type Broker struct {
 	conn *amqp.Connection
 	ch   *amqp.Channel
 	con  *config.Config
+	log  *logging.Logger
 }
 
-func New(con *config.Config) (*Broker, error) {
+func NewBroker(con *config.Config, log *logging.Logger) (*Broker, error) {
 	conn, err := amqp.Dial(con.Url)
 	if err != nil {
 		return nil, err
@@ -24,18 +25,16 @@ func New(con *config.Config) (*Broker, error) {
 		return nil, err
 	}
 
-	return &Broker{conn, ch, con}, nil
+	return &Broker{conn, ch, con, log}, nil
 }
 
 func (b *Broker) Init() ([]amqp.Queue, error) {
-	inputQueues, err := b.declareInput()
+	inputQs, err := b.initInput()
 	if err != nil {
 		return nil, err
 	}
-	if err := b.declareOutput(); err != nil {
-		return nil, err
-	}
-	return inputQueues, nil
+
+	return inputQs, nil
 }
 
 func (b *Broker) DeInit() {
@@ -47,71 +46,28 @@ func (b *Broker) DeInit() {
 	}
 }
 
-func (b *Broker) declareInput() ([]amqp.Queue, error) {
-	exchangeNames := b.con.InputExchangeNames
-	exchangeTypes := b.con.InputExchangeTypes
-	qNames := b.con.InputQueueNames
-	qKeys := b.con.InputQueueKeys
-
-	if len(exchangeNames) != len(exchangeTypes) {
-		return nil, fmt.Errorf("config failed to check len(InputExchangeNames) == len(InputExchangeTypes)")
-	}
-
-	if len(qNames) != len(qKeys) {
-		return nil, fmt.Errorf("config failed to check len(InputQueueNames) == len(InputQueueKeys)")
-	}
-
-	if len(exchangeNames) != len(qNames) {
-		return nil, fmt.Errorf("config failed to check len(InputExchangeNames) == len(InputQueueNames)")
-	}
-
-	inputQueues := make([]amqp.Queue, 0, len(qNames))
-	for i := range exchangeNames {
-		if err := b.exchangeDeclare(exchangeNames[i], exchangeTypes[i]); err != nil {
-			return nil, err
+func (b *Broker) initInputExchange() error {
+	for _, exchangeName := range b.con.InputExchangeNames {
+		if err := b.exchangeDeclare(exchangeName, "direct"); err != nil {
+			return err
 		}
-
-		q, err := b.queueDeclare(qNames[i])
-		if err != nil {
-			return nil, err
-		}
-
-		if err := b.queueBind(q, qKeys[i], exchangeNames[i]); err != nil {
-			return nil, err
-		}
-
-		inputQueues = append(inputQueues, q)
 	}
-
-	return inputQueues, nil
+	return nil
 }
 
-func (b *Broker) declareOutput() error {
-	exchangeName := b.con.OutputExchangeName
-	exchangeType := b.con.OutputExchangeType
-	qNames := b.con.OutputQueueNames
-	qKeys := b.con.OutputQueueKeys
+func (b *Broker) initInputQueues() ([]amqp.Queue, error) {
+	qs := make([]amqp.Queue, 0, len(b.con.InputQueueNames))
 
-	if len(qNames) != len(qKeys) {
-		return fmt.Errorf("config failed to check len(OutputQueueNames) == len(OutputQueueKeys)")
-	}
-
-	if err := b.exchangeDeclare(exchangeName, exchangeType); err != nil {
-		return err
-	}
-
-	for i := range qNames {
-		q, err := b.queueDeclare(qNames[i])
+	for _, qName := range b.con.InputQueueNames {
+		nameFmt := qName + "-%d"
+		q, err := b.queueDeclare(nameFmt)
 		if err != nil {
-			return err
+			return nil, err
 		}
-
-		if err := b.queueBind(q, qKeys[i], exchangeName); err != nil {
-			return err
-		}
+		qs = append(qs, q)
 	}
 
-	return nil
+	return qs, nil
 }
 
 func (b *Broker) exchangeDeclare(name string, kind string) error {

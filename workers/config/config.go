@@ -32,22 +32,26 @@ func configLog(logLevel logging.Level) {
 }
 
 func Create() (*Config, error) {
+	// ID
 	id, err := strconv.Atoi(os.Getenv("ID"))
 	if err != nil {
 		return nil, fmt.Errorf("the given id is invalid: %v", id)
 	}
 
+	// RABBIT_URL
 	url := os.Getenv("RABBIT_URL")
 	if len(url) == 0 {
 		return nil, fmt.Errorf("the rabbitmq url was not provided")
 	}
 
+	// INPUT_EXCHANGE_NAMES
 	inputExchangeNamesString := os.Getenv("INPUT_EXCHANGE_NAMES")
 	inputExchangeNames := strings.Split(inputExchangeNamesString, ",")
 	if len(inputExchangeNames) == 0 {
 		return nil, fmt.Errorf("the input exchange names were not provided")
 	}
 
+	// INPUT_QUEUE_NAMES
 	inputQueueNamesString := os.Getenv("INPUT_QUEUE_NAMES")
 	inputQueueNames := strings.Split(inputQueueNamesString, ",")
 	if len(inputQueueNames) == 0 {
@@ -58,22 +62,35 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the length of input exchange names and input queue names don't match (exchange: %v, queues: %v)", len(inputExchangeNames), len(inputQueueNames))
 	}
 
+	// OUTPUT_EXCHANGE_NAME
 	outputExchangeName := os.Getenv("OUTPUT_EXCHANGE_NAME")
 	if len(outputExchangeName) == 0 {
 		return nil, fmt.Errorf("the output exchange name was not provided")
 	}
 
+	// OUTPUT_QUEUE_NAMES
 	outputQueueNamesString := os.Getenv("OUTPUT_QUEUE_NAMES")
 	if len(outputQueueNamesString) == 0 {
 		return nil, fmt.Errorf("the output queues were not provided")
 	}
 	outputQueueNames := strings.Split(outputQueueNamesString, ",")
 
+	// OUTPUT_DELIVERY_TYPES
+	validDeliveryTypes := []string{"direct", "shard"}
+	outputDeliveryTypes := strings.Split(os.Getenv("OUTPUT_DELIVERY_TYPES"), ",")
+	for _, delType := range outputDeliveryTypes {
+		if !slices.Contains(validDeliveryTypes, delType) {
+			return nil, fmt.Errorf("inavlid delivery type %v", delType)
+		}
+	}
+
+	if len(outputDeliveryTypes) != len(outputQueueNames) {
+		return nil, fmt.Errorf("the length of output queue names and output delivery types don't match (names: %v, types: %v)", len(outputQueueNames), len(outputDeliveryTypes))
+	}
+
+	// OUTPUT_COPIES
 	outputCopiesPerQueueString := os.Getenv("OUTPUT_COPIES")
 	outputCopiesPerQueueSlice := strings.Split(outputCopiesPerQueueString, ",")
-	if len(outputCopiesPerQueueSlice) != len(outputQueueNames) {
-		return nil, fmt.Errorf("the lenght of output queue names and output copies per queue don't match (names: %v, copies: %v)", len(outputQueueNames), len(outputCopiesPerQueueSlice))
-	}
 	outputCopies := make([]int, 0, len(outputCopiesPerQueueSlice))
 	for i, copies := range outputCopiesPerQueueSlice {
 		n, err := strconv.Atoi(copies)
@@ -83,17 +100,11 @@ func Create() (*Config, error) {
 		outputCopies = append(outputCopies, n)
 	}
 
-	validOutputTypes := []string{"direct", "shard"}
-	outputDeliveryTypes := strings.Split(os.Getenv("OUTPUT_DELIVERY_TYPES"), ",")
-	if len(outputDeliveryTypes) != len(outputQueueNames) {
-		return nil, fmt.Errorf("the length of output queue names and output delivery types don't match (names: %v, types: %v)", len(outputQueueNames), len(outputDeliveryTypes))
-	}
-	for _, delType := range outputDeliveryTypes {
-		if !slices.Contains(validOutputTypes, delType) {
-			return nil, fmt.Errorf("inavlid delivery type %v", delType)
-		}
+	if len(outputCopies) != len(outputQueueNames) {
+		return nil, fmt.Errorf("the length of output queue names and output copies per queue don't match (names: %v, copies: %v)", len(outputQueueNames), len(outputCopiesPerQueueSlice))
 	}
 
+	// SELECT
 	selectString := os.Getenv("SELECT")
 	if len(selectString) == 0 {
 		return nil, fmt.Errorf("the select were not provided")
@@ -103,6 +114,7 @@ func Create() (*Config, error) {
 		selectMap[field] = struct{}{}
 	}
 
+	// LOG_LEVEL
 	logLevelVar := strings.ToUpper(os.Getenv("LOG_LEVEL"))
 	logLevel, err := logging.LogLevel(logLevelVar)
 	if err != nil {

@@ -20,28 +20,25 @@ type IWorker interface {
 }
 
 type Worker struct {
-	Broker      *rabbit.Broker
+	Mailer      *rabbit.Mailer
 	SigChan     chan os.Signal
 	inputQueues []amqp.Queue
 	Log         *logging.Logger
 }
 
 func New(con *config.Config, log *logging.Logger) (*Worker, error) {
-	broker, err := rabbit.New(con)
+	mailer, err := rabbit.NewMailer(con, log)
 	if err != nil {
 		return nil, err
 	}
 
-	inputQueues, err := broker.Init()
-	if err != nil {
-		return nil, err
-	}
+	inputQueues, err := mailer.Init()
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM)
 
 	return &Worker{
-		broker,
+		mailer,
 		sigs,
 		inputQueues,
 		log,
@@ -57,7 +54,7 @@ func (base *Worker) Run(w IWorker) error {
 
 	base.Log.Infof("Running...")
 	for _, q := range base.inputQueues {
-		ch, err := base.Broker.Consume(q, "")
+		ch, err := base.Mailer.Consume(q)
 		if err != nil {
 			return err
 		}
@@ -93,6 +90,6 @@ func (base *Worker) Run(w IWorker) error {
 }
 
 func (w *Worker) Close() {
-	w.Broker.DeInit()
+	w.Mailer.DeInit()
 	close(w.SigChan)
 }
