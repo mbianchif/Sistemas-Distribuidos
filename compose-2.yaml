@@ -36,8 +36,8 @@ services:
 
   # ====================== Sanitizers ======================
 
-  sanitize-movies-1:
-    container_name: sanitize-movies-1
+  sanitize-movies-0:
+    container_name: sanitize-movies-0
     build:
       context: workers
       dockerfile: dockerfiles/sanitize.Dockerfile
@@ -47,8 +47,26 @@ services:
     env_file:
       - workers/.env
       - envs/sanitize/.env.movies
+    environment:
+      - ID=0
+      - OUTPUT_COPIES=1,2,1
 
   # ====================== Filters ======================
+
+  filter-production_countries_length-0:
+    container_name: filter-production_countries_length-0
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.production_countries_length
+    environment:
+      - ID=0
+      - OUTPUT_COPIES=1
 
   filter-production_countries_length-1:
     container_name: filter-production_countries_length-1
@@ -61,6 +79,9 @@ services:
     env_file:
       - workers/.env
       - envs/filter/.env.production_countries_length
+    environment:
+      - ID=1
+      - OUTPUT_COPIES=1
 
   # ====================== Explodes ======================
 
@@ -78,8 +99,8 @@ services:
 
   # ====================== GroupBys ======================
 
-  groupby-country_sum_budget-1:
-    container_name: groupby-country_sum_budget-1
+  groupby-country_sum_budget-0:
+    container_name: groupby-country_sum_budget-0
     build:
       context: workers
       dockerfile: dockerfiles/groupby.Dockerfile
@@ -89,11 +110,14 @@ services:
     env_file:
       - workers/.env
       - envs/groupby/.env.country_sum_budget
+    environment:
+      - ID=0
+      - OUTPUT_COPIES=1
 
 # ====================== Tops ======================
 
-  top-5_budget-1:
-    container_name: top-5_budget-1
+  top-5_budget-0:
+    container_name: top-5_budget-0
     build:
       context: workers
       dockerfile: dockerfiles/top.Dockerfile
@@ -103,11 +127,14 @@ services:
     env_file:
       - workers/.env
       - envs/top/.env.5_budget
+    environment:
+      - ID=0
+      - OUTPUT_COPIES=1
 
   # ====================== Sinks ======================
 
-  sink-2-1:
-    container_name: sink-2-1
+  sink-2-0:
+    container_name: sink-2-0
     build:
       context: workers
       dockerfile: dockerfiles/sink.Dockerfile
@@ -117,3 +144,6 @@ services:
     env_file:
       - workers/.env
       - envs/sink/.env.2
+    environment:
+      - ID=0
+      - OUTPUT_COPIES=1

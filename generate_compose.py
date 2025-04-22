@@ -53,13 +53,9 @@ def generate_docker_compose(
       timeout: 3s
       retries: 10
       start_period: 50s
-      """
-
-    for i in range(gateway):
-        docker_compose += f"""
-  gateway-{i}:
-    container_name: gateway-{i}
-    build: gateway-{i}
+  gateway:
+    container_name: gateway
+    build: gateway
     ports:
       - 9090:9090
     depends_on:
@@ -366,8 +362,8 @@ def generate_docker_compose(
 """
     for i in range(top_5_budget):
         docker_compose += f"""
-  top-5_top_5_budget-{i}:
-    container_name: top-5_top_5_budget-{i}
+  top-5_budget-{i}:
+    container_name: top-5_budget-{i}
     build:
       context: workers
       dockerfile: dockerfiles/top.Dockerfile
@@ -376,7 +372,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/top/.env.overview
+      - envs/top/.env.5_budget
     environment:
       - ID={i}
       - OUTPUT_COPIES={sink_2}

@@ -19,10 +19,9 @@ services:
       timeout: 3s
       retries: 10
       start_period: 50s
-      
-  gateway-0:
-    container_name: gateway-0
-    build: gateway-0
+  gateway:
+    container_name: gateway
+    build: gateway
     ports:
       - 9090:9090
     depends_on:
@@ -301,8 +300,8 @@ services:
       - ID=0
       - OUTPUT_COPIES=1
 
-  top-5_top_5_budget-0:
-    container_name: top-5_top_5_budget-0
+  top-5_budget-0:
+    container_name: top-5_budget-0
     build:
       context: workers
       dockerfile: dockerfiles/top.Dockerfile
@@ -311,7 +310,7 @@ services:
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/top/.env.overview
+      - envs/top/.env.5_budget
     environment:
       - ID=0
       - OUTPUT_COPIES=1

@@ -49,7 +49,7 @@ services:
       - envs/sanitize/.env.movies
     environment:
       - ID=0
-      - OUTPUT_COPIES=1,1,1
+      - OUTPUT_COPIES=1,2,1
 
   # ====================== Filters ======================
 
@@ -96,6 +96,36 @@ services:
       - envs/filter/.env.release_date_upto_2010
     environment:
       - ID=0
+      - OUTPUT_COPIES=1
+
+  filter-release_date_upto_2010-1:
+    container_name: filter-release_date_upto_2010-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.release_date_upto_2010
+    environment:
+      - ID=1
+      - OUTPUT_COPIES=1
+
+  filter-release_date_upto_2010-2:
+    container_name: filter-release_date_upto_2010-2
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.release_date_upto_2010
+    environment:
+      - ID=2
       - OUTPUT_COPIES=1
 
   # ====================== Sinks ======================
