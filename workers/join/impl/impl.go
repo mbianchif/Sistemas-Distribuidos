@@ -204,7 +204,6 @@ func shard(w *Join, fieldMaps []map[string]string, key string) map[int][]map[str
 	for _, fieldMap := range fieldMaps {
 		key, ok := fieldMap[key]
 		if !ok {
-			w.Log.Errorf("fieldMap: %v", fieldMap)
 			w.Log.Errorf("left key %v was not found in field map", w.Con.LeftKey)
 			continue
 		}

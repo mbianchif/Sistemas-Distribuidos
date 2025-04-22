@@ -214,3 +214,17 @@ func (m Eof) EncodeWithQuery(query int) []byte {
 func DecodeEof([]byte) Eof {
 	return Eof{}
 }
+
+type Error struct{}
+
+func (m Error) Encode() []byte {
+	return []byte{ERROR}
+}
+
+func (m Error) EncodeWithQuery(query int) []byte {
+	return []byte{EOF, byte(query)}
+}
+
+func DecodeError([]byte) Error {
+	return Error{}
+}
