@@ -45,7 +45,7 @@ services:
       - envs/sanitize/.env.movies
     environment:
       - ID=0
-      - OUTPUT_COPIES=1,2,1
+      - OUTPUT_COPIES=1,1,1
 
   sanitize-credits-0:
     container_name: sanitize-credits-0
@@ -75,7 +75,7 @@ services:
       - envs/sanitize/.env.ratings
     environment:
       - ID=0
-      - OUTPUT_COPIES=1
+      - OUTPUT_COPIES=2
 
   #### Filters ####
   filter-production_countries_length-0:
@@ -93,22 +93,6 @@ services:
       - ID=0
       - OUTPUT_COPIES=1
 
-  #### Filters ####
-  filter-production_countries_length-1:
-    container_name: filter-production_countries_length-1
-    build:
-      context: workers
-      dockerfile: dockerfiles/filter.Dockerfile
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    env_file:
-      - workers/.env
-      - envs/filter/.env.production_countries_length
-    environment:
-      - ID=1
-      - OUTPUT_COPIES=1
-
   filter-release_date_since_2000-0:
     container_name: filter-release_date_since_2000-0
     build:
@@ -122,7 +106,7 @@ services:
       - envs/filter/.env.release_date_since_2000
     environment:
       - ID=0
-      - OUTPUT_COPIES=1,1,1
+      - OUTPUT_COPIES=2,1
 
   filter-release_date_upto_2010-0:
     container_name: filter-release_date_upto_2010-0
@@ -152,7 +136,7 @@ services:
       - envs/filter/.env.production_countries_argentina
     environment:
       - ID=0
-      - OUTPUT_COPIES=1
+      - OUTPUT_COPIES=1,2
 
   filter-production_countries_argentina_spain-0:
     container_name: filter-production_countries_argentina_spain-0
@@ -167,6 +151,21 @@ services:
       - envs/filter/.env.production_countries_argentina_spain
     environment:
       - ID=0
+      - OUTPUT_COPIES=1
+
+  filter-production_countries_argentina_spain-1:
+    container_name: filter-production_countries_argentina_spain-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.production_countries_argentina_spain
+    environment:
+      - ID=1
       - OUTPUT_COPIES=1
 
   #### Exploders ####
@@ -185,6 +184,22 @@ services:
       - ID=0
       - OUTPUT_COPIES=1
 
+  #### Exploders ####
+  explode-cast-1:
+    container_name: explode-cast-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/explode.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/explode/.env.cast
+    environment:
+      - ID=1
+      - OUTPUT_COPIES=1
+
   explode-production_countries-0:
     container_name: explode-production_countries-0
     build:
@@ -198,7 +213,7 @@ services:
       - envs/explode/.env.production_countries
     environment:
       - ID=0
-      - OUTPUT_COPIES=1
+      - OUTPUT_COPIES=2
 
   #### Group by ####
   groupby-id_title_mean_rating-0:
@@ -246,8 +261,8 @@ services:
       - ID=0
       - OUTPUT_COPIES=1
 
-  groupby-id_actor_count-0:
-    container_name: groupby-id_actor_count-0
+  groupby-country_sum_budget-1:
+    container_name: groupby-country_sum_budget-1
     build:
       context: workers
       dockerfile: dockerfiles/groupby.Dockerfile
@@ -256,7 +271,22 @@ services:
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/groupby/.env.id_actor_count
+      - envs/groupby/.env.country_sum_budget
+    environment:
+      - ID=1
+      - OUTPUT_COPIES=1
+
+  groupby-actor_count-0:
+    container_name: groupby-actor_count-0
+    build:
+      context: workers
+      dockerfile: dockerfiles/groupby.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/groupby/.env.actor_count
     environment:
       - ID=0
       - OUTPUT_COPIES=1
@@ -275,7 +305,7 @@ services:
       - envs/divider/.env.revenue_budget
     environment:
       - ID=0
-      - OUTPUT_COPIES=1
+      - OUTPUT_COPIES=2
 
   #### Sentiment ####
   sentiment-0:
@@ -291,6 +321,22 @@ services:
       - envs/sentiment/.env.overview
     environment:
       - ID=0
+      - OUTPUT_COPIES=1
+
+  #### Sentiment ####
+  sentiment-1:
+    container_name: sentiment-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/sentiment.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/sentiment/.env.overview
+    environment:
+      - ID=1
       - OUTPUT_COPIES=1
 
   #### Tops #### 
@@ -356,6 +402,22 @@ services:
       - ID=0
       - OUTPUT_COPIES=1
 
+  #### Joins ####
+  join-id_movieid-1:
+    container_name: join-id_movieid-1
+    build:
+      context: workers
+      dockerfile: dockerfiles/join.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/join/.env.id_movieId
+    environment:
+      - ID=1
+      - OUTPUT_COPIES=1
+
   join-id_id-0:
     container_name: join-id_id-0
     build:
@@ -369,7 +431,7 @@ services:
       - envs/join/.env.id_id
     environment:
       - ID=0
-      - OUTPUT_COPIES=1
+      - OUTPUT_COPIES=2
 
   #### Sinks ####
   sink-1-0:

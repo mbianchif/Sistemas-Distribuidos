@@ -17,7 +17,7 @@ def generate_docker_compose(
     explode_cast,
     groupby_sentiment_mean_rate_revenue_budget,
     groupby_country_sum_budget,
-    groupby_id_actor_count,
+    groupby_actor_count,
     groupby_id_title_mean_rating,
     divider,
     sentiment,
@@ -81,6 +81,7 @@ def generate_docker_compose(
       - envs/sanitize/.env.movies
     environment:
       - ID={i}
+      - INPUT_COPIES={gateway}
       - OUTPUT_COPIES={divider},{filter_production_countries_length},{filter_release_date_since_2000}
 """
 
@@ -99,6 +100,7 @@ def generate_docker_compose(
       - envs/sanitize/.env.credits
     environment:
       - ID={i}
+      - INPUT_COPIES={gateway}
       - OUTPUT_COPIES={join_id_id}
 """
 
@@ -117,6 +119,7 @@ def generate_docker_compose(
       - envs/sanitize/.env.ratings
     environment:
       - ID={i}
+      - INPUT_COPIES={gateway}
       - OUTPUT_COPIES={join_id_movieid}
 """
 
@@ -136,6 +139,7 @@ def generate_docker_compose(
       - envs/filter/.env.production_countries_length
     environment:
       - ID={i}
+      - INPUT_COPIES={sanitize_movies}
       - OUTPUT_COPIES={explode_production_countries}
 """
 
@@ -154,7 +158,8 @@ def generate_docker_compose(
       - envs/filter/.env.release_date_since_2000
     environment:
       - ID={i}
-      - OUTPUT_COPIES={join_id_id},{filter_production_countries_argentina_spain},{filter_production_countries_argentina}
+      - INPUT_COPIES={sanitize_movies}
+      - OUTPUT_COPIES={filter_production_countries_argentina_spain},{filter_production_countries_argentina}
 """
 
     for i in range(filter_release_date_upto_2010):
@@ -172,6 +177,7 @@ def generate_docker_compose(
       - envs/filter/.env.release_date_upto_2010
     environment:
       - ID={i}
+      - INPUT_COPIES={filter_production_countries_argentina_spain}
       - OUTPUT_COPIES={sink_1}
 """
 
@@ -190,7 +196,8 @@ def generate_docker_compose(
       - envs/filter/.env.production_countries_argentina
     environment:
       - ID={i}
-      - OUTPUT_COPIES={join_id_movieid}
+      - INPUT_COPIES={filter_release_date_since_2000}
+      - OUTPUT_COPIES={join_id_id},{join_id_movieid}
 """
 
     for i in range(filter_production_countries_argentina_spain):
@@ -208,6 +215,7 @@ def generate_docker_compose(
       - envs/filter/.env.production_countries_argentina_spain
     environment:
       - ID={i}
+      - INPUT_COPIES={filter_release_date_since_2000}
       - OUTPUT_COPIES={filter_release_date_upto_2010}
 """
     for i in range(explode_cast):
@@ -226,7 +234,8 @@ def generate_docker_compose(
       - envs/explode/.env.cast
     environment:
       - ID={i}
-      - OUTPUT_COPIES={groupby_id_actor_count}
+      - INPUT_COPIES={join_id_id}
+      - OUTPUT_COPIES={groupby_actor_count}
 """
     for i in range(explode_production_countries):
         docker_compose += f"""
@@ -243,6 +252,7 @@ def generate_docker_compose(
       - envs/explode/.env.production_countries
     environment:
       - ID={i}
+      - INPUT_COPIES={filter_production_countries_length}
       - OUTPUT_COPIES={groupby_country_sum_budget}
 """
     for i in range(groupby_id_title_mean_rating):
@@ -261,6 +271,7 @@ def generate_docker_compose(
       - envs/groupby/.env.id_title_mean_rating
     environment:
       - ID={i}
+      - INPUT_COPIES={join_id_movieid}
       - OUTPUT_COPIES={minmax_rating}
 """
     for i in range(groupby_sentiment_mean_rate_revenue_budget):
@@ -278,6 +289,7 @@ def generate_docker_compose(
       - envs/groupby/.env.sentiment_mean_rate_revenue_budget
     environment:
       - ID={i}
+      - INPUT_COPIES={sentiment}
       - OUTPUT_COPIES={sink_5}
 """
     for i in range(groupby_country_sum_budget):
@@ -295,12 +307,13 @@ def generate_docker_compose(
       - envs/groupby/.env.country_sum_budget
     environment:
       - ID={i}
+      - INPUT_COPIES={explode_production_countries}
       - OUTPUT_COPIES={top_5_budget}
 """
-    for i in range(groupby_id_actor_count):
+    for i in range(groupby_actor_count):
         docker_compose += f"""
-  groupby-id_actor_count-{i}:
-    container_name: groupby-id_actor_count-{i}
+  groupby-actor_count-{i}:
+    container_name: groupby-actor_count-{i}
     build:
       context: workers
       dockerfile: dockerfiles/groupby.Dockerfile
@@ -309,9 +322,10 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/groupby/.env.id_actor_count
+      - envs/groupby/.env.actor_count
     environment:
       - ID={i}
+      - INPUT_COPIES={explode_cast}
       - OUTPUT_COPIES={top_10_count}
 """
     for i in range(divider):
@@ -330,6 +344,7 @@ def generate_docker_compose(
       - envs/divider/.env.revenue_budget
     environment:
       - ID={i}
+      - INPUT_COPIES={sanitize_movies}
       - OUTPUT_COPIES={sentiment}
 """
     for i in range(sentiment):
@@ -348,6 +363,7 @@ def generate_docker_compose(
       - envs/sentiment/.env.overview
     environment:
       - ID={i}
+      - INPUT_COPIES={divider}
       - OUTPUT_COPIES={groupby_sentiment_mean_rate_revenue_budget}
 """
     for i in range(top_10_count):
@@ -366,6 +382,7 @@ def generate_docker_compose(
       - envs/top/.env.10_count
     environment:
       - ID={i}
+      - INPUT_COPIES={groupby_actor_count}
       - OUTPUT_COPIES={sink_4}
 """
     for i in range(top_5_budget):
@@ -383,6 +400,7 @@ def generate_docker_compose(
       - envs/top/.env.5_budget
     environment:
       - ID={i}
+      - INPUT_COPIES={groupby_country_sum_budget}
       - OUTPUT_COPIES={sink_2}
 """
     for i in range(minmax_rating):
@@ -401,6 +419,7 @@ def generate_docker_compose(
       - envs/minmax/.env.rating
     environment:
       - ID={i}
+      - INPUT_COPIES={groupby_id_title_mean_rating}
       - OUTPUT_COPIES={sink_3}
 """
     for i in range(join_id_movieid):
@@ -419,6 +438,7 @@ def generate_docker_compose(
       - envs/join/.env.id_movieId
     environment:
       - ID={i}
+      - INPUT_COPIES={filter_production_countries_argentina},{sanitize_ratings}
       - OUTPUT_COPIES={groupby_id_title_mean_rating}
 """
     for i in range(join_id_id):
@@ -436,6 +456,7 @@ def generate_docker_compose(
       - envs/join/.env.id_id
     environment:
       - ID={i}
+      - INPUT_COPIES={filter_production_countries_argentina},{sanitize_credits}
       - OUTPUT_COPIES={explode_cast}
 """
     for i in range(sink_1):
@@ -454,6 +475,7 @@ def generate_docker_compose(
       - envs/sink/.env.1
     environment:
       - ID={i}
+      - INPUT_COPIES={filter_release_date_upto_2010}
       - OUTPUT_COPIES={gateway}
 """
     for i in range(sink_2):
@@ -471,6 +493,7 @@ def generate_docker_compose(
       - envs/sink/.env.2
     environment:
       - ID={i}
+      - INPUT_COPIES={top_5_budget}
       - OUTPUT_COPIES={gateway}
 """
     for i in range(sink_3):
@@ -488,6 +511,7 @@ def generate_docker_compose(
       - envs/sink/.env.3
     environment:
       - ID={i}
+      - INPUT_COPIES={minmax_rating}
       - OUTPUT_COPIES={gateway}
 """
     for i in range(sink_4):
@@ -505,6 +529,7 @@ def generate_docker_compose(
       - envs/sink/.env.4
     environment:
       - ID={i}
+      - INPUT_COPIES={top_10_count}
       - OUTPUT_COPIES={gateway}
 """
     for i in range(sink_5):
@@ -522,6 +547,7 @@ def generate_docker_compose(
       - envs/sink/.env.5
     environment:
       - ID={i}
+      - INPUT_COPIES={groupby_sentiment_mean_rate_revenue_budget}
       - OUTPUT_COPIES={gateway}
 """
 
