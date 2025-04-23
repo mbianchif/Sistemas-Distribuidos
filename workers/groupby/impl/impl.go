@@ -8,6 +8,8 @@ import (
 	"github.com/op/go-logging"
 )
 
+const SEP = "<|>"
+
 type Groupby struct {
 	*workers.Worker
 	Con     *config.GroupbyConfig

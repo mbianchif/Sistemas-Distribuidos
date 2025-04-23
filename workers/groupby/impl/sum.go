@@ -36,7 +36,7 @@ func (w *Sum) Add(fieldMap map[string]string, con *config.GroupbyConfig) error {
 		keys = append(keys, field)
 	}
 
-	compKey := strings.Join(keys, ",")
+	compKey := strings.Join(keys, SEP)
 	w.state[compKey] += sumValue
 	return nil
 }
@@ -46,7 +46,7 @@ func (w *Sum) Result(con *config.GroupbyConfig) []map[string]string {
 	for compKey, v := range w.state {
 		fieldMap := make(map[string]string)
 
-		keys := strings.Split(compKey, ",")
+		keys := strings.Split(compKey, SEP)
 		for i, key := range keys {
 			fieldMap[con.GroupKeys[i]] = key
 		}

@@ -9,15 +9,24 @@ import (
 )
 
 type SenderShard struct {
-	broker *Broker
-	fmt    string
-	key    string
-	n      int
-	log    *logging.Logger
+	broker       *Broker
+	fmt          string
+	key          string
+	inputCopies  int
+	outputCopies int
+	eofsRecv     int
+	log          *logging.Logger
 }
 
-func NewShard(broker *Broker, fmt string, key string, n int, log *logging.Logger) *SenderShard {
-	return &SenderShard{broker, fmt, key, n, log}
+func NewShard(broker *Broker, fmt string, key string, inputCopies int, outputCopies int, log *logging.Logger) *SenderShard {
+	return &SenderShard{
+		broker: broker,
+		fmt: fmt,
+		key: key,
+		inputCopies: inputCopies,
+		outputCopies: outputCopies,
+		log: log,
+	}
 }
 
 func keyHash(field string, mod int) int {
@@ -29,7 +38,7 @@ func keyHash(field string, mod int) int {
 }
 
 func (s *SenderShard) shard(fieldMaps []map[string]string) (map[int][]map[string]string, error) {
-	shards := make(map[int][]map[string]string, s.n)
+	shards := make(map[int][]map[string]string, s.outputCopies)
 
 	for _, fieldMap := range fieldMaps {
 		key, ok := fieldMap[s.key]
@@ -37,7 +46,7 @@ func (s *SenderShard) shard(fieldMaps []map[string]string) (map[int][]map[string
 			return nil, fmt.Errorf("left key %v was not found in field map", s.key)
 		}
 
-		shardKey := keyHash(key, s.n)
+		shardKey := keyHash(key, s.outputCopies)
 		shards[shardKey] = append(shards[shardKey], fieldMap)
 	}
 
@@ -80,11 +89,23 @@ func (s *SenderShard) BatchWithQuery(batch protocol.Batch, filterCols map[string
 }
 
 func (s *SenderShard) Eof(eof protocol.Eof) error {
+	s.eofsRecv += 1
+
+	if s.eofsRecv < s.outputCopies {
+		return nil
+	}
+
 	body := eof.Encode()
 	return s.broadcast(body)
 }
 
 func (s *SenderShard) EofWithQuery(eof protocol.Eof, query int) error {
+	s.eofsRecv += 1
+
+	if s.eofsRecv < s.outputCopies {
+		return nil
+	}
+
 	body := eof.EncodeWithQuery(query)
 	return s.broadcast(body)
 }
@@ -95,7 +116,7 @@ func (s *SenderShard) Error(erro protocol.Error) error {
 }
 
 func (s *SenderShard) broadcast(body []byte) error {
-	for i := range s.n {
+	for i := range s.outputCopies {
 		key := fmt.Sprintf(s.fmt, i)
 		if err := s.broker.Publish(key, body); err != nil {
 			return err

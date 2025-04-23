@@ -45,6 +45,7 @@ services:
       - envs/sanitize/.env.movies
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1,1,1
 
   sanitize-credits-0:
@@ -60,6 +61,7 @@ services:
       - envs/sanitize/.env.credits
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   sanitize-ratings-0:
@@ -75,6 +77,7 @@ services:
       - envs/sanitize/.env.ratings
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=2
 
   #### Filters ####
@@ -91,6 +94,7 @@ services:
       - envs/filter/.env.production_countries_length
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   filter-release_date_since_2000-0:
@@ -106,6 +110,7 @@ services:
       - envs/filter/.env.release_date_since_2000
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=2,1
 
   filter-release_date_upto_2010-0:
@@ -121,6 +126,7 @@ services:
       - envs/filter/.env.release_date_upto_2010
     environment:
       - ID=0
+      - INPUT_COPIES=2
       - OUTPUT_COPIES=1
 
   filter-production_countries_argentina-0:
@@ -136,6 +142,7 @@ services:
       - envs/filter/.env.production_countries_argentina
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1,2
 
   filter-production_countries_argentina_spain-0:
@@ -151,6 +158,7 @@ services:
       - envs/filter/.env.production_countries_argentina_spain
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   filter-production_countries_argentina_spain-1:
@@ -166,6 +174,7 @@ services:
       - envs/filter/.env.production_countries_argentina_spain
     environment:
       - ID=1
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   #### Exploders ####
@@ -182,6 +191,7 @@ services:
       - envs/explode/.env.cast
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   #### Exploders ####
@@ -198,6 +208,7 @@ services:
       - envs/explode/.env.cast
     environment:
       - ID=1
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   explode-production_countries-0:
@@ -213,6 +224,7 @@ services:
       - envs/explode/.env.production_countries
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=2
 
   #### Group by ####
@@ -229,6 +241,7 @@ services:
       - envs/groupby/.env.id_title_mean_rating
     environment:
       - ID=0
+      - INPUT_COPIES=2
       - OUTPUT_COPIES=1
 
   groupby-sentiment_mean_rate_revenue_budget-0:
@@ -244,6 +257,7 @@ services:
       - envs/groupby/.env.sentiment_mean_rate_revenue_budget
     environment:
       - ID=0
+      - INPUT_COPIES=2
       - OUTPUT_COPIES=1
 
   groupby-country_sum_budget-0:
@@ -259,6 +273,7 @@ services:
       - envs/groupby/.env.country_sum_budget
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   groupby-country_sum_budget-1:
@@ -274,6 +289,7 @@ services:
       - envs/groupby/.env.country_sum_budget
     environment:
       - ID=1
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   groupby-actor_count-0:
@@ -289,6 +305,7 @@ services:
       - envs/groupby/.env.actor_count
     environment:
       - ID=0
+      - INPUT_COPIES=2
       - OUTPUT_COPIES=1
 
   #### Divider ####
@@ -305,6 +322,7 @@ services:
       - envs/divider/.env.revenue_budget
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=2
 
   #### Sentiment ####
@@ -321,6 +339,7 @@ services:
       - envs/sentiment/.env.overview
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   #### Sentiment ####
@@ -337,6 +356,7 @@ services:
       - envs/sentiment/.env.overview
     environment:
       - ID=1
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   #### Tops #### 
@@ -353,6 +373,7 @@ services:
       - envs/top/.env.10_count
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   top-5_budget-0:
@@ -368,6 +389,7 @@ services:
       - envs/top/.env.5_budget
     environment:
       - ID=0
+      - INPUT_COPIES=2
       - OUTPUT_COPIES=1
 
   #### Minmax ####
@@ -384,6 +406,7 @@ services:
       - envs/minmax/.env.rating
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   #### Joins ####
@@ -400,6 +423,7 @@ services:
       - envs/join/.env.id_movieId
     environment:
       - ID=0
+      - INPUT_COPIES=1,1
       - OUTPUT_COPIES=1
 
   #### Joins ####
@@ -416,6 +440,7 @@ services:
       - envs/join/.env.id_movieId
     environment:
       - ID=1
+      - INPUT_COPIES=1,1
       - OUTPUT_COPIES=1
 
   join-id_id-0:
@@ -431,6 +456,7 @@ services:
       - envs/join/.env.id_id
     environment:
       - ID=0
+      - INPUT_COPIES=1,1
       - OUTPUT_COPIES=2
 
   #### Sinks ####
@@ -447,6 +473,7 @@ services:
       - envs/sink/.env.1
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   sink-2-0:
@@ -462,6 +489,7 @@ services:
       - envs/sink/.env.2
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   sink-3-0:
@@ -477,6 +505,7 @@ services:
       - envs/sink/.env.3
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   sink-4-0:
@@ -492,6 +521,7 @@ services:
       - envs/sink/.env.4
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1
 
   sink-5-0:
@@ -507,4 +537,5 @@ services:
       - envs/sink/.env.5
     environment:
       - ID=0
+      - INPUT_COPIES=1
       - OUTPUT_COPIES=1

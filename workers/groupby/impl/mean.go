@@ -41,7 +41,7 @@ func (w *Mean) Add(fieldMap map[string]string, con *config.GroupbyConfig) error 
 		keys = append(keys, field)
 	}
 
-	compKey := strings.Join(keys, ",")
+	compKey := strings.Join(keys, SEP)
 	if tup, ok := w.state[compKey]; !ok {
 		w.state[compKey] = tuple{sumValue, 1}
 	} else {
@@ -56,7 +56,7 @@ func (w *Mean) Result(con *config.GroupbyConfig) []map[string]string {
 	for compKey, v := range w.state {
 		fieldMap := make(map[string]string)
 
-		keys := strings.Split(compKey, ",")
+		keys := strings.Split(compKey, SEP)
 		for i, key := range keys {
 			fieldMap[con.GroupKeys[i]] = key
 		}
