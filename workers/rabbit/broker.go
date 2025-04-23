@@ -150,7 +150,7 @@ func (b *Broker) Consume(q amqp.Queue, consumer string) (<-chan amqp.Delivery, e
 	return b.ch.Consume(
 		q.Name,
 		consumer,
-		false, // auto-ack
+		true,  // auto-ack
 		false, // exclusive
 		false, // no-local
 		false, // no-wait

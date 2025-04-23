@@ -84,7 +84,6 @@ func (base *Worker) Run(w IWorker) error {
 					exit = handle(data)
 				}
 
-				del.Ack(false)
 			}
 		}
 	}

@@ -49,7 +49,7 @@ services:
       - envs/sanitize/.env.movies
     environment:
       - ID=0
-      - OUTPUT_COPIES=1,2,1
+      - OUTPUT_COPIES=1,3,1
 
   # ====================== Filters ======================
 
@@ -83,10 +83,25 @@ services:
       - ID=1
       - OUTPUT_COPIES=1
 
+  filter-production_countries_length-2:
+    container_name: filter-production_countries_length-2
+    build:
+      context: workers
+      dockerfile: dockerfiles/filter.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/filter/.env.production_countries_length
+    environment:
+      - ID=2
+      - OUTPUT_COPIES=1
+
   # ====================== Explodes ======================
 
-  explode-production_countries-1:
-    container_name: explode-production_countries-1
+  explode-production_countries-0:
+    container_name: explode-production_countries-0
     build:
       context: workers
       dockerfile: dockerfiles/explode.Dockerfile
@@ -96,6 +111,9 @@ services:
     env_file:
       - workers/.env
       - envs/explode/.env.production_countries
+    environment:
+      - ID=0
+      - OUTPUT_COPIES=1
 
   # ====================== GroupBys ======================
 
