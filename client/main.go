@@ -36,7 +36,7 @@ func main() {
 	defer skt.Close()
 	log.Infof("Connected to gateway server")
 
-	files := []string{"movies.csv", "credits.csv"} //, "ratings.csv"}
+	files := []string{"movies.csv", "credits.csv", "ratings.csv"}
 	for id, filename := range files {
 		path := con.DataPath + "/" + filename
 		fp, err := os.Open(path)

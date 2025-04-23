@@ -61,7 +61,7 @@ class Server:
         self._broker.close()
 
     def _handle_client(self, conn: CsvTransferStream):
-        for _ in range(2):#TODO: CAMBIAR A 3!!!!!!!!! 
+        for _ in range(3):
             filename = conn.resource()
             logging.info(f"Receiving {filename}")
 
@@ -70,12 +70,12 @@ class Server:
                 if msg.kind == MSG_FIN:
                     logging.info(f"{filename} was successfully received")
                     body = fin_to_sanitize(msg.data)
-                    self._broker.publish(routing_key=filename, body=body)
+                    self._broker.publish(routing_key=filename+ '-0', body=body)
                     break
 
                 elif msg.kind == MSG_BATCH:
                     body = lines_to_sanitize(msg.data)
-                    self._broker.publish(routing_key=filename, body=body)
+                    self._broker.publish(routing_key=filename + '-0', body=body)
 
                 elif msg.kind == MSG_ERR:
                     logging.critical("An error occurred, exiting...")
