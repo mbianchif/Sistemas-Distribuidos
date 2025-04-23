@@ -53,6 +53,7 @@ def generate_docker_compose(
       timeout: 3s
       retries: 10
       start_period: 50s
+
   gateway:
     container_name: gateway
     build: gateway
@@ -66,6 +67,7 @@ def generate_docker_compose(
 """
     for i in range(sanitize_movies):
         docker_compose += f"""
+  #### Sanitizers ####
   sanitize-movies-{i}:
     container_name: sanitize-movies-{i}
     build:
@@ -97,7 +99,7 @@ def generate_docker_compose(
       - envs/sanitize/.env.credits
     environment:
       - ID={i}
-      - OUTPUT_COPIES={divider},{filter_production_countries_length},{filter_release_date_since_2000}
+      - OUTPUT_COPIES={join_id_id}
 """
 
     for i in range(sanitize_ratings):
@@ -120,6 +122,7 @@ def generate_docker_compose(
 
     for i in range(filter_production_countries_length):
         docker_compose += f"""
+  #### Filters ####
   filter-production_countries_length-{i}:
     container_name: filter-production_countries_length-{i}
     build:
@@ -209,6 +212,7 @@ def generate_docker_compose(
 """
     for i in range(explode_cast):
         docker_compose += f"""
+  #### Exploders ####
   explode-cast-{i}:
     container_name: explode-cast-{i}
     build:
@@ -243,6 +247,7 @@ def generate_docker_compose(
 """
     for i in range(groupby_id_title_mean_rating):
         docker_compose += f"""
+  #### Group by ####
   groupby-id_title_mean_rating-{i}:
     container_name: groupby-id_title_mean_rating-{i}
     build:
@@ -311,6 +316,7 @@ def generate_docker_compose(
 """
     for i in range(divider):
         docker_compose += f"""
+  #### Divider ####
   divider-{i}:
     container_name: divider-{i}
     build:
@@ -328,6 +334,7 @@ def generate_docker_compose(
 """
     for i in range(sentiment):
         docker_compose += f"""
+  #### Sentiment ####
   sentiment-{i}:
     container_name: sentiment-{i}
     build:
@@ -345,6 +352,7 @@ def generate_docker_compose(
 """
     for i in range(top_10_count):
         docker_compose += f"""
+  #### Tops #### 
   top-10_count-{i}:
     container_name: top-10_count-{i}
     build:
@@ -355,7 +363,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/top/.env.overview
+      - envs/top/.env.10_count
     environment:
       - ID={i}
       - OUTPUT_COPIES={sink_4}
@@ -379,6 +387,7 @@ def generate_docker_compose(
 """
     for i in range(minmax_rating):
         docker_compose += f"""
+  #### Minmax ####
   minmax-rating-{i}:
     container_name: minmax-rating-{i}
     build:
@@ -394,8 +403,44 @@ def generate_docker_compose(
       - ID={i}
       - OUTPUT_COPIES={sink_3}
 """
+    for i in range(join_id_movieid):
+        docker_compose += f"""
+  #### Joins ####
+  join-id_movieid-{i}:
+    container_name: join-id_movieid-{i}
+    build:
+      context: workers
+      dockerfile: dockerfiles/join.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/join/.env.id_movieId
+    environment:
+      - ID={i}
+      - OUTPUT_COPIES={groupby_id_title_mean_rating}
+"""
+    for i in range(join_id_id):
+        docker_compose += f"""
+  join-id_id-{i}:
+    container_name: join-id_id-{i}
+    build:
+      context: workers
+      dockerfile: dockerfiles/join.Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - workers/.env
+      - envs/join/.env.id_id
+    environment:
+      - ID={i}
+      - OUTPUT_COPIES={explode_cast}
+"""
     for i in range(sink_1):
         docker_compose += f"""
+  #### Sinks ####
   sink-1-{i}:
     container_name: sink-1-{i}
     build:
