@@ -6,23 +6,30 @@ from functools import partial
 class Broker:
     def __init__(self, config):
         logging.getLogger("pika").setLevel(logging.WARNING)
-
         self._outputexchange_name = config.outputExchangeName
         self._input_queue_name = config.inputQueueNames[0]
 
         try:
-            self._conn = pika.BlockingConnection(
+            self._recvconn = pika.BlockingConnection(
                 pika.ConnectionParameters(host="rabbitmq")
             )
-            self._chan = self._conn.channel()
+            self._sendconn = pika.BlockingConnection(
+                pika.ConnectionParameters(host="rabbitmq")
+            )
+
+            self._recvchan = self._recvconn.channel()
+            self._sendchan = self._sendconn.channel()
 
             self.inputQueues = self._declare_side(
+                self._recvchan,
                 config.inputExchangeName,
                 config.inputExchangeType,
                 config.inputQueueNames,
                 config.inputQueueKeys,
             )
+
             self.outputQueues = self._declare_side(
+                self._sendchan,
                 self._outputexchange_name,
                 config.outputExchangeType,
                 config.outputQueueNames,
@@ -32,8 +39,8 @@ class Broker:
             logging.critical(f"Failed to connect with RabbitMQ: {e}")
             raise
 
-    def _declare_side(self, exchange_name, exchange_type, queues_name, queues_keys):
-        self._chan.exchange_declare(
+    def _declare_side(self, chan, exchange_name, exchange_type, queues_name, queues_keys):
+        chan.exchange_declare(
             exchange=exchange_name,
             exchange_type=exchange_type,
             durable=True,
@@ -41,8 +48,8 @@ class Broker:
 
         qs = []
         for i, queue in enumerate(queues_name):
-            self._chan.queue_declare(queue=queue)
-            q = self._chan.queue_bind(
+            chan.queue_declare(queue=queue)
+            q = chan.queue_bind(
                 exchange=exchange_name,
                 queue=queue,
                 routing_key=queues_keys[i],
@@ -53,7 +60,7 @@ class Broker:
 
     def publish(self, routing_key: str, body: str | bytes):
         try:
-            self._chan.basic_publish(
+            self._sendchan.basic_publish(
                 exchange=self._outputexchange_name,
                 routing_key=routing_key,
                 body=body,
@@ -64,25 +71,32 @@ class Broker:
 
     def consume(self, consumer, callback, conn):
         try:
-            self._chan.basic_consume(
+            self._recvchan.basic_consume(
                 queue=self._input_queue_name,
                 on_message_callback=partial(callback, conn),
                 auto_ack=False,
                 exclusive=False,
                 consumer_tag=consumer,
             )
-            self._chan.start_consuming()
+            self._recvchan.start_consuming()
         except Exception as e:
             logging.critical(f"Failed to consume message {e}")
             raise
         finally:
-            self._chan.stop_consuming()
+            self._recvchan.stop_consuming()
 
     def close(self):
-        if self._chan and self._chan.is_open:
+        if self._recvchan and self._recvchan.is_open:
             try:
-                self._chan.close()
+                self._recvchan.close()
             except:
                 pass
-        if self._conn and self._conn.is_open:
-            self._conn.close()
+        if self._sendchan and self._sendchan.is_open:
+            try:
+                self._sendchan.close()
+            except:
+                pass
+        if self._recvconn and self._recvconn.is_open:
+            self._recvconn.close()
+        if self._sendconn and self._sendconn.is_open:
+            self._sendconn.close()

@@ -9,8 +9,10 @@ from protocol.socket import (
 from protocol.sanitize import lines_to_sanitize, fin_to_sanitize
 from protocol.sink import *
 from rabbit.broker import Broker
+from threading import Thread
 import logging
 import signal
+
 
 def handle_result(conn: CsvTransferStream, ch, method, properties, body):
     kind, query, data = read_delivery_with_query(body)
@@ -36,6 +38,7 @@ def handle_result(conn: CsvTransferStream, ch, method, properties, body):
 
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
+
 class Server:
     def __init__(self, config):
         self._lis = CsvTransferListener.bind(config.host, config.port, config.backlog)
@@ -55,9 +58,18 @@ class Server:
 
         self._lis.close()
 
-        self._handle_client(conn)
-        conn.close()
+        # Background process to handle the client
+        client_handler = Thread(
+            target=self._handle_client,
+            name="client handler process",
+            args=(conn,),
+        )
+        client_handler.start()
+        self._broker.consume("", handle_result, conn)
 
+        client_handler.join()
+
+        conn.close()
         self._broker.close()
 
     def _handle_client(self, conn: CsvTransferStream):
@@ -70,12 +82,12 @@ class Server:
                 if msg.kind == MSG_FIN:
                     logging.info(f"{filename} was successfully received")
                     body = fin_to_sanitize(msg.data)
-                    self._broker.publish(routing_key=filename+ '-0', body=body)
+                    self._broker.publish(routing_key=filename + "-0", body=body)
                     break
 
                 elif msg.kind == MSG_BATCH:
                     body = lines_to_sanitize(msg.data)
-                    self._broker.publish(routing_key=filename + '-0', body=body)
+                    self._broker.publish(routing_key=filename + "-0", body=body)
 
                 elif msg.kind == MSG_ERR:
                     logging.critical("An error occurred, exiting...")
@@ -84,9 +96,8 @@ class Server:
                 else:
                     logging.critical(f"An unknown msg kind was received {msg.kind}")
                     return 1
-        
-        logging.info("Waiting for results...")
-        self._broker.consume("", handle_result, conn)
+
+        logging.info("all files were succesfully received")
 
     def _accept_new_conn(self):
         logging.info(f"Waiting for connections...")

@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/op/go-logging"
 )
@@ -122,39 +121,38 @@ func writeAll(w *bufio.Writer, data []byte) error {
 	return nil
 }
 
-func spawn_file_handler(s *CsvTransferStream, query int, ch <-chan []byte, storage string) error {
-	if strings.Contains(storage, "0") {
-		return fmt.Errorf("una pena")
+func spawn_file_handler(query int, ch <-chan []byte, storage string) error {
+	dirPath := fmt.Sprintf("/%s", storage)
+	if err := os.MkdirAll(dirPath, 0755); err != nil {
+		return err
 	}
-	// path := storage + "/" + strconv.Itoa(query) + ".csv"
-	// // fp, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	// if err != nil {
-	// 	return fmt.Errorf("the file could not be created %v", err)
-	// }
-	// defer fp.Close()
 
-	// writer := bufio.NewWriterSize(fp, 1<<12)
+	path := fmt.Sprintf("%s/%d.csv", dirPath, query)
+	fp, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("the file could not be created %v", err)
+	}
+	defer fp.Close()
+
+	writer := bufio.NewWriter(fp)
 	for data := range ch {
-		for line := range bytes.SplitSeq(data, []byte("\n")) {
-			s.log.Infof("query %v, line: `%s`", query, line)
-		}
-		// data = append(data, []byte("\n")...)
-		// writeAll(writer, data)
-		// writer.Flush()
+		data = append(data, []byte("\n")...)
+		writeAll(writer, data)
+		writer.Flush()
 	}
 
 	return nil
 }
 
-func (s *CsvTransferStream) RecvQueryResult(storage string) {
-	queryCount := 5
-
+func (s *CsvTransferStream) RecvQueryResult(storage string, queryCount int) {
 	chans := make(map[int]chan<- []byte, queryCount)
 	for i := 1; i <= queryCount; i++ {
 		ch := make(chan []byte)
 		chans[i] = ch
 		go func(i int) {
-			spawn_file_handler(s, i, ch, storage)
+			if err := spawn_file_handler(i, ch, storage); err != nil {
+				s.log.Criticalf("error at spawn_file_handler: %v", err)
+			}
 		}(i)
 	}
 
@@ -171,6 +169,7 @@ func (s *CsvTransferStream) RecvQueryResult(storage string) {
 		dataLength := binary.BigEndian.Uint32(header[:4])
 		kind := int(header[4])
 		query := int(header[5])
+		fmt.Printf("llego tipo %d para la query %d\n", kind, query)
 		if kind == MSG_EOF {
 			s.log.Infof("query %v is ready!", query)
 			done[query] = struct{}{}

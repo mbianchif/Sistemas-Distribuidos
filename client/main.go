@@ -36,23 +36,9 @@ func main() {
 	defer skt.Close()
 	log.Infof("Connected to gateway server")
 
+	// Send files to gateway
 	files := []string{"movies.csv", "credits.csv", "ratings.csv"}
-	for id, filename := range files {
-		path := con.DataPath + "/" + filename
-		fp, err := os.Open(path)
-		if err != nil {
-			log.Fatalf("Can't open file %s: %v", path, err)
-			break
-		}
-		defer fp.Close()
+	go protocol.SendFiles(skt, con, log, files)
 
-		log.Debugf("Sending %s", filename)
-		if err = skt.SendFile(fp, uint8(id), con.BatchSize, con.Lines); err != nil {
-			log.Criticalf("Couldn't send batch of file %s: %v", filename, err)
-			break
-		}
-	}
-
-	log.Infof("Waiting for results")
-	skt.RecvQueryResult(con.Storage)
+	skt.RecvQueryResult(con.Storage, 5)
 }
