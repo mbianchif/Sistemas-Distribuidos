@@ -6,6 +6,10 @@
   ```bash
   sh download-dataset.sh
   ```
+- Generar el compose del sistema
+  ```bash
+  python3 generar_compose.py
+  ```
 - Correr el compose para levantar el programa
   ```bash
   docker compose up -- build
