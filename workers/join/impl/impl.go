@@ -115,7 +115,6 @@ func load(w *Join, fp *os.File, fieldMaps []map[string]string) ([]map[string]str
 		}
 	}
 
-	// TODO: Remove file
 	return responseFieldMaps, nil
 }
 
@@ -145,7 +144,7 @@ func spawn_file_persistor(w *Join, ch chan tuple, i int) error {
 		}
 	}
 
-	return nil
+	return os.Remove(path)
 }
 
 func (w *Join) Run() error {

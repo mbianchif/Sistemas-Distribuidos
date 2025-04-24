@@ -32,7 +32,9 @@ def generate_docker_compose(
     join_id_movieid,
     join_id_id
 ):
-    docker_compose = """services:
+    docker_compose = "name: moviesanalyzer"
+    docker_compose += """
+services:
   client:
     container_name: client
     build: client
@@ -555,7 +557,7 @@ def generate_docker_compose(
 
 
 if __name__ == "__main__":
-    config_path = Path("configs/generate_compose_config.json")
+    config_path = Path("configs/compose/config.json")
 
     if not config_path.exists():
         print(f"Error: Config file not found at {config_path}")
