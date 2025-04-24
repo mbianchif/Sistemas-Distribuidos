@@ -628,7 +628,7 @@ networks:
     return docker_compose
 
 def generate_client_compose():
-    compose = """name: client_moviesanalyzer
+    compose = """name: clients
 services:
   client:
     container_name: client
