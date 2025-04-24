@@ -12,5 +12,8 @@
   ```
 - Correr el compose para levantar el programa
   ```bash
-  docker compose up -- build
+  docker compose up --build
+- Correr el compose para levantar el cliente
+  ```sh
+  docker compose -f client-compose.yaml up --build
   ```

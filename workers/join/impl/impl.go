@@ -78,30 +78,30 @@ func joinFieldMaps(left map[string]string, right map[string]string) map[string]s
 
 func load(w *Join, fp *os.File, fieldMaps []map[string]string) ([]map[string]string, error) {
 	responseFieldMaps := make([]map[string]string, 0)
-	for _, right := range fieldMaps {
-		fp.Seek(0, 0)
-		reader := bufio.NewReader(fp)
+	fp.Seek(0, 0)
+	reader := bufio.NewReader(fp)
 
-		for {
-			line, err := reader.ReadBytes('\n')
-			line = bytes.TrimSpace(line)
-			if err == io.EOF {
-				break
-			} else if err != nil {
-				return nil, err
-			}
+	for {
+		line, err := reader.ReadBytes('\n')
+		line = bytes.TrimSpace(line)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
 
-			left, err := protocol.DecodeLine(line)
-			if err != nil {
-				w.Log.Fatalf("failed to decode line: %v", err)
-			}
+		left, err := protocol.DecodeLine(line)
+		if err != nil {
+			w.Log.Fatalf("failed to decode line: %v", err)
+		}
 
-			valueLeft, ok := left[w.Con.LeftKey]
-			if !ok {
-				w.Log.Errorf("key %v was not found in left side", w.Con.LeftKey)
-				continue
-			}
+		valueLeft, ok := left[w.Con.LeftKey]
+		if !ok {
+			w.Log.Errorf("key %v was not found in left side", w.Con.LeftKey)
+			continue
+		}
 
+		for _, right := range fieldMaps {
 			valueRight, ok := right[w.Con.RightKey]
 			if !ok {
 				w.Log.Errorf("key %v was not found in right side", w.Con.RightKey)
@@ -196,7 +196,7 @@ func keyHash(str string, mod int) int {
 		hash = ((hash << 5) + hash) + uint64(c) // hash * 33 + c
 	}
 
-    return int(hash % uint64(mod))
+	return int(hash % uint64(mod))
 }
 
 func shard(w *Join, fieldMaps []map[string]string, key string) map[int][]map[string]string {
