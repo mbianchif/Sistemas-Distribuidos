@@ -33,7 +33,7 @@ def generate_pipeline_compose(
     join_id_id
 ):
     docker_compose = "name: moviesanalyzer"
-    docker_compose += """
+    docker_compose += f"""
 services:
   rabbitmq:
     container_name: rabbitmq
@@ -61,6 +61,9 @@ services:
         condition: service_healthy
     env_file:
       - configs/gateway/.env.gateway
+    environment:
+      - INPUT_COPIES={sink_1},{sink_2},{sink_3},{sink_4},{sink_5}
+      - OUTPUT_COPIES={sanitize_movies},{sanitize_credits},{sanitize_ratings}
 """
 
     docker_compose += "\n# ======================= Sanitizers =======================\n"

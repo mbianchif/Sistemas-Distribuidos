@@ -1,6 +1,7 @@
 import pika
 import logging
 from functools import partial
+from ..config.config import Config
 
 
 class Broker:
@@ -38,6 +39,48 @@ class Broker:
         except Exception as e:
             logging.critical(f"Failed to connect with RabbitMQ: {e}")
             raise
+
+    def _init_input(self, chan, config: Config):
+        exchange_name = config.inputExchangeName
+        q_name = config.inputQueueName
+        
+        chan.exchange_declare(
+            exchange=exchange_name,
+            exchange_type="direct",
+            durable=True,
+        )
+
+        chan.queue_declare(queue=q_name)
+        return chan.queue_bind(
+            exchange=exchange_name,
+            exchange_type="direct",
+            durable=True
+        )
+
+    def _init_output(self, chan, config: Config):
+        exchange_name = config.outputExchangeName
+        q_names = config.outputQueueNames
+        q_copies = config.outputCopies
+
+        chan.exchange_declare(
+            exchange=exchange_name,
+            exchange_type="direct",
+            durable=True,
+        )
+
+        for i in range(len(q_names)):
+            q_fmt = q_names[i] + "-{}"
+            for id in range(q_copies[i]):
+                q_name = q_fmt.format(id)
+
+                chan.queue_declare(queue=q_name)
+                q = chan.queue_bind(
+                    exchange=exchange_name,
+                    exchange_type="direct",
+                    durable=True,
+                )
+
+
 
     def _declare_side(self, chan, exchange_name, exchange_type, queues_name, queues_keys):
         chan.exchange_declare(
