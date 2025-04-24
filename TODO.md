@@ -6,7 +6,6 @@
 - terminar los diagramas
 - terminar el informe
 - llenar los readmes de los workers
-- cambiar las funciones de hash para los shards del join y del Sender
 - cambiar el protocolo para que los metadatos se pasen por los headers
 - hacer un compose aparte para el cliente
 
