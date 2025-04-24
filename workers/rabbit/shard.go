@@ -26,12 +26,14 @@ func NewShard(broker *Broker, fmt string, key string, outputCopies int, log *log
 	}
 }
 
-func keyHash(field string, mod int) int {
-	acc := 0
-	for _, ch := range field {
-		acc += int(ch)
+func keyHash(str string, mod int) int {
+	var hash uint64 = 5381
+
+	for _, c := range str {
+		hash = ((hash << 5) + hash) + uint64(c) // hash * 33 + c
 	}
-	return acc % mod
+
+    return int(hash % uint64(mod))
 }
 
 func (s *SenderShard) shard(fieldMaps []map[string]string) (map[int][]map[string]string, error) {
