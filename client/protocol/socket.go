@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"encoding/csv"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 
 	"github.com/op/go-logging"
@@ -34,82 +36,98 @@ func NewConnection(ip string, port uint16, log *logging.Logger) (*CsvTransferStr
 	return &CsvTransferStream{conn, log}, nil
 }
 
-func (s *CsvTransferStream) sendBatch(writer *bufio.Writer, lines [][]byte) error {
+func (s *CsvTransferStream) sendBatch(records [][]byte) error {
+	writer := bufio.NewWriter(s.conn)
 	writer.WriteByte(MSG_BATCH)
 
 	quantBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(quantBytes, uint32(len(lines)))
+	binary.BigEndian.PutUint32(quantBytes, uint32(len(records)))
 	writer.Write(quantBytes)
 
 	lengthBytes := make([]byte, 4)
-	for _, line := range lines {
-		binary.BigEndian.PutUint32(lengthBytes, uint32(len(line)))
+	for _, record := range records {
+		binary.BigEndian.PutUint32(lengthBytes, uint32(len(record)))
 		writer.Write(lengthBytes)
-		writer.Write(line)
+		writer.Write(record)
 	}
 
 	return writer.Flush()
 }
 
-func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int, nlines int) error {
-	writer := bufio.NewWriter(s.conn)
-	writer.WriteByte(fileId)
+func fits(currentSize int, csvRowSize int, batchSize int) bool {
+	// TYPE + COUNT + CURRSIZE + ROW_SIZE_SIZE + ROW_SIZE
+	return 1 + 4 + currentSize + 4 + csvRowSize < batchSize
+}
 
-	reader := bufio.NewReader(fp)
-	lines := make([][]byte, 0, batchSize)
-	sentLines := 0
+func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) error {
+	if err := writeAll(s.conn, []byte{fileId}); err != nil {
+		return fmt.Errorf("Couldn't send fileId %d: %v", fileId, err)
+	}
 
-	// Skip header line
-	line, err := reader.ReadBytes('\n')
+	reader := csv.NewReader(bufio.NewReader(fp))
+	reader.Read() // Skip header line
+	records := make([][]byte, 0, batchSize)
+	accSize := 0
+
+	var buf bytes.Buffer
+	csvWriter := csv.NewWriter(&buf)
+
 	for {
-		line, err = reader.ReadBytes('\n')
-		line = bytes.TrimSpace(line)
-		if len(line) > 0 {
-			lines = append(lines, line)
-		}
-
-		// File was read entirely
+		row, err := reader.Read()
 		if err == io.EOF {
-			err = nil
-			if len(lines) > 0 {
-				err = s.sendBatch(writer, lines)
-			}
 			break
 		}
-
-		// Read the wanted lines of the file
-		if nlines != -1 && sentLines+len(lines) == nlines {
-			if len(lines) > 0 {
-				err = s.sendBatch(writer, lines)
-			}
-			break
+		if err == csv.ErrFieldCount {
+			continue
+		}
+		if parseErr, ok := err.(*csv.ParseError); ok && parseErr.Err == csv.ErrFieldCount {
+			continue
 		}
 
-		// batchSize lines were read
-		if len(lines) == batchSize {
-			err = s.sendBatch(writer, lines)
-			if err != nil {
-				s.log.Errorf("Error sending batch")
-				break
+		if len(row) > 0 {
+			buf.Reset()
+			csvWriter.Write(row)
+			csvWriter.Flush()
+
+			size := buf.Len()
+			bytes := slices.Clone(buf.Bytes())
+
+			if !fits(accSize, size, batchSize) {
+				if len(records) == 0 {
+					return fmt.Errorf("BATCH_SIZE should be incremented to let record of size ~%d fly by", size)
+				}
+
+				if err := s.sendBatch(records); err != nil {
+					return fmt.Errorf("couldn't send batch with fileId %d: %v", fileId, err)
+				}
+
+				accSize = 0
+				records = records[:0]
 			}
-			sentLines += len(lines)
-			lines = lines[:0]
-			if sentLines == nlines {
-				break
-			}
+
+			accSize += size
+			records = append(records, bytes)
 		}
 	}
 
-	if err != nil {
-		writer.WriteByte(MSG_ERR)
-	} else {
-		writer.WriteByte(MSG_EOF)
+	if len(records) > 0 {
+		if err := s.sendBatch(records); err != nil {
+			return fmt.Errorf("couldn't send batch with fileId %d: %v", fileId, err)
+		}
 	}
 
-	return writer.Flush()
+	return nil
 }
 
-func writeAll(w *bufio.Writer, data []byte) error {
+func (s *CsvTransferStream) Confirm() error {
+	return writeAll(s.conn, []byte{MSG_EOF})
+}
+
+func (s *CsvTransferStream) Error() error {
+	return writeAll(s.conn, []byte{MSG_ERR})
+}
+
+func writeAll(w io.Writer, data []byte) error {
 	total := 0
 	for total < len(data) {
 		n, err := w.Write(data[total:])

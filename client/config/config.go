@@ -16,7 +16,6 @@ type Config struct {
 	DataPath    string
 	Storage     string
 	LogLevel    logging.Level
-	Lines       int
 }
 
 func Create() (*Config, error) {
@@ -51,11 +50,6 @@ func Create() (*Config, error) {
 		logLevel = logging.DEBUG
 	}
 
-	lines, err := strconv.Atoi(os.Getenv("LINES"))
-	if err != nil {
-		lines = -1
-	}
-
 	return &Config{
 		BatchSize:   batchSize,
 		GatewayHost: gatewayHost,
@@ -63,6 +57,5 @@ func Create() (*Config, error) {
 		DataPath:    dataPath,
 		Storage:     storage,
 		LogLevel:    logLevel,
-		Lines:       lines,
 	}, nil
 }
