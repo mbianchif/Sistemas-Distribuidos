@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 
-def generate_docker_compose(
+def generate_pipeline_compose(
     gateway,
     sanitize_movies,
     sanitize_credits,
@@ -35,18 +35,11 @@ def generate_docker_compose(
     docker_compose = "name: moviesanalyzer"
     docker_compose += """
 services:
-  client:
-    container_name: client
-    build: client
-    env_file: client/.env
-    volumes:
-      - .data:/data
-    depends_on:
-      - gateway
-      
   rabbitmq:
     container_name: rabbitmq
     image: rabbitmq:management
+    networks:
+      - my-network
     ports:
       - 15672:15672
     healthcheck:
@@ -59,6 +52,8 @@ services:
   gateway:
     container_name: gateway
     build: gateway
+    networks:
+      - my-network
     ports:
       - 9090:9090
     depends_on:
@@ -67,14 +62,17 @@ services:
     env_file:
       - configs/gateway/.env.gateway
 """
+
+    docker_compose += "\n# ======================= Sanitizers =======================\n"
     for i in range(sanitize_movies):
         docker_compose += f"""
-  #### Sanitizers ####
   sanitize-movies-{i}:
     container_name: sanitize-movies-{i}
     build:
       context: workers
       dockerfile: dockerfiles/sanitize.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -94,6 +92,8 @@ services:
     build:
       context: workers
       dockerfile: dockerfiles/sanitize.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -113,6 +113,8 @@ services:
     build:
       context: workers
       dockerfile: dockerfiles/sanitize.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -125,14 +127,16 @@ services:
       - OUTPUT_COPIES={join_id_movieid}
 """
 
+    docker_compose += "\n# ======================= Filters =======================\n"
     for i in range(filter_production_countries_length):
         docker_compose += f"""
-  #### Filters ####
   filter-production_countries_length-{i}:
     container_name: filter-production_countries_length-{i}
     build:
       context: workers
       dockerfile: dockerfiles/filter.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -152,6 +156,8 @@ services:
     build:
       context: workers
       dockerfile: dockerfiles/filter.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -171,6 +177,8 @@ services:
     build:
       context: workers
       dockerfile: dockerfiles/filter.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -193,6 +201,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - my-network
     env_file:
       - workers/.env
       - configs/filter/.env.production_countries_argentina
@@ -212,6 +222,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - my-network
     env_file:
       - workers/.env
       - configs/filter/.env.production_countries_argentina_spain
@@ -220,9 +232,10 @@ services:
       - INPUT_COPIES={filter_release_date_since_2000}
       - OUTPUT_COPIES={filter_release_date_upto_2010}
 """
+
+    docker_compose += "\n# ======================= Explodes =======================\n"
     for i in range(explode_cast):
         docker_compose += f"""
-  #### Exploders ####
   explode-cast-{i}:
     container_name: explode-cast-{i}
     build:
@@ -231,6 +244,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - my-network
     env_file:
       - workers/.env
       - configs/explode/.env.cast
@@ -239,6 +254,7 @@ services:
       - INPUT_COPIES={join_id_id}
       - OUTPUT_COPIES={groupby_actor_count}
 """
+
     for i in range(explode_production_countries):
         docker_compose += f"""
   explode-production_countries-{i}:
@@ -249,6 +265,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - my-network
     env_file:
       - workers/.env
       - configs/explode/.env.production_countries
@@ -257,9 +275,10 @@ services:
       - INPUT_COPIES={filter_production_countries_length}
       - OUTPUT_COPIES={groupby_country_sum_budget}
 """
+
+    docker_compose += "\n# ======================= GroupBys =======================\n"
     for i in range(groupby_id_title_mean_rating):
         docker_compose += f"""
-  #### Group by ####
   groupby-id_title_mean_rating-{i}:
     container_name: groupby-id_title_mean_rating-{i}
     build:
@@ -268,6 +287,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - my-network
     env_file:
       - workers/.env
       - configs/groupby/.env.id_title_mean_rating
@@ -276,6 +297,7 @@ services:
       - INPUT_COPIES={join_id_movieid}
       - OUTPUT_COPIES={minmax_rating}
 """
+
     for i in range(groupby_sentiment_mean_rate_revenue_budget):
         docker_compose += f"""
   groupby-sentiment_mean_rate_revenue_budget-{i}:
@@ -286,6 +308,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - my-network
     env_file:
       - workers/.env
       - configs/groupby/.env.sentiment_mean_rate_revenue_budget
@@ -294,6 +318,7 @@ services:
       - INPUT_COPIES={sentiment}
       - OUTPUT_COPIES={sink_5}
 """
+
     for i in range(groupby_country_sum_budget):
         docker_compose += f"""
   groupby-country_sum_budget-{i}:
@@ -304,6 +329,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - my-network
     env_file:
       - workers/.env
       - configs/groupby/.env.country_sum_budget
@@ -312,6 +339,7 @@ services:
       - INPUT_COPIES={explode_production_countries}
       - OUTPUT_COPIES={top_5_budget}
 """
+
     for i in range(groupby_actor_count):
         docker_compose += f"""
   groupby-actor_count-{i}:
@@ -322,6 +350,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - my-network
     env_file:
       - workers/.env
       - configs/groupby/.env.actor_count
@@ -330,9 +360,10 @@ services:
       - INPUT_COPIES={explode_cast}
       - OUTPUT_COPIES={top_10_count}
 """
+
+    docker_compose += "\n# ======================= Dividers =======================\n"
     for i in range(divider):
         docker_compose += f"""
-  #### Divider ####
   divider-{i}:
     container_name: divider-{i}
     build:
@@ -341,6 +372,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - my-network
     env_file:
       - workers/.env
       - configs/divider/.env.revenue_budget
@@ -349,9 +382,10 @@ services:
       - INPUT_COPIES={sanitize_movies}
       - OUTPUT_COPIES={sentiment}
 """
+
+    docker_compose += "\n# ======================= Sentiments =======================\n"
     for i in range(sentiment):
         docker_compose += f"""
-  #### Sentiment ####
   sentiment-{i}:
     container_name: sentiment-{i}
     build:
@@ -360,6 +394,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - my-network
     env_file:
       - workers/.env
       - configs/sentiment/.env.overview
@@ -368,14 +404,17 @@ services:
       - INPUT_COPIES={divider}
       - OUTPUT_COPIES={groupby_sentiment_mean_rate_revenue_budget}
 """
+
+    docker_compose += "\n# ======================= Tops =======================\n"
     for i in range(top_10_count):
         docker_compose += f"""
-  #### Tops #### 
   top-10_count-{i}:
     container_name: top-10_count-{i}
     build:
       context: workers
       dockerfile: dockerfiles/top.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -387,6 +426,7 @@ services:
       - INPUT_COPIES={groupby_actor_count}
       - OUTPUT_COPIES={sink_4}
 """
+
     for i in range(top_5_budget):
         docker_compose += f"""
   top-5_budget-{i}:
@@ -394,6 +434,8 @@ services:
     build:
       context: workers
       dockerfile: dockerfiles/top.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -405,14 +447,17 @@ services:
       - INPUT_COPIES={groupby_country_sum_budget}
       - OUTPUT_COPIES={sink_2}
 """
+
+    docker_compose += "\n# ======================= MinMax =======================\n"
     for i in range(minmax_rating):
         docker_compose += f"""
-  #### Minmax ####
   minmax-rating-{i}:
     container_name: minmax-rating-{i}
     build:
       context: workers
       dockerfile: dockerfiles/minmax.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -424,14 +469,17 @@ services:
       - INPUT_COPIES={groupby_id_title_mean_rating}
       - OUTPUT_COPIES={sink_3}
 """
+
+    docker_compose += "\n# ======================= Joins =======================\n"
     for i in range(join_id_movieid):
         docker_compose += f"""
-  #### Joins ####
   join-id_movieid-{i}:
     container_name: join-id_movieid-{i}
     build:
       context: workers
       dockerfile: dockerfiles/join.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -443,6 +491,7 @@ services:
       - INPUT_COPIES={filter_production_countries_argentina},{sanitize_ratings}
       - OUTPUT_COPIES={groupby_id_title_mean_rating}
 """
+
     for i in range(join_id_id):
         docker_compose += f"""
   join-id_id-{i}:
@@ -450,6 +499,8 @@ services:
     build:
       context: workers
       dockerfile: dockerfiles/join.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -461,14 +512,17 @@ services:
       - INPUT_COPIES={filter_production_countries_argentina},{sanitize_credits}
       - OUTPUT_COPIES={explode_cast}
 """
+
+    docker_compose += "\n# ======================= Sinks =======================\n"
     for i in range(sink_1):
         docker_compose += f"""
-  #### Sinks ####
   sink-1-{i}:
     container_name: sink-1-{i}
     build:
       context: workers
       dockerfile: dockerfiles/sink.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -480,6 +534,7 @@ services:
       - INPUT_COPIES={filter_release_date_upto_2010}
       - OUTPUT_COPIES={gateway}
 """
+
     for i in range(sink_2):
         docker_compose += f"""
   sink-2-{i}:
@@ -487,6 +542,8 @@ services:
     build:
       context: workers
       dockerfile: dockerfiles/sink.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -498,6 +555,7 @@ services:
       - INPUT_COPIES={top_5_budget}
       - OUTPUT_COPIES={gateway}
 """
+
     for i in range(sink_3):
         docker_compose += f"""
   sink-3-{i}:
@@ -505,6 +563,8 @@ services:
     build:
       context: workers
       dockerfile: dockerfiles/sink.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -516,6 +576,7 @@ services:
       - INPUT_COPIES={minmax_rating}
       - OUTPUT_COPIES={gateway}
 """
+
     for i in range(sink_4):
         docker_compose += f"""
   sink-4-{i}:
@@ -523,6 +584,8 @@ services:
     build:
       context: workers
       dockerfile: dockerfiles/sink.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -534,6 +597,7 @@ services:
       - INPUT_COPIES={top_10_count}
       - OUTPUT_COPIES={gateway}
 """
+
     for i in range(sink_5):
         docker_compose += f"""
   sink-5-{i}:
@@ -541,6 +605,8 @@ services:
     build:
       context: workers
       dockerfile: dockerfiles/sink.Dockerfile
+    networks:
+      - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -553,10 +619,35 @@ services:
       - OUTPUT_COPIES={gateway}
 """
 
+    docker_compose += """
+networks:
+  my-network:
+    name: moviesanalyzer_net
+"""
+
     return docker_compose
 
+def generate_client_compose():
+    compose = """name: client_moviesanalyzer
+services:
+  client:
+    container_name: client
+    build: client
+    env_file: client/.env
+    volumes:
+      - .data:/data
+    networks:
+      - my-network
+
+networks:
+  my-network:
+    name: moviesanalyzer_net
+    external: true
+"""
+    return compose
 
 if __name__ == "__main__":
+    # pipeline
     config_path = Path("configs/compose/config.json")
 
     if not config_path.exists():
@@ -567,14 +658,24 @@ if __name__ == "__main__":
         config = json.load(config_file)
 
     try:
-        docker_compose = generate_docker_compose(**config)
+        pipeline_docker_compose = generate_pipeline_compose(**config)
     except KeyError as e:
         print(f"Missing configuration key: {e}")
         sys.exit(1)
 
-    compose_name = "compose.yaml"
+    pipeline_compose_name = "compose.yaml"
 
-    with open(compose_name, "w") as f:
+    with open(pipeline_compose_name, "w") as f:
+        f.write(pipeline_docker_compose)
+
+    print(f"Pipeline compose file saved to {pipeline_compose_name}")
+
+    # client
+    client_compose_name = "client-compose.yaml"
+
+    docker_compose = generate_client_compose()
+    with open(client_compose_name, "w") as f:
         f.write(docker_compose)
 
-    print(f"Docker Compose configuration saved to {compose_name}")
+    print(f"Client compose file saved to {client_compose_name}")
+

@@ -6,6 +6,7 @@
 - terminar los diagramas
 - terminar el informe
 - llenar los readmes de los workers
+
+- arreglar como quedan los generos en el archivo de resultados (lo proximo)
 - cambiar el protocolo para que los metadatos se pasen por los headers
-- hacer un compose aparte para el cliente
 
