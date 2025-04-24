@@ -74,10 +74,10 @@ class Batch:
             first = False
             value = field_map[col]
 
-            if "," in value:
+            if col == "genres":
                 value = "[" + value + "]"
             
-            line.extend(value.encode())
+            line.extend(value.strip().encode())
 
         return line
 
