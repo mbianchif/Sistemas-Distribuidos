@@ -63,7 +63,7 @@ def generate_docker_compose(
       rabbitmq:
         condition: service_healthy
     env_file:
-      - envs/gateway/.env.gateway
+      - configs/gateway/.env.gateway
 """
     for i in range(sanitize_movies):
         docker_compose += f"""
@@ -78,7 +78,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sanitize/.env.movies
+      - configs/sanitize/.env.movies
     environment:
       - ID={i}
       - INPUT_COPIES={gateway}
@@ -97,7 +97,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sanitize/.env.credits
+      - configs/sanitize/.env.credits
     environment:
       - ID={i}
       - INPUT_COPIES={gateway}
@@ -116,7 +116,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sanitize/.env.ratings
+      - configs/sanitize/.env.ratings
     environment:
       - ID={i}
       - INPUT_COPIES={gateway}
@@ -136,7 +136,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/filter/.env.production_countries_length
+      - configs/filter/.env.production_countries_length
     environment:
       - ID={i}
       - INPUT_COPIES={sanitize_movies}
@@ -155,7 +155,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/filter/.env.release_date_since_2000
+      - configs/filter/.env.release_date_since_2000
     environment:
       - ID={i}
       - INPUT_COPIES={sanitize_movies}
@@ -174,7 +174,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/filter/.env.release_date_upto_2010
+      - configs/filter/.env.release_date_upto_2010
     environment:
       - ID={i}
       - INPUT_COPIES={filter_production_countries_argentina_spain}
@@ -193,7 +193,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/filter/.env.production_countries_argentina
+      - configs/filter/.env.production_countries_argentina
     environment:
       - ID={i}
       - INPUT_COPIES={filter_release_date_since_2000}
@@ -212,7 +212,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/filter/.env.production_countries_argentina_spain
+      - configs/filter/.env.production_countries_argentina_spain
     environment:
       - ID={i}
       - INPUT_COPIES={filter_release_date_since_2000}
@@ -231,7 +231,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/explode/.env.cast
+      - configs/explode/.env.cast
     environment:
       - ID={i}
       - INPUT_COPIES={join_id_id}
@@ -249,7 +249,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/explode/.env.production_countries
+      - configs/explode/.env.production_countries
     environment:
       - ID={i}
       - INPUT_COPIES={filter_production_countries_length}
@@ -268,7 +268,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/groupby/.env.id_title_mean_rating
+      - configs/groupby/.env.id_title_mean_rating
     environment:
       - ID={i}
       - INPUT_COPIES={join_id_movieid}
@@ -286,7 +286,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/groupby/.env.sentiment_mean_rate_revenue_budget
+      - configs/groupby/.env.sentiment_mean_rate_revenue_budget
     environment:
       - ID={i}
       - INPUT_COPIES={sentiment}
@@ -304,7 +304,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/groupby/.env.country_sum_budget
+      - configs/groupby/.env.country_sum_budget
     environment:
       - ID={i}
       - INPUT_COPIES={explode_production_countries}
@@ -322,7 +322,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/groupby/.env.actor_count
+      - configs/groupby/.env.actor_count
     environment:
       - ID={i}
       - INPUT_COPIES={explode_cast}
@@ -341,7 +341,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/divider/.env.revenue_budget
+      - configs/divider/.env.revenue_budget
     environment:
       - ID={i}
       - INPUT_COPIES={sanitize_movies}
@@ -360,7 +360,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sentiment/.env.overview
+      - configs/sentiment/.env.overview
     environment:
       - ID={i}
       - INPUT_COPIES={divider}
@@ -379,7 +379,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/top/.env.10_count
+      - configs/top/.env.10_count
     environment:
       - ID={i}
       - INPUT_COPIES={groupby_actor_count}
@@ -397,7 +397,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/top/.env.5_budget
+      - configs/top/.env.5_budget
     environment:
       - ID={i}
       - INPUT_COPIES={groupby_country_sum_budget}
@@ -416,7 +416,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/minmax/.env.rating
+      - configs/minmax/.env.rating
     environment:
       - ID={i}
       - INPUT_COPIES={groupby_id_title_mean_rating}
@@ -435,7 +435,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/join/.env.id_movieId
+      - configs/join/.env.id_movieId
     environment:
       - ID={i}
       - INPUT_COPIES={filter_production_countries_argentina},{sanitize_ratings}
@@ -453,7 +453,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/join/.env.id_id
+      - configs/join/.env.id_id
     environment:
       - ID={i}
       - INPUT_COPIES={filter_production_countries_argentina},{sanitize_credits}
@@ -472,7 +472,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sink/.env.1
+      - configs/sink/.env.1
     environment:
       - ID={i}
       - INPUT_COPIES={filter_release_date_upto_2010}
@@ -490,7 +490,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sink/.env.2
+      - configs/sink/.env.2
     environment:
       - ID={i}
       - INPUT_COPIES={top_5_budget}
@@ -508,7 +508,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sink/.env.3
+      - configs/sink/.env.3
     environment:
       - ID={i}
       - INPUT_COPIES={minmax_rating}
@@ -526,7 +526,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sink/.env.4
+      - configs/sink/.env.4
     environment:
       - ID={i}
       - INPUT_COPIES={top_10_count}
@@ -544,7 +544,7 @@ def generate_docker_compose(
         condition: service_healthy
     env_file:
       - workers/.env
-      - envs/sink/.env.5
+      - configs/sink/.env.5
     environment:
       - ID={i}
       - INPUT_COPIES={groupby_sentiment_mean_rate_revenue_budget}
@@ -555,7 +555,7 @@ def generate_docker_compose(
 
 
 if __name__ == "__main__":
-    config_path = Path("generate_compose_config.json")
+    config_path = Path("configs/generate_compose_config.json")
 
     if not config_path.exists():
         print(f"Error: Config file not found at {config_path}")
