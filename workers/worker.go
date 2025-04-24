@@ -52,22 +52,24 @@ func New(con *config.Config, log *logging.Logger) (*Worker, error) {
 }
 
 func (base *Worker) Run(w IWorker) error {
-	handlers := map[int]func([]byte) bool{
-		protocol.BATCH: w.Batch,
-		protocol.ERROR: w.Error,
-		protocol.EOF: func(data []byte) bool {
-			base.eofsRecv += 1
-
-			if base.eofsRecv < base.con.InputCopies {
-				return false
-			}
-
-			return w.Eof(data)
-		},
-	}
 
 	base.Log.Infof("Running...")
-	for _, q := range base.inputQueues {
+	for i, q := range base.inputQueues {
+		handlers := map[int]func([]byte) bool{
+			protocol.BATCH: w.Batch,
+			protocol.ERROR: w.Error,
+			protocol.EOF: func(data []byte) bool {
+				base.eofsRecv += 1
+
+				if base.eofsRecv < base.con.InputCopies[i] {
+					return false
+				}
+
+				base.eofsRecv = 0
+				return w.Eof(data)
+			},
+		}
+
 		ch, err := base.mailer.Consume(q)
 		if err != nil {
 			return err

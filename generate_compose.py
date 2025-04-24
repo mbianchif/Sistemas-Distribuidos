@@ -438,7 +438,7 @@ def generate_docker_compose(
       - envs/join/.env.id_movieId
     environment:
       - ID={i}
-      - INPUT_COPIES={filter_production_countries_argentina + sanitize_ratings}
+      - INPUT_COPIES={filter_production_countries_argentina},{sanitize_ratings}
       - OUTPUT_COPIES={groupby_id_title_mean_rating}
 """
     for i in range(join_id_id):
@@ -456,7 +456,7 @@ def generate_docker_compose(
       - envs/join/.env.id_id
     environment:
       - ID={i}
-      - INPUT_COPIES={filter_production_countries_argentina + sanitize_credits}
+      - INPUT_COPIES={filter_production_countries_argentina},{sanitize_credits}
       - OUTPUT_COPIES={explode_cast}
 """
     for i in range(sink_1):

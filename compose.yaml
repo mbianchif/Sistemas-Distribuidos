@@ -423,7 +423,7 @@ services:
       - envs/join/.env.id_movieId
     environment:
       - ID=0
-      - INPUT_COPIES=2
+      - INPUT_COPIES=1,1
       - OUTPUT_COPIES=1
 
   #### Joins ####
@@ -440,7 +440,7 @@ services:
       - envs/join/.env.id_movieId
     environment:
       - ID=1
-      - INPUT_COPIES=2
+      - INPUT_COPIES=1,1
       - OUTPUT_COPIES=1
 
   join-id_id-0:
@@ -456,7 +456,7 @@ services:
       - envs/join/.env.id_id
     environment:
       - ID=0
-      - INPUT_COPIES=2
+      - INPUT_COPIES=1,1
       - OUTPUT_COPIES=2
 
   #### Sinks ####
