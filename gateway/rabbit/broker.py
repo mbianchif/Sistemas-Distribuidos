@@ -1,110 +1,84 @@
 import pika
 import logging
 from functools import partial
-from ..config.config import Config
 
 
 class Broker:
     def __init__(self, config):
         logging.getLogger("pika").setLevel(logging.WARNING)
-        self._outputexchange_name = config.outputExchangeName
-        self._input_queue_name = config.inputQueueNames[0]
+        self._config = config
 
+    def initialize(self) -> tuple[dict[int, int], list[str]]:
         try:
+            # Init input
             self._recvconn = pika.BlockingConnection(
                 pika.ConnectionParameters(host="rabbitmq")
             )
+            self._recvchan = self._recvconn.channel()
+            self._init_input()
+
+            # Init output
             self._sendconn = pika.BlockingConnection(
                 pika.ConnectionParameters(host="rabbitmq")
             )
-
-            self._recvchan = self._recvconn.channel()
             self._sendchan = self._sendconn.channel()
+            output_fmts = self._init_output()
 
-            self.inputQueues = self._declare_side(
-                self._recvchan,
-                config.inputExchangeName,
-                config.inputExchangeType,
-                config.inputQueueNames,
-                config.inputQueueKeys,
-            )
+            return {i + 1: copies for i, copies in enumerate(self._config.inputCopies)}, output_fmts
 
-            self.outputQueues = self._declare_side(
-                self._sendchan,
-                self._outputexchange_name,
-                config.outputExchangeType,
-                config.outputQueueNames,
-                config.outputQueueKeys,
-            )
         except Exception as e:
             logging.critical(f"Failed to connect with RabbitMQ: {e}")
             raise
 
-    def _init_input(self, chan, config: Config):
-        exchange_name = config.inputExchangeName
-        q_name = config.inputQueueName
-        
-        chan.exchange_declare(
+    def _init_input(self):
+        exchange_name = self._config.inputExchangeName
+        q_name = self._config.inputQueueName + f"-{self._config.id}"
+
+        self._recvchan.exchange_declare(
             exchange=exchange_name,
             exchange_type="direct",
             durable=True,
         )
 
-        chan.queue_declare(queue=q_name)
-        return chan.queue_bind(
+        self._recvchan.queue_declare(queue=q_name)
+        self._recvchan.queue_bind(
             exchange=exchange_name,
-            exchange_type="direct",
-            durable=True
+            queue=q_name,
+            routing_key=q_name,
         )
 
-    def _init_output(self, chan, config: Config):
-        exchange_name = config.outputExchangeName
-        q_names = config.outputQueueNames
-        q_copies = config.outputCopies
+    def _init_output(self) -> list[str]:
+        exchange_name = self._config.outputExchangeName
+        q_names = self._config.outputQueueNames
+        q_copies = self._config.outputCopies
 
-        chan.exchange_declare(
+        self._sendchan.exchange_declare(
             exchange=exchange_name,
             exchange_type="direct",
             durable=True,
         )
 
+        output_fmts = []
         for i in range(len(q_names)):
             q_fmt = q_names[i] + "-{}"
+            output_fmts.append(q_fmt)
+
             for id in range(q_copies[i]):
                 q_name = q_fmt.format(id)
 
-                chan.queue_declare(queue=q_name)
-                q = chan.queue_bind(
+                self._sendchan.queue_declare(queue=q_name)
+                self._sendchan.queue_bind(
                     exchange=exchange_name,
-                    exchange_type="direct",
-                    durable=True,
+                    queue=q_name,
+                    routing_key=q_name,
                 )
 
-
-
-    def _declare_side(self, chan, exchange_name, exchange_type, queues_name, queues_keys):
-        chan.exchange_declare(
-            exchange=exchange_name,
-            exchange_type=exchange_type,
-            durable=True,
-        )
-
-        qs = []
-        for i, queue in enumerate(queues_name):
-            chan.queue_declare(queue=queue)
-            q = chan.queue_bind(
-                exchange=exchange_name,
-                queue=queue,
-                routing_key=queues_keys[i],
-            )
-            qs.append(q)
-
-        return qs
+        return output_fmts
 
     def publish(self, routing_key: str, body: str | bytes):
         try:
             self._sendchan.basic_publish(
-                exchange=self._outputexchange_name,
+                exchange=self._config.outputExchangeName,
                 routing_key=routing_key,
                 body=body,
             )
@@ -115,7 +89,7 @@ class Broker:
     def consume(self, consumer, callback, conn):
         try:
             self._recvchan.basic_consume(
-                queue=self._input_queue_name,
+                queue=self._config.inputQueueName + "-0",
                 on_message_callback=partial(callback, conn),
                 auto_ack=False,
                 exclusive=False,

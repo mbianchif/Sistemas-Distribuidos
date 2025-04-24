@@ -62,6 +62,7 @@ services:
     env_file:
       - configs/gateway/.env.gateway
     environment:
+      - ID={gateway}
       - INPUT_COPIES={sink_1},{sink_2},{sink_3},{sink_4},{sink_5}
       - OUTPUT_COPIES={sanitize_movies},{sanitize_credits},{sanitize_ratings}
 """
