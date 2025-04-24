@@ -12,22 +12,6 @@ El worker `Sentiment`:
 - Publica los resultados procesados.
 - Maneja el mensaje de fin de flujo (`EOF`) y mensajes de error.
 
-## 🚀 Métodos principales
-
-### `New(con *config.SentimentConfig, log *logging.Logger) (*Sentiment, error)`
-Inicializa el worker y carga el modelo de análisis de sentimientos preentrenado.
-
-### `Run() error`
-Ejecuta el ciclo de vida del worker, delegando en la lógica base.
-
-### `Batch(data []byte) bool`
-Decodifica los datos entrantes y procesa cada mensaje aplicando análisis de sentimiento al campo `"overview"`.
-
-### `Eof(data []byte) bool`
-Publica el mensaje de fin de flujo (`EOF`) cuando se recibe.
-
-### `Error(data []byte) bool`
-Registra un error al recibir un mensaje inesperado o mal formado.
 
 ## 🧠 Análisis de Sentimiento
 
