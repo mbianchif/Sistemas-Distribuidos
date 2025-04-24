@@ -31,25 +31,22 @@ func (m *Mailer) Init() ([]amqp.Queue, error) {
 	}
 
 	m.senders = m.initSenders(outputQFmts)
-	m.broker.log.Infof("inputQs: %v", inputQs)
-	m.broker.log.Infof("outputQs: %v", m.senders)
 	return inputQs, nil
 }
 
 func (m *Mailer) initSenders(outputQFmts []string) []Sender {
 	delTypes := m.broker.con.OutputDeliveryTypes
-	inputQCopies := m.broker.con.InputCopies
 	outputQCopies := m.broker.con.OutputCopies
 	senders := make([]Sender, 0, len(delTypes))
 
 	for i := range outputQFmts {
 		var sender Sender
 		if delTypes[i] == "robin" {
-			sender = NewRobin(m.broker, outputQFmts[i], inputQCopies[i], outputQCopies[i], m.broker.log)
+			sender = NewRobin(m.broker, outputQFmts[i], outputQCopies[i], m.broker.log)
 		} else {
 			parts := strings.Split(delTypes[i], ":")
 			key := parts[1]
-			sender = NewShard(m.broker, outputQFmts[i], key, inputQCopies[i], outputQCopies[i], m.broker.log)
+			sender = NewShard(m.broker, outputQFmts[i], key, outputQCopies[i], m.broker.log)
 		}
 
 		senders = append(senders, sender)

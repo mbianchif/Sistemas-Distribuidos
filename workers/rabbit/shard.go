@@ -12,18 +12,15 @@ type SenderShard struct {
 	broker       *Broker
 	fmt          string
 	key          string
-	inputCopies  int
 	outputCopies int
-	eofsRecv     int
 	log          *logging.Logger
 }
 
-func NewShard(broker *Broker, fmt string, key string, inputCopies int, outputCopies int, log *logging.Logger) *SenderShard {
+func NewShard(broker *Broker, fmt string, key string, outputCopies int, log *logging.Logger) *SenderShard {
 	return &SenderShard{
 		broker: broker,
 		fmt: fmt,
 		key: key,
-		inputCopies: inputCopies,
 		outputCopies: outputCopies,
 		log: log,
 	}
@@ -89,23 +86,11 @@ func (s *SenderShard) BatchWithQuery(batch protocol.Batch, filterCols map[string
 }
 
 func (s *SenderShard) Eof(eof protocol.Eof) error {
-	s.eofsRecv += 1
-
-	if s.eofsRecv < s.outputCopies {
-		return nil
-	}
-
 	body := eof.Encode()
 	return s.broadcast(body)
 }
 
 func (s *SenderShard) EofWithQuery(eof protocol.Eof, query int) error {
-	s.eofsRecv += 1
-
-	if s.eofsRecv < s.outputCopies {
-		return nil
-	}
-
 	body := eof.EncodeWithQuery(query)
 	return s.broadcast(body)
 }

@@ -14,7 +14,7 @@ type Config struct {
 	Url                 string
 	InputExchangeNames  []string
 	InputQueueNames     []string
-	InputCopies         []int
+	InputCopies         int
 	OutputExchangeName  string
 	OutputQueueNames    []string
 	OutputCopies        []int
@@ -63,19 +63,9 @@ func Create() (*Config, error) {
 	}
 
 	// INPUT_COPIES
-	inputCopiesPerQueueString := os.Getenv("INPUT_COPIES")
-	inputCopiesPerQueueSlice := strings.Split(inputCopiesPerQueueString, ",")
-	inputCopies := make([]int, 0, len(inputCopiesPerQueueSlice))
-	for i, copies := range inputCopiesPerQueueSlice {
-		n, err := strconv.Atoi(copies)
-		if err != nil {
-			return nil, fmt.Errorf("%v'nth copy quantity is not a number: %v", i, copies)
-		}
-		inputCopies = append(inputCopies, n)
-	}
-
-	if len(inputCopies) != len(inputQueueNames) {
-		return nil, fmt.Errorf("the length of input queue names and input copies per queue don't match (names: %v, copies: %v)", len(inputQueueNames), len(inputCopiesPerQueueSlice))
+	inputCopies, err := strconv.Atoi(os.Getenv("INPUT_COPIES"))
+	if err != nil {
+		return nil, fmt.Errorf("input copy quantity is not a number: %v", inputCopies)
 	}
 
 	// OUTPUT_EXCHANGE_NAME

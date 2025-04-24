@@ -20,10 +20,12 @@ type IWorker interface {
 }
 
 type Worker struct {
-	Mailer      *rabbit.Mailer
-	SigChan     chan os.Signal
-	inputQueues []amqp.Queue
 	Log         *logging.Logger
+	mailer      *rabbit.Mailer
+	sigChan     chan os.Signal
+	inputQueues []amqp.Queue
+	eofsRecv int
+	con         *config.Config
 }
 
 func New(con *config.Config, log *logging.Logger) (*Worker, error) {
@@ -41,23 +43,32 @@ func New(con *config.Config, log *logging.Logger) (*Worker, error) {
 	signal.Notify(sigs, syscall.SIGTERM)
 
 	return &Worker{
-		mailer,
-		sigs,
-		inputQueues,
-		log,
+		Log:         log,
+		mailer:      mailer,
+		sigChan:     sigs,
+		inputQueues: inputQueues,
+		con:         con,
 	}, nil
 }
 
 func (base *Worker) Run(w IWorker) error {
 	handlers := map[int]func([]byte) bool{
 		protocol.BATCH: w.Batch,
-		protocol.EOF:   w.Eof,
 		protocol.ERROR: w.Error,
+		protocol.EOF: func(data []byte) bool {
+			base.eofsRecv += 1
+
+			if base.eofsRecv < base.con.InputCopies {
+				return false
+			}
+
+			return w.Eof(data)
+		},
 	}
 
 	base.Log.Infof("Running...")
 	for _, q := range base.inputQueues {
-		ch, err := base.Mailer.Consume(q)
+		ch, err := base.mailer.Consume(q)
 		if err != nil {
 			return err
 		}
@@ -65,7 +76,7 @@ func (base *Worker) Run(w IWorker) error {
 		exit := false
 		for !exit {
 			select {
-			case <-base.SigChan:
+			case <-base.sigChan:
 				base.Log.Info("received SIGTERM")
 				return nil
 
@@ -83,7 +94,6 @@ func (base *Worker) Run(w IWorker) error {
 				} else {
 					exit = handle(data)
 				}
-
 			}
 		}
 	}
@@ -92,26 +102,26 @@ func (base *Worker) Run(w IWorker) error {
 }
 
 func (base *Worker) PublishBatch(batch protocol.Batch) error {
-	return base.Mailer.PublishBatch(batch)
+	return base.mailer.PublishBatch(batch)
 }
 
 func (base *Worker) PublishBatchWithQuery(batch protocol.Batch, query int) error {
-	return base.Mailer.PublishBatchWithQuery(batch, query)
+	return base.mailer.PublishBatchWithQuery(batch, query)
 }
 
 func (base *Worker) PublishEof(eof protocol.Eof) error {
-	return base.Mailer.PublishEof(eof)
+	return base.mailer.PublishEof(eof)
 }
 
 func (base *Worker) PublishEofWithQuery(eof protocol.Eof, query int) error {
-	return base.Mailer.PublishEofWithQuery(eof, query)
+	return base.mailer.PublishEofWithQuery(eof, query)
 }
 
 func (base *Worker) PublishError(erro protocol.Error) error {
-	return base.Mailer.PublishError(erro)
+	return base.mailer.PublishError(erro)
 }
 
 func (w *Worker) Close() {
-	w.Mailer.DeInit()
-	close(w.SigChan)
+	w.mailer.DeInit()
+	close(w.sigChan)
 }
