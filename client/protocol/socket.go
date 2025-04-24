@@ -94,7 +94,7 @@ func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) e
 
 			if !fits(accSize, size, batchSize) {
 				if len(records) == 0 {
-					return fmt.Errorf("BATCH_SIZE should be incremented to let record of size ~%d fly by", size)
+					return fmt.Errorf("BATCH_SIZE should be incremented to let record of size ~%dB through", size)
 				}
 
 				if err := s.sendBatch(records); err != nil {
@@ -187,7 +187,6 @@ func (s *CsvTransferStream) RecvQueryResult(storage string, queryCount int) {
 		dataLength := binary.BigEndian.Uint32(header[:4])
 		kind := int(header[4])
 		query := int(header[5])
-		fmt.Printf("llego tipo %d para la query %d\n", kind, query)
 		if kind == MSG_EOF {
 			s.log.Infof("query %v is ready!", query)
 			done[query] = struct{}{}

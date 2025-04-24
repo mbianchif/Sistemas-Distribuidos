@@ -1,5 +1,4 @@
 {
-    "gateway": 1,
     "filter_production_countries_length": 1,
     "filter_production_countries_argentina_spain": 1,
     "filter_production_countries_argentina": 1,
@@ -23,6 +22,7 @@
     "sink_3": 1,
     "sink_4": 1,
     "sink_5": 1,
+    "gateway": 1,
     "minmax_rating": 1,
     "top_10_count": 1,
     "top_5_budget": 1

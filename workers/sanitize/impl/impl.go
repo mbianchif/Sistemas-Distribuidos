@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"io"
-	"strconv"
 	"strings"
-	"time"
 
 	"workers"
 	"workers/protocol"
@@ -146,16 +144,6 @@ func handleMovie(w *Sanitize, line []string) map[string]string {
 	return fieldMap
 }
 
-func parseTimestamp(timestamp string) (string, error) {
-	unixEpoc, err := strconv.ParseInt(timestamp, 10, 64)
-	if err != nil {
-		return "", err
-	}
-
-	t := time.Unix(unixEpoc, 0)
-	return t.Format("2006-01-02 15:04:05"), nil
-}
-
 func handleRating(w *Sanitize, line []string) map[string]string {
 	if len(line) != 4 {
 		return nil
@@ -167,15 +155,9 @@ func handleRating(w *Sanitize, line []string) map[string]string {
 		}
 	}
 
-	timestamp, err := parseTimestamp(line[3])
-	if err != nil {
-		return nil
-	}
-
 	fields := map[string]string{
 		"movieId":   line[1],
 		"rating":    line[2],
-		"timestamp": timestamp,
 	}
 
 	if !isValidRow(fields) {
