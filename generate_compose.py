@@ -31,7 +31,7 @@ def generate_pipeline_compose(
     top_5_budget,
     join_id_movieid,
     join_id_id
-):
+) -> str:
     docker_compose = "name: moviesanalyzer"
     docker_compose += f"""
 services:
@@ -51,7 +51,8 @@ services:
 
   gateway:
     container_name: gateway
-    build: gateway
+    build:
+      dockerfile: build/gateway.Dockerfile
     networks:
       - my-network
     ports:
@@ -60,7 +61,7 @@ services:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - configs/gateway/.env.gateway
+      - configs/gateway/.env
     environment:
       - ID={gateway}
       - INPUT_COPIES={sink_1},{sink_2},{sink_3},{sink_4},{sink_5}
@@ -73,16 +74,15 @@ services:
   sanitize-movies-{i}:
     container_name: sanitize-movies-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/sanitize.Dockerfile
+      dockerfile: build/sanitize.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/sanitize/.env.movies
+      - configs/workers/.env
+      - configs/workers/sanitize/.env.movies
     environment:
       - ID={i}
       - INPUT_COPIES={gateway}
@@ -94,16 +94,15 @@ services:
   sanitize-credits-{i}:
     container_name: sanitize-credits-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/sanitize.Dockerfile
+      dockerfile: build/sanitize.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/sanitize/.env.credits
+      - configs/workers/.env
+      - configs/workers/sanitize/.env.credits
     environment:
       - ID={i}
       - INPUT_COPIES={gateway}
@@ -115,16 +114,15 @@ services:
   sanitize-ratings-{i}:
     container_name: sanitize-ratings-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/sanitize.Dockerfile
+      dockerfile: build/sanitize.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/sanitize/.env.ratings
+      - configs/workers/.env
+      - configs/workers/sanitize/.env.ratings
     environment:
       - ID={i}
       - INPUT_COPIES={gateway}
@@ -137,16 +135,15 @@ services:
   filter-production_countries_length-{i}:
     container_name: filter-production_countries_length-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/filter.Dockerfile
+      dockerfile: build/filter.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/filter/.env.production_countries_length
+      - configs/workers/.env
+      - configs/workers/filter/.env.production_countries_length
     environment:
       - ID={i}
       - INPUT_COPIES={sanitize_movies}
@@ -158,16 +155,15 @@ services:
   filter-release_date_since_2000-{i}:
     container_name: filter-release_date_since_2000-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/filter.Dockerfile
+      dockerfile: build/filter.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/filter/.env.release_date_since_2000
+      - configs/workers/.env
+      - configs/workers/filter/.env.release_date_since_2000
     environment:
       - ID={i}
       - INPUT_COPIES={sanitize_movies}
@@ -179,16 +175,15 @@ services:
   filter-release_date_upto_2010-{i}:
     container_name: filter-release_date_upto_2010-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/filter.Dockerfile
+      dockerfile: build/filter.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/filter/.env.release_date_upto_2010
+      - configs/workers/.env
+      - configs/workers/filter/.env.release_date_upto_2010
     environment:
       - ID={i}
       - INPUT_COPIES={filter_production_countries_argentina_spain}
@@ -200,16 +195,15 @@ services:
   filter-production_countries_argentina-{i}:
     container_name: filter-production_countries_argentina-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/filter.Dockerfile
+      dockerfile: build/filter.Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
     networks:
       - my-network
     env_file:
-      - workers/.env
-      - configs/filter/.env.production_countries_argentina
+      - configs/workers/.env
+      - configs/workers/filter/.env.production_countries_argentina
     environment:
       - ID={i}
       - INPUT_COPIES={filter_release_date_since_2000}
@@ -221,16 +215,15 @@ services:
   filter-production_countries_argentina_spain-{i}:
     container_name: filter-production_countries_argentina_spain-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/filter.Dockerfile
+      dockerfile: build/filter.Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
     networks:
       - my-network
     env_file:
-      - workers/.env
-      - configs/filter/.env.production_countries_argentina_spain
+      - configs/workers/.env
+      - configs/workers/filter/.env.production_countries_argentina_spain
     environment:
       - ID={i}
       - INPUT_COPIES={filter_release_date_since_2000}
@@ -243,16 +236,15 @@ services:
   explode-cast-{i}:
     container_name: explode-cast-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/explode.Dockerfile
+      dockerfile: build/explode.Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
     networks:
       - my-network
     env_file:
-      - workers/.env
-      - configs/explode/.env.cast
+      - configs/workers/.env
+      - configs/workers/explode/.env.cast
     environment:
       - ID={i}
       - INPUT_COPIES={join_id_id}
@@ -264,16 +256,15 @@ services:
   explode-production_countries-{i}:
     container_name: explode-production_countries-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/explode.Dockerfile
+      dockerfile: build/explode.Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
     networks:
       - my-network
     env_file:
-      - workers/.env
-      - configs/explode/.env.production_countries
+      - configs/workers/.env
+      - configs/workers/explode/.env.production_countries
     environment:
       - ID={i}
       - INPUT_COPIES={filter_production_countries_length}
@@ -286,16 +277,15 @@ services:
   groupby-id_title_mean_rating-{i}:
     container_name: groupby-id_title_mean_rating-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/groupby.Dockerfile
+      dockerfile: build/groupby.Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
     networks:
       - my-network
     env_file:
-      - workers/.env
-      - configs/groupby/.env.id_title_mean_rating
+      - configs/workers/.env
+      - configs/workers/groupby/.env.id_title_mean_rating
     environment:
       - ID={i}
       - INPUT_COPIES={join_id_movieid}
@@ -307,16 +297,15 @@ services:
   groupby-sentiment_mean_rate_revenue_budget-{i}:
     container_name: groupby-sentiment_mean_rate_revenue_budget-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/groupby.Dockerfile
+      dockerfile: build/groupby.Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
     networks:
       - my-network
     env_file:
-      - workers/.env
-      - configs/groupby/.env.sentiment_mean_rate_revenue_budget
+      - configs/workers/.env
+      - configs/workers/groupby/.env.sentiment_mean_rate_revenue_budget
     environment:
       - ID={i}
       - INPUT_COPIES={sentiment}
@@ -328,16 +317,15 @@ services:
   groupby-country_sum_budget-{i}:
     container_name: groupby-country_sum_budget-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/groupby.Dockerfile
+      dockerfile: build/groupby.Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
     networks:
       - my-network
     env_file:
-      - workers/.env
-      - configs/groupby/.env.country_sum_budget
+      - configs/workers/.env
+      - configs/workers/groupby/.env.country_sum_budget
     environment:
       - ID={i}
       - INPUT_COPIES={explode_production_countries}
@@ -349,16 +337,15 @@ services:
   groupby-actor_count-{i}:
     container_name: groupby-actor_count-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/groupby.Dockerfile
+      dockerfile: build/groupby.Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
     networks:
       - my-network
     env_file:
-      - workers/.env
-      - configs/groupby/.env.actor_count
+      - configs/workers/.env
+      - configs/workers/groupby/.env.actor_count
     environment:
       - ID={i}
       - INPUT_COPIES={explode_cast}
@@ -371,16 +358,15 @@ services:
   divider-{i}:
     container_name: divider-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/divider.Dockerfile
+      dockerfile: build/divider.Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
     networks:
       - my-network
     env_file:
-      - workers/.env
-      - configs/divider/.env.revenue_budget
+      - configs/workers/.env
+      - configs/workers/divider/.env.revenue_budget
     environment:
       - ID={i}
       - INPUT_COPIES={sanitize_movies}
@@ -393,16 +379,15 @@ services:
   sentiment-{i}:
     container_name: sentiment-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/sentiment.Dockerfile
+      dockerfile: build/sentiment.Dockerfile
     depends_on:
       rabbitmq:
         condition: service_healthy
     networks:
       - my-network
     env_file:
-      - workers/.env
-      - configs/sentiment/.env.overview
+      - configs/workers/.env
+      - configs/workers/sentiment/.env.overview
     environment:
       - ID={i}
       - INPUT_COPIES={divider}
@@ -415,16 +400,15 @@ services:
   top-10_count-{i}:
     container_name: top-10_count-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/top.Dockerfile
+      dockerfile: build/top.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/top/.env.10_count
+      - configs/workers/.env
+      - configs/workers/top/.env.10_count
     environment:
       - ID={i}
       - INPUT_COPIES={groupby_actor_count}
@@ -436,16 +420,15 @@ services:
   top-5_budget-{i}:
     container_name: top-5_budget-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/top.Dockerfile
+      dockerfile: build/top.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/top/.env.5_budget
+      - configs/workers/.env
+      - configs/workers/top/.env.5_budget
     environment:
       - ID={i}
       - INPUT_COPIES={groupby_country_sum_budget}
@@ -458,16 +441,15 @@ services:
   minmax-rating-{i}:
     container_name: minmax-rating-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/minmax.Dockerfile
+      dockerfile: build/minmax.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/minmax/.env.rating
+      - configs/workers/.env
+      - configs/workers/minmax/.env.rating
     environment:
       - ID={i}
       - INPUT_COPIES={groupby_id_title_mean_rating}
@@ -480,16 +462,15 @@ services:
   join-id_movieid-{i}:
     container_name: join-id_movieid-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/join.Dockerfile
+      dockerfile: build/join.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/join/.env.id_movieId
+      - configs/workers/.env
+      - configs/workers/join/.env.id_movieId
     environment:
       - ID={i}
       - INPUT_COPIES={filter_production_countries_argentina},{sanitize_ratings}
@@ -501,16 +482,15 @@ services:
   join-id_id-{i}:
     container_name: join-id_id-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/join.Dockerfile
+      dockerfile: build/join.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/join/.env.id_id
+      - configs/workers/.env
+      - configs/workers/join/.env.id_id
     environment:
       - ID={i}
       - INPUT_COPIES={filter_production_countries_argentina},{sanitize_credits}
@@ -523,16 +503,15 @@ services:
   sink-1-{i}:
     container_name: sink-1-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/sink.Dockerfile
+      dockerfile: build/sink.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/sink/.env.1
+      - configs/workers/.env
+      - configs/workers/sink/.env.1
     environment:
       - ID={i}
       - INPUT_COPIES={filter_release_date_upto_2010}
@@ -544,16 +523,15 @@ services:
   sink-2-{i}:
     container_name: sink-2-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/sink.Dockerfile
+      dockerfile: build/sink.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/sink/.env.2
+      - configs/workers/.env
+      - configs/workers/sink/.env.2
     environment:
       - ID={i}
       - INPUT_COPIES={top_5_budget}
@@ -565,16 +543,15 @@ services:
   sink-3-{i}:
     container_name: sink-3-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/sink.Dockerfile
+      dockerfile: build/sink.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/sink/.env.3
+      - configs/workers/.env
+      - configs/workers/sink/.env.3
     environment:
       - ID={i}
       - INPUT_COPIES={minmax_rating}
@@ -586,16 +563,15 @@ services:
   sink-4-{i}:
     container_name: sink-4-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/sink.Dockerfile
+      dockerfile: build/sink.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/sink/.env.4
+      - configs/workers/.env
+      - configs/workers/sink/.env.4
     environment:
       - ID={i}
       - INPUT_COPIES={top_10_count}
@@ -607,16 +583,15 @@ services:
   sink-5-{i}:
     container_name: sink-5-{i}
     build:
-      context: workers
-      dockerfile: dockerfiles/sink.Dockerfile
+      dockerfile: build/sink.Dockerfile
     networks:
       - my-network
     depends_on:
       rabbitmq:
         condition: service_healthy
     env_file:
-      - workers/.env
-      - configs/sink/.env.5
+      - configs/workers/.env
+      - configs/workers/sink/.env.5
     environment:
       - ID={i}
       - INPUT_COPIES={groupby_sentiment_mean_rate_revenue_budget}
@@ -631,17 +606,18 @@ networks:
 
     return docker_compose
 
-def generate_client_compose():
+def generate_client_compose() -> str:
     compose = """name: clients
 services:
   client:
     container_name: client
-    build: client
-    env_file: client/.env
+    build:
+      dockerfile: build/client.Dockerfile
     volumes:
       - .data:/data
     networks:
       - my-network
+    env_file: configs/client/.env
 
 networks:
   my-network:
