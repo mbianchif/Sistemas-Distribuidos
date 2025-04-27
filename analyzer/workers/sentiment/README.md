@@ -1,4 +1,4 @@
-# Sentiment Worker – Sistema Distribuido de Análisis de Películas
+# Sentiment Worker
 
 Este worker `Sentiment` realiza análisis de sentimientos sobre datos textuales, particularmente sobre el campo `"overview"` de cada mensaje recibido. Utiliza un modelo preentrenado de lenguaje natural para clasificar el contenido como **positivo** o **negativo**.
 

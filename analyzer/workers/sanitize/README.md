@@ -1,4 +1,4 @@
-# Sanitize Worker – Sistema Distribuido de Limpieza de Datos de Películas
+# Sanitize Worker
 
 Este módulo implementa un worker `Sanitize`, cuya funcionalidad consiste en **limpiar, transformar y validar registros** provenientes de archivos CSV para su posterior análisis en un sistema distribuido.
 
@@ -44,8 +44,7 @@ Transformaciones:
 
 La estructura de configuración (`SanitizeConfig`) debe definir:
 
-- `Handler`: Tipo de dataset a sanitizar (`movies`, `credits`, `ratings`).
-- `Config`: Configuración general del worker base.
+- `HANDLER`: Tipo de dataset a sanitizar (`movies`, `credits`, `ratings`).
 
 ## 🧩 Integración
 

@@ -1,4 +1,4 @@
-# Filter Worker – Sistema Distribuido de Filtrado de Datos
+# Filter Worker
 
 Este módulo implementa un worker `Filter`, cuya funcionalidad consiste en **filtrar registros** dentro de un flujo de datos, según condiciones definidas dinámicamente en la configuración.
 
@@ -7,7 +7,7 @@ Este módulo implementa un worker `Filter`, cuya funcionalidad consiste en **fil
 El worker `Filter`:
 
 - Recibe batches de datos codificados.
-- Aplica un filtro específico a cada registro, según una clave (`Key`) y un valor (`Value`) configurados.
+- Aplica un filtro específico a cada registro, según una clave (`KEY`) y un valor (`VALUE`) configurados.
 - Si un registro cumple con la condición, se incluye en el batch de salida.
 - En caso contrario, se descarta.
 - Al final del flujo (`EOF`), publica un mensaje de cierre.
@@ -16,13 +16,12 @@ El worker `Filter`:
 
 La estructura de configuración (`FilterConfig`) debe definir:
 
-- `Key`: Clave sobre la cual se aplica el filtro.
-- `Value`: Valor de referencia usado para evaluar la condición.
+- `KEY`: Clave sobre la cual se aplica el filtro.
+- `VALUE`: Valor de referencia usado para evaluar la condición.
 - `Handler`: Tipo de filtro a aplicar. Puede ser:
   - `"range"`: Evalúa si el año (extraído de una fecha) está dentro de un rango solo inclusivo a la izquierda.
   - `"contains"`: Verifica si el campo contiene todos los valores especificados.
   - `"length"`: Verifica si el campo tiene una cantidad determinada de elementos.
-- `Config`: Configuración general del worker base.
 
 ## 🧠 Tipos de filtro
 

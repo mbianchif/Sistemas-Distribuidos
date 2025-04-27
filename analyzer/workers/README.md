@@ -1,25 +1,18 @@
-# Worker
+# Worker – Sistema Distribuido 
 
-## Variables
-```sh
-# .env
-RABBIT_URL=amqp://guest:guest@rabbitmq:5672/
-LOG_LEVEL=DEBUG | INFO | NOTICE | WARNING | ERROR | CRITICAL
+Este módulo implementa la base de los workers que implementa la comunicación con rabbit.
 
-# Docker Compose
+## 🔐 Configuración
 
-# Input
-INPUT_EXCHANGE_NAME=%string
-INPUT_EXCHANGE_TYPE=direct | fanout | topic | headers
-INPUT_QUEUE_NAMES=%[string]
-INPUT_QUEUE_KEYS=%[string]
+La estructura de configuración (`Worker`) debe definir:
 
-# Output
-OUTPUT_EXCHANGE_NAME=%string
-OUTPUT_EXCHANGE_TYPE=direct | fanout | topic | headers
-OUTPUT_QUEUE_NAMES=%[string,]
-OUTPUT_QUEUE_KEYS=%[string,]
-
-# Worker
-SELECT=%[string,]
-```
+- `RABBIT_URL`: Url al proceso que corre el servicio de rabbitmq.
+- `LOG_LEVEL`: Nivel de logeo.
+- `INPUT_EXCHANGE_NAMES`: Lista de nombres de los exchanges de input.
+- `INPUT_QUEUE_NAMES`: Lista de nombres de las colas para cada exchange (1:1).
+- `OUTPUT_EXCHANGE_NAME`: Nombre del exchange de output.
+- `OUTPUT_QUEUE_NAMES`: Lista de nombres de las colas de output.
+- `OUTPUT_DELIVERY_TYPES`: Lista de tipo de delivery por cada cola.
+    - `robin`: Despachará los mensajes en estilo _round-robin_ entre las réplicas.
+    - `shard:{key}`: Despachará los mensajes en estilo _shard_ utilizando la clave proveída.
+- `SELECT`: Lista de nombres de columnas que sobreviviran al procesado.

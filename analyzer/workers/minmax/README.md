@@ -1,4 +1,4 @@
-# MinMax Worker – Sistema Distribuido de Identificación de Mínimos y Máximos
+# MinMax Worker
 
 Este módulo implementa un worker `MinMax`, cuya funcionalidad consiste en **identificar los elementos con el valor mínimo y máximo** de una clave numérica específica en un flujo de datos procesado en batches.
 
@@ -7,7 +7,7 @@ Este módulo implementa un worker `MinMax`, cuya funcionalidad consiste en **ide
 El worker `MinMax`:
 
 - Recibe batches de datos codificados.
-- Extrae el valor asociado a una clave numérica (`Key`) especificada en la configuración.
+- Extrae el valor asociado a una clave numérica (`KEY`) especificada en la configuración.
 - Compara y mantiene una referencia al elemento con el valor **mínimo** y al de **máximo** observado hasta el momento.
 - Al finalizar el flujo (`EOF`), publica ambos elementos (mínimo y máximo) a través de la cola correspondiente.
 
@@ -15,8 +15,7 @@ El worker `MinMax`:
 
 La estructura de configuración (`MinMaxConfig`) debe definir:
 
-- `Key`: Clave sobre la cual se realiza la comparación (debe contener valores numéricos).
-- `Config`: Configuración general del worker base.
+- `KEY`: Clave sobre la cual se realiza la comparación (debe contener valores numéricos).
 
 ## 🧠 Lógica de comparación
 
