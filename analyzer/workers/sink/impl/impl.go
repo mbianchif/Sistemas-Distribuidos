@@ -1,11 +1,12 @@
 package impl
 
 import (
-	"analyzer/workers"
 	"analyzer/comms"
+	"analyzer/workers"
 	"analyzer/workers/sink/config"
 
 	"github.com/op/go-logging"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Sink struct {
@@ -35,7 +36,8 @@ func (w *Sink) Batch(data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		batch := comms.NewBatch(responseFieldMaps)
-		if err := w.PublishBatchWithQuery(batch, w.Con.Query); err != nil {
+		headers := amqp.Table{"query": w.Con.Query}
+		if err := w.Mailer.PublishBatch(batch, headers); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -45,7 +47,8 @@ func (w *Sink) Batch(data []byte) bool {
 
 func (w *Sink) Eof(data []byte) bool {
 	eof := comms.DecodeEof(data)
-	if err := w.PublishEofWithQuery(eof, w.Con.Query); err != nil {
+	headers := amqp.Table{"query": w.Con.Query}
+	if err := w.Mailer.PublishEof(eof, headers); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 	return true

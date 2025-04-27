@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 var name2Id = map[string]int{
@@ -69,33 +67,7 @@ var id2Name = []string{
 const (
 	BATCH = iota
 	EOF
-	ERROR
 )
-
-/*
-
-1 Tipo
-	- Batch
-		- Payload
-			\n separated
-	- EOF
-*/
-
-func ReadDelivery(del amqp.Delivery) (int, []byte) {
-	body := del.Body
-	if len(body) < 1 {
-		return ERROR, nil
-	}
-	return int(body[0]), body[1:]
-}
-
-func ReadDeliveryWithQuery(del amqp.Delivery) (int, int, []byte) {
-	body := del.Body
-	if len(body) < 2 {
-		return ERROR, -1, nil
-	}
-	return int(body[0]), int(body[1]), body[2:]
-}
 
 type Batch struct {
 	FieldMaps []map[string]string
@@ -103,6 +75,47 @@ type Batch struct {
 
 func NewBatch(fieldMaps []map[string]string) Batch {
 	return Batch{fieldMaps}
+}
+
+func DecodeLine(data []byte) (map[string]string, error) {
+	fields := make(map[string]string, 12)
+
+	for kv := range bytes.SplitSeq(data, []byte(";")) {
+		pair := bytes.Split(kv, []byte("="))
+		if len(pair) != 2 {
+			continue
+		}
+
+		keyNum, err := strconv.Atoi(string(pair[0]))
+		if err != nil || keyNum >= len(id2Name) {
+			continue
+		}
+
+		if keyNum > len(id2Name) {
+			return nil, fmt.Errorf("%v field is not supported by the protocol, must add", err)
+		}
+
+		keyName := id2Name[keyNum]
+		fields[keyName] = string(pair[1])
+	}
+
+	return fields, nil
+}
+
+func DecodeBatch(data []byte) (*Batch, error) {
+	lines := bytes.Split(data, []byte("\n"))
+	fieldMaps := make([]map[string]string, 0, len(lines))
+
+	for _, line := range lines {
+		fieldMap, err := DecodeLine(line)
+		if err != nil {
+			return nil, err
+		}
+
+		fieldMaps = append(fieldMaps, fieldMap)
+	}
+
+	return &Batch{fieldMaps}, nil
 }
 
 func encodeLine(fields map[string]string, filterCols map[string]struct{}) []byte {
@@ -134,7 +147,8 @@ func encodeLine(fields map[string]string, filterCols map[string]struct{}) []byte
 	return bytes
 }
 
-func (m Batch) encodeWithStartingBuffer(filterCols map[string]struct{}, startingBuf []byte) []byte {
+func (m Batch) Encode(filterCols map[string]struct{}) []byte {
+	startingBuf := make([]byte, 0, 1024)
 	buf := bytes.NewBuffer(startingBuf)
 	first := true
 
@@ -151,23 +165,8 @@ func (m Batch) encodeWithStartingBuffer(filterCols map[string]struct{}, starting
 	return buf.Bytes()
 }
 
-func (m Batch) Encode(filterCols map[string]struct{}) []byte {
-	startingBuf := make([]byte, 1, 1024)
-	startingBuf[0] = BATCH
-	return m.encodeWithStartingBuffer(filterCols, startingBuf)
-}
-
-func (m Batch) EncodeWithQuery(filterCols map[string]struct{}, query int) []byte {
-	startingBuf := make([]byte, 2, 1024)
-	startingBuf[0] = BATCH
-	startingBuf[1] = byte(query)
-	return m.encodeWithStartingBuffer(filterCols, startingBuf)
-}
-
 func (m Batch) EncodeForPersistance() []byte {
-	startingBuf := make([]byte, 0, 1024)
-	encoded := m.encodeWithStartingBuffer(nil, startingBuf)
-	return append(encoded, "\n"...)
+	return append(m.Encode(nil), "\n"...)
 }
 
 // Names for the columns in the result for each query
@@ -223,75 +222,16 @@ func (m Batch) ToResult(query int) []byte {
 	return data
 }
 
-func DecodeLine(data []byte) (map[string]string, error) {
-	fields := make(map[string]string, 12)
-
-	for kv := range bytes.SplitSeq(data, []byte(";")) {
-		pair := bytes.Split(kv, []byte("="))
-		if len(pair) != 2 {
-			continue
-		}
-
-		keyNum, err := strconv.Atoi(string(pair[0]))
-		if err != nil || keyNum >= len(id2Name) {
-			continue
-		}
-
-		if keyNum > len(id2Name) {
-			return nil, fmt.Errorf("%v field is not supported by the protocol, must add", err)
-		}
-
-		keyName := id2Name[keyNum]
-		fields[keyName] = string(pair[1])
-	}
-
-	return fields, nil
-}
-
-func DecodeBatch(data []byte) (*Batch, error) {
-	lines := bytes.Split(data, []byte("\n"))
-	fieldMaps := make([]map[string]string, 0, len(lines))
-
-	for _, line := range lines {
-		fieldMap, err := DecodeLine(line)
-		if err != nil {
-			return nil, err
-		}
-
-		fieldMaps = append(fieldMaps, fieldMap)
-	}
-
-	return &Batch{fieldMaps}, nil
-}
-
 type Eof struct{}
-
-func (m Eof) Encode() []byte {
-	return []byte{EOF}
-}
-
-func (m Eof) EncodeWithQuery(query int) []byte {
-	return []byte{EOF, byte(query)}
-}
-
-func (m Eof) ToResult(query int) []byte {
-	return []byte{0, 0, 0, 0, EOF, byte(query)}
-}
 
 func DecodeEof([]byte) Eof {
 	return Eof{}
 }
 
-type Error struct{}
-
-func (m Error) Encode() []byte {
-	return []byte{ERROR}
+func (m Eof) Encode() []byte {
+	return []byte{}
 }
 
-func (m Error) EncodeWithQuery(query int) []byte {
-	return []byte{EOF, byte(query)}
-}
-
-func DecodeError([]byte) Error {
-	return Error{}
+func (m Eof) ToResult(query int) []byte {
+	return []byte{0, 0, 0, 0, EOF, byte(query)}
 }

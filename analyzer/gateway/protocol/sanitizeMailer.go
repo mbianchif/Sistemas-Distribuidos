@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"analyzer/comms"
 	"analyzer/comms/rabbit"
 	"analyzer/gateway/config"
 
@@ -72,11 +73,17 @@ func (s *SanitizeMailer) Consume(q amqp.Queue) (<-chan amqp.Delivery, error) {
 }
 
 func (s *SanitizeMailer) PublishBatch(fileName string, body []byte) error {
-	return s.senders[s.filename2Id[fileName]].Direct(body)
+	baseHeaders := amqp.Table{
+		"kind": comms.BATCH,
+	}
+	return s.senders[s.filename2Id[fileName]].Direct(body, baseHeaders)
 }
 
 func (s *SanitizeMailer) PublishEof(fileName string, body []byte) error {
-	return s.senders[s.filename2Id[fileName]].Broadcast(body)
+	baseHeaders := amqp.Table{
+		"kind": comms.EOF,
+	}
+	return s.senders[s.filename2Id[fileName]].Broadcast(body, baseHeaders)
 }
 
 func (s *SanitizeMailer) DeInit() {

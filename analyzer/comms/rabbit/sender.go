@@ -2,12 +2,11 @@ package rabbit
 
 import (
 	"analyzer/comms"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Sender interface {
-	Batch(comms.Batch, map[string]struct{}) error
-	BatchWithQuery(comms.Batch, map[string]struct{}, int) error
-	Eof(comms.Eof) error
-	EofWithQuery(comms.Eof, int) error
-	Error(comms.Error) error
+	Batch(comms.Batch, map[string]struct{}, amqp.Table) error
+	Eof(comms.Eof, amqp.Table) error
 }

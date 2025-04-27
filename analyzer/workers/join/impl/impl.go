@@ -67,13 +67,10 @@ func store(writer *bufio.Writer, fieldMaps []map[string]string) error {
 }
 
 func joinFieldMaps(left map[string]string, right map[string]string) map[string]string {
-	if len(left) > len(right) {
-		maps.Copy(left, right)
-		return left
-	} else {
-		maps.Copy(right, left)
-		return right
-	}
+	joined := make(map[string]string, len(left)+len(right))
+	maps.Copy(joined, left)
+	maps.Copy(joined, right)
+	return joined
 }
 
 func load(w *Join, fp *os.File, fieldMaps []map[string]string) ([]map[string]string, error) {
@@ -175,17 +172,11 @@ func (w *Join) Eof(data []byte) bool {
 
 		// Send Eof
 		eof := comms.DecodeEof(data)
-		if err := w.PublishEof(eof); err != nil {
+		if err := w.Mailer.PublishEof(eof); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
 
-	return true
-}
-
-func (w *Join) Error(data []byte) bool {
-	w.Log.Error("Received an ERROR message kind")
-	w.readingLeft = false
 	return true
 }
 
@@ -247,7 +238,7 @@ func handleRight(w *Join, data []byte) error {
 		if len(responseFieldMaps) > 0 {
 			w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 			batch := comms.NewBatch(responseFieldMaps)
-			if err := w.PublishBatch(batch); err != nil {
+			if err := w.Mailer.PublishBatch(batch); err != nil {
 				w.Log.Errorf("failed to publish message: %v", err)
 			}
 		}

@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"maps"
 	"strings"
 
 	"analyzer/comms"
@@ -71,45 +72,35 @@ func (m *Mailer) Consume(q amqp.Queue) (<-chan amqp.Delivery, error) {
 	return m.broker.Consume(q, "")
 }
 
-func (m *Mailer) PublishBatch(batch comms.Batch) error {
+func mergeHeaders(base amqp.Table, headers []amqp.Table) amqp.Table {
+	for _, h := range headers {
+		maps.Copy(base, h)
+	}
+	return base
+}
+
+func (m *Mailer) PublishBatch(batch comms.Batch, headers ...amqp.Table) error {
+	baseHeaders := amqp.Table{
+		"kind": comms.BATCH,
+	}
+	merged := mergeHeaders(baseHeaders, headers)
+
 	for _, sender := range m.senders {
-		if err := sender.Batch(batch, m.con.Select); err != nil {
+		if err := sender.Batch(batch, m.con.Select, merged); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *Mailer) PublishBatchWithQuery(batch comms.Batch, query int) error {
-	for _, sender := range m.senders {
-		if err := sender.BatchWithQuery(batch, m.con.Select, query); err != nil {
-			return err
-		}
+func (m *Mailer) PublishEof(eof comms.Eof, headers ...amqp.Table) error {
+	baseHeaders := amqp.Table{
+		"kind": comms.EOF,
 	}
-	return nil
-}
+	merged := mergeHeaders(baseHeaders, headers)
 
-func (m *Mailer) PublishEof(eof comms.Eof) error {
 	for _, sender := range m.senders {
-		if err := sender.Eof(eof); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *Mailer) PublishEofWithQuery(eof comms.Eof, query int) error {
-	for _, sender := range m.senders {
-		if err := sender.EofWithQuery(eof, query); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *Mailer) PublishError(erro comms.Error) error {
-	for _, sender := range m.senders {
-		if err := sender.Error(erro); err != nil {
+		if err := sender.Eof(eof, merged); err != nil {
 			return err
 		}
 	}

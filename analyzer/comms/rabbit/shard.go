@@ -6,6 +6,7 @@ import (
 	"analyzer/comms"
 
 	"github.com/op/go-logging"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type SenderShard struct {
@@ -18,11 +19,11 @@ type SenderShard struct {
 
 func NewShard(broker *Broker, fmt string, key string, outputCopies int, log *logging.Logger) *SenderShard {
 	return &SenderShard{
-		broker: broker,
-		fmt: fmt,
-		key: key,
+		broker:       broker,
+		fmt:          fmt,
+		key:          key,
 		outputCopies: outputCopies,
-		log: log,
+		log:          log,
 	}
 }
 
@@ -33,7 +34,7 @@ func keyHash(str string, mod int) int {
 		hash = ((hash << 5) + hash) + uint64(c) // hash * 33 + c
 	}
 
-    return int(hash % uint64(mod))
+	return int(hash % uint64(mod))
 }
 
 func (s *SenderShard) shard(fieldMaps []map[string]string) (map[int][]map[string]string, error) {
@@ -52,7 +53,7 @@ func (s *SenderShard) shard(fieldMaps []map[string]string) (map[int][]map[string
 	return shards, nil
 }
 
-func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}) error {
+func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}, headers amqp.Table) error {
 	shards, err := s.shard(batch.FieldMaps)
 	if err != nil {
 		return err
@@ -61,7 +62,7 @@ func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}) e
 	for i, shard := range shards {
 		key := fmt.Sprintf(s.fmt, i)
 		body := comms.NewBatch(shard).Encode(filterCols)
-		if err := s.broker.Publish(key, body); err != nil {
+		if err := s.broker.Publish(key, body, headers); err != nil {
 			s.log.Errorf("error while publishing sharded message to %v", i)
 			continue
 		}
@@ -70,42 +71,15 @@ func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}) e
 	return nil
 }
 
-func (s *SenderShard) BatchWithQuery(batch comms.Batch, filterCols map[string]struct{}, query int) error {
-	shards, err := s.shard(batch.FieldMaps)
-	if err != nil {
-		return err
-	}
-
-	for i, shard := range shards {
-		key := fmt.Sprintf(s.fmt, i)
-		body := comms.NewBatch(shard).EncodeWithQuery(filterCols, query)
-		if err := s.broker.Publish(key, body); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (s *SenderShard) Eof(eof comms.Eof) error {
+func (s *SenderShard) Eof(eof comms.Eof, headers amqp.Table) error {
 	body := eof.Encode()
-	return s.broadcast(body)
+	return s.Broadcast(body, headers)
 }
 
-func (s *SenderShard) EofWithQuery(eof comms.Eof, query int) error {
-	body := eof.EncodeWithQuery(query)
-	return s.broadcast(body)
-}
-
-func (s *SenderShard) Error(erro comms.Error) error {
-	body := erro.Encode()
-	return s.broadcast(body)
-}
-
-func (s *SenderShard) broadcast(body []byte) error {
+func (s *SenderShard) Broadcast(body []byte, headers amqp.Table) error {
 	for i := range s.outputCopies {
 		key := fmt.Sprintf(s.fmt, i)
-		if err := s.broker.Publish(key, body); err != nil {
+		if err := s.broker.Publish(key, body, headers); err != nil {
 			return err
 		}
 	}

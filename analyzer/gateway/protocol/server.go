@@ -80,15 +80,15 @@ func (s *Server) clientHandler(conn *CsvTransferStream) error {
 				return err
 			}
 
-			if msg.Kind == comms.EOF {
+			if msg.Kind == MSG_EOF {
 				s.log.Infof("%s was successfully received", fileName)
 				s.sendEof(fileName)
 				break
 
-			} else if msg.Kind == comms.BATCH {
+			} else if msg.Kind == MSG_BATCH {
 				s.sendBatch(fileName, msg.Data)
 
-			} else if msg.Kind == comms.ERROR {
+			} else if msg.Kind == MSG_ERR {
 				s.log.Criticalf("an error was received from the client, exiting...")
 				return nil
 			} else {
@@ -130,21 +130,24 @@ func (s *Server) recvResults(conn *CsvTransferStream) error {
 
 	eofsRecv := make(map[int]int, 0)
 	for del := range recvChan {
-		kind, query, data := comms.ReadDeliveryWithQuery(del)
+		kind := int(del.Headers["kind"].(int32))
+		query := int(del.Headers["query"].(int32))
+		body := del.Body
+
 		if kind == comms.BATCH {
-			batch, err := comms.DecodeBatch(data)
+			batch, err := comms.DecodeBatch(body)
 			if err != nil {
 				return fmt.Errorf("failed to decode batch from query %d", query)
 			}
-			body := batch.ToResult(query)
-			conn.Send(body)
+			result := batch.ToResult(query)
+			conn.Send(result)
 
-		} else if kind == comms.EOF {
+		} else if kind == MSG_EOF {
 			eofsRecv[query] += 1
 			if eofsRecv[query] >= s.inputCopies[query] {
-				eof := comms.DecodeEof(data)
-				data := eof.ToResult(query)
-				conn.Send(data)
+				eof := comms.DecodeEof(body)
+				result := eof.ToResult(query)
+				conn.Send(result)
 				s.log.Infof("Query %d has been successfully processed", query)
 			}
 		} else {

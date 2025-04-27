@@ -15,12 +15,11 @@ import (
 type IWorker interface {
 	Batch([]byte) bool
 	Eof([]byte) bool
-	Error([]byte) bool
 }
 
 type Worker struct {
 	Log         *logging.Logger
-	mailer      *Mailer
+	Mailer      *Mailer
 	sigChan     chan os.Signal
 	inputQueues []amqp.Queue
 	eofsRecv    int
@@ -43,7 +42,7 @@ func New(con *config.Config, log *logging.Logger) (*Worker, error) {
 
 	return &Worker{
 		Log:         log,
-		mailer:      mailer,
+		Mailer:      mailer,
 		sigChan:     sigs,
 		inputQueues: inputQueues,
 		con:         con,
@@ -51,25 +50,9 @@ func New(con *config.Config, log *logging.Logger) (*Worker, error) {
 }
 
 func (base *Worker) Run(w IWorker) error {
-
 	base.Log.Infof("Running...")
 	for i, q := range base.inputQueues {
-		handlers := map[int]func([]byte) bool{
-			comms.BATCH: w.Batch,
-			comms.ERROR: w.Error,
-			comms.EOF: func(data []byte) bool {
-				base.eofsRecv += 1
-
-				if base.eofsRecv < base.con.InputCopies[i] {
-					return false
-				}
-
-				base.eofsRecv = 0
-				return w.Eof(data)
-			},
-		}
-
-		ch, err := base.mailer.Consume(q)
+		ch, err := base.Mailer.Consume(q)
 		if err != nil {
 			return err
 		}
@@ -88,12 +71,23 @@ func (base *Worker) Run(w IWorker) error {
 					break
 				}
 
-				kind, data := comms.ReadDelivery(del)
-				handle, ok := handlers[kind]
-				if !ok {
+				kind := int(del.Headers["kind"].(int32))
+				body := del.Body
+
+				switch kind {
+				case comms.BATCH:
+					exit = w.Batch(body)
+				case comms.EOF:
+					base.eofsRecv += 1
+
+					if base.eofsRecv < base.con.InputCopies[i] {
+						break
+					}
+
+					base.eofsRecv = 0
+					exit = w.Eof(body)
+				default:
 					base.Log.Errorf("received an unknown message type %v", kind)
-				} else {
-					exit = handle(data)
 				}
 			}
 		}
@@ -102,27 +96,7 @@ func (base *Worker) Run(w IWorker) error {
 	return nil
 }
 
-func (base *Worker) PublishBatch(batch comms.Batch) error {
-	return base.mailer.PublishBatch(batch)
-}
-
-func (base *Worker) PublishBatchWithQuery(batch comms.Batch, query int) error {
-	return base.mailer.PublishBatchWithQuery(batch, query)
-}
-
-func (base *Worker) PublishEof(eof comms.Eof) error {
-	return base.mailer.PublishEof(eof)
-}
-
-func (base *Worker) PublishEofWithQuery(eof comms.Eof, query int) error {
-	return base.mailer.PublishEofWithQuery(eof, query)
-}
-
-func (base *Worker) PublishError(erro comms.Error) error {
-	return base.mailer.PublishError(erro)
-}
-
 func (w *Worker) Close() {
-	w.mailer.DeInit()
+	w.Mailer.DeInit()
 	close(w.sigChan)
 }

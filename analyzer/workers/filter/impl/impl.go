@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
+	"analyzer/comms"
 	"analyzer/workers"
 	"analyzer/workers/filter/config"
-	"analyzer/comms"
 
 	"github.com/op/go-logging"
 )
@@ -47,7 +47,6 @@ func (w *Filter) Batch(data []byte) bool {
 	for _, fieldMap := range batch.FieldMaps {
 		responseFieldMap, err := w.Handler(w, fieldMap)
 		if err != nil {
-			w.Log.Errorf("recv fieldMap: %v", fieldMap)
 			w.Log.Errorf("failed to handle message: %v", err)
 			continue
 		}
@@ -60,7 +59,7 @@ func (w *Filter) Batch(data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		body := comms.NewBatch(responseFieldMaps)
-		if err := w.PublishBatch(body); err != nil {
+		if err := w.Mailer.PublishBatch(body); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -70,7 +69,7 @@ func (w *Filter) Batch(data []byte) bool {
 
 func (w *Filter) Eof(data []byte) bool {
 	eof := comms.DecodeEof(data)
-	if err := w.PublishEof(eof); err != nil {
+	if err := w.Mailer.PublishEof(eof); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 	return true

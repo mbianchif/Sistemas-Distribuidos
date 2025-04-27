@@ -1,9 +1,9 @@
 package impl
 
 import (
+	"analyzer/comms"
 	"analyzer/workers"
 	"analyzer/workers/groupby/config"
-	"analyzer/comms"
 
 	"github.com/op/go-logging"
 )
@@ -64,13 +64,13 @@ func (w *Groupby) Eof(data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		batch := comms.NewBatch(responseFieldMaps)
-		if err := w.PublishBatch(batch); err != nil {
+		if err := w.Mailer.PublishBatch(batch); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
 
 	eof := comms.DecodeEof(data)
-	if err := w.PublishEof(eof); err != nil {
+	if err := w.Mailer.PublishEof(eof); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 

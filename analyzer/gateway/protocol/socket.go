@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net"
+)
 
-	"analyzer/comms"
+const (
+	MSG_BATCH = iota
+	MSG_EOF
+	MSG_ERR
 )
 
 // File identifiers
@@ -53,7 +57,7 @@ func (s *CsvTransferStream) Recv() (*Message, error) {
 	}
 	msgKind := int(msgKindBytes[0])
 
-	if msgKind != comms.BATCH {
+	if msgKind != MSG_BATCH {
 		return &Message{Kind: msgKind, Data: nil}, nil
 	}
 

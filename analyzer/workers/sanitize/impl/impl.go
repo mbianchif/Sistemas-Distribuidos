@@ -56,7 +56,7 @@ func (w *Sanitize) Batch(data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		batch := comms.NewBatch(responseFieldMaps)
-		if err := w.PublishBatch(batch); err != nil {
+		if err := w.Mailer.PublishBatch(batch); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -153,8 +153,8 @@ func handleRating(w *Sanitize, line []string) map[string]string {
 	}
 
 	fields := map[string]string{
-		"movieId":   line[1],
-		"rating":    line[2],
+		"movieId": line[1],
+		"rating":  line[2],
 	}
 
 	if !isValidRow(fields) {
@@ -188,13 +188,8 @@ func handleCredit(w *Sanitize, line []string) map[string]string {
 
 func (w *Sanitize) Eof(data []byte) bool {
 	eof := comms.DecodeEof(data)
-	if err := w.PublishEof(eof); err != nil {
+	if err := w.Mailer.PublishEof(eof); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
-	return true
-}
-
-func (w *Sanitize) Error(data []byte) bool {
-	w.Log.Error("Received an ERROR message kind")
 	return true
 }

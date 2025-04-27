@@ -3,8 +3,8 @@ package impl
 import (
 	"fmt"
 
-	"analyzer/workers"
 	"analyzer/comms"
+	"analyzer/workers"
 	"analyzer/workers/sentiment/config"
 
 	"github.com/cdipaolo/sentiment"
@@ -57,7 +57,7 @@ func (w *Sentiment) Batch(data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		batch := comms.NewBatch(responseFieldMaps)
-		if err := w.PublishBatch(batch); err != nil {
+		if err := w.Mailer.PublishBatch(batch); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -89,14 +89,9 @@ func handleSentiment(w *Sentiment, fieldMap map[string]string) (map[string]strin
 
 func (w *Sentiment) Eof(data []byte) bool {
 	eof := comms.DecodeEof(data)
-	if err := w.PublishEof(eof); err != nil {
+	if err := w.Mailer.PublishEof(eof); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
-	return true
-}
-
-func (w *Sentiment) Error(data []byte) bool {
-	w.Log.Error("Received an ERROR message kind")
 	return true
 }

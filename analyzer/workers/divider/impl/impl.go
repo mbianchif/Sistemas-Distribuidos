@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strconv"
 
+	"analyzer/comms"
 	"analyzer/workers"
 	"analyzer/workers/divider/config"
-	"analyzer/comms"
 
 	"github.com/op/go-logging"
 )
@@ -50,7 +50,7 @@ func (w *Divider) Batch(data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		batch := comms.NewBatch(responseFieldMaps)
-		if err := w.PublishBatch(batch); err != nil {
+		if err := w.Mailer.PublishBatch(batch); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -90,13 +90,8 @@ func handleDivider(fieldMap map[string]string) (map[string]string, error) {
 
 func (w *Divider) Eof(data []byte) bool {
 	body := comms.DecodeEof(data)
-	if err := w.PublishEof(body); err != nil {
+	if err := w.Mailer.PublishEof(body); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
-	return true
-}
-
-func (w *Divider) Error(data []byte) bool {
-	w.Log.Error("Received an ERROR message kind")
 	return true
 }

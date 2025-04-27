@@ -153,7 +153,7 @@ func (b *Broker) Consume(q amqp.Queue, consumer string) (<-chan amqp.Delivery, e
 	)
 }
 
-func (b *Broker) Publish(key string, body []byte) error {
+func (b *Broker) Publish(key string, body []byte, headers amqp.Table) error {
 	return b.ch.Publish(
 		b.outputExchangeName,
 		key,
@@ -162,5 +162,6 @@ func (b *Broker) Publish(key string, body []byte) error {
 		amqp.Publishing{
 			ContentType: "application/octet-stream",
 			Body:        body,
+			Headers:     headers,
 		})
 }

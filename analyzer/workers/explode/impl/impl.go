@@ -5,9 +5,9 @@ import (
 	"maps"
 	"strings"
 
+	"analyzer/comms"
 	"analyzer/workers"
 	"analyzer/workers/explode/config"
-	"analyzer/comms"
 
 	"github.com/op/go-logging"
 )
@@ -49,7 +49,7 @@ func (w *Explode) Batch(data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		body := comms.NewBatch(responseFieldMaps)
-		if err := w.PublishBatch(body); err != nil {
+		if err := w.Mailer.PublishBatch(body); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -75,14 +75,9 @@ func handleExplode(fieldMap map[string]string, con *config.ExplodeConfig) ([]map
 
 func (w *Explode) Eof(data []byte) bool {
 	eof := comms.DecodeEof(data)
-	if err := w.PublishEof(eof); err != nil {
+	if err := w.Mailer.PublishEof(eof); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
-	return true
-}
-
-func (w *Explode) Error(data []byte) bool {
-	w.Log.Error("Received an ERROR message kind")
 	return true
 }

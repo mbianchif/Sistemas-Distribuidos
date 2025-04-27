@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"analyzer/comms"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type SenderRobin struct {
@@ -27,40 +29,25 @@ func (s *SenderRobin) nextKey() string {
 	return key
 }
 
-func (s *SenderRobin) Batch(batch comms.Batch, filterCols map[string]struct{}) error {
+func (s *SenderRobin) Batch(batch comms.Batch, filterCols map[string]struct{}, headers amqp.Table) error {
 	body := batch.Encode(filterCols)
-	return s.Direct(body)
+	return s.Direct(body, headers)
 }
 
-func (s *SenderRobin) BatchWithQuery(batch comms.Batch, filterCols map[string]struct{}, query int) error {
-	body := batch.EncodeWithQuery(filterCols, query)
-	return s.Direct(body)
-}
-
-func (s *SenderRobin) Eof(eof comms.Eof) error {
+func (s *SenderRobin) Eof(eof comms.Eof, headers amqp.Table) error {
 	body := eof.Encode()
-	return s.Broadcast(body)
+	return s.Broadcast(body, headers)
 }
 
-func (s *SenderRobin) EofWithQuery(eof comms.Eof, query int) error {
-	body := eof.EncodeWithQuery(query)
-	return s.Broadcast(body)
-}
-
-func (s *SenderRobin) Error(erro comms.Error) error {
-	body := erro.Encode()
-	return s.Broadcast(body)
-}
-
-func (s *SenderRobin) Direct(body []byte) error {
+func (s *SenderRobin) Direct(body []byte, headers amqp.Table) error {
 	key := s.nextKey()
-	return s.broker.Publish(key, body)
+	return s.broker.Publish(key, body, headers)
 }
 
-func (s *SenderRobin) Broadcast(body []byte) error {
+func (s *SenderRobin) Broadcast(body []byte, headers amqp.Table) error {
 	for i := range s.outputCopies {
 		key := fmt.Sprintf(s.fmt, i)
-		if err := s.broker.Publish(key, body); err != nil {
+		if err := s.broker.Publish(key, body, headers); err != nil {
 			return err
 		}
 	}

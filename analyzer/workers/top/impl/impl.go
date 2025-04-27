@@ -4,8 +4,8 @@ import (
 	"sort"
 	"strconv"
 
-	"analyzer/workers"
 	"analyzer/comms"
+	"analyzer/workers"
 	"analyzer/workers/top/config"
 
 	"github.com/op/go-logging"
@@ -46,26 +46,21 @@ func (w *Top) Batch(data []byte) bool {
 	return false
 }
 
-func (w *Top) Eof(data []byte) bool {
+func (w *Top) Eof(body []byte) bool {
 	responseFieldMaps := w.top_lit
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", w.top_lit)
 		batch := comms.NewBatch(w.top_lit)
-		if err := w.PublishBatch(batch); err != nil {
+		if err := w.Mailer.PublishBatch(batch); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
 
-	eof := comms.DecodeEof(data)
-	if err := w.PublishEof(eof); err != nil {
+	eof := comms.DecodeEof(body)
+	if err := w.Mailer.PublishEof(eof); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
-	return true
-}
-
-func (w *Top) Error(data []byte) bool {
-	w.Log.Error("Received an ERROR message kind")
 	return true
 }
 
