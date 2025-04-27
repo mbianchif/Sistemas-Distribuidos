@@ -66,6 +66,5 @@ func (w *Mean) Result(con *config.GroupbyConfig) []map[string]string {
 		fieldMaps = append(fieldMaps, fieldMap)
 	}
 
-	fmt.Println(fieldMaps)
 	return fieldMaps
 }

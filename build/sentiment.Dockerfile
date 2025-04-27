@@ -1,7 +1,7 @@
 FROM golang:1.24.2 AS builder
 
 WORKDIR /analyzer/workers
-COPY analyzer/workers/worker.go .
+COPY analyzer/workers/*.go      .
 COPY analyzer/workers/config    ./config
 COPY analyzer/workers/sentiment ./sentiment
 

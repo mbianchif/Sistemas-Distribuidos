@@ -2,8 +2,10 @@ package comms
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"strconv"
+	"strings"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -87,6 +89,14 @@ func ReadDelivery(del amqp.Delivery) (int, []byte) {
 	return int(body[0]), body[1:]
 }
 
+func ReadDeliveryWithQuery(del amqp.Delivery) (int, int, []byte) {
+	body := del.Body
+	if len(body) < 2 {
+		return ERROR, -1, nil
+	}
+	return int(body[0]), int(body[1]), body[2:]
+}
+
 type Batch struct {
 	FieldMaps []map[string]string
 }
@@ -160,6 +170,59 @@ func (m Batch) EncodeForPersistance() []byte {
 	return append(encoded, "\n"...)
 }
 
+// Names for the columns in the result for each query
+var queryCols = map[int][]string{
+	1: {"title", "genres"},
+	2: {"country", "budget"},
+	3: {"title", "rating"},
+	4: {"actor", "count"},
+	5: {"sentiment", "rate_revenue_budget"},
+}
+
+func encodeQueryFieldMap(fieldMap map[string]string, query int) []byte {
+	must := queryCols[query]
+	record := make([]byte, 0, 64)
+	first := true
+
+	for _, col := range must {
+		value, ok := fieldMap[col]
+		if !ok {
+			return nil
+		}
+		if !first {
+			record = append(record, ',')
+		}
+
+		first = false
+		if col == "genres" {
+			value = fmt.Sprintf("[%s]", value)
+		}
+
+		record = append(record, strings.TrimSpace(value)...)
+	}
+
+	return record
+}
+
+func (m Batch) ToResult(query int) []byte {
+	data := []byte{0, 0, 0, 0, BATCH, byte(query)}
+	first := true
+
+	for _, fieldMap := range m.FieldMaps {
+		if !first {
+			data = append(data, '\n')
+		}
+
+		first = false
+		recordBytes := encodeQueryFieldMap(fieldMap, query)
+		data = append(data, recordBytes...)
+	}
+
+	length := len(data) - 6
+	binary.BigEndian.PutUint32(data[0:4], uint32(length))
+	return data
+}
+
 func DecodeLine(data []byte) (map[string]string, error) {
 	fields := make(map[string]string, 12)
 
@@ -209,6 +272,10 @@ func (m Eof) Encode() []byte {
 
 func (m Eof) EncodeWithQuery(query int) []byte {
 	return []byte{EOF, byte(query)}
+}
+
+func (m Eof) ToResult(query int) []byte {
+	return []byte{0, 0, 0, 0, EOF, byte(query)}
 }
 
 func DecodeEof([]byte) Eof {

@@ -1,6 +1,15 @@
-FROM python:3.13.3
+FROM golang:1.24.2 AS builder
 
-WORKDIR /app
+WORKDIR /analyzer/gateway
 COPY analyzer/gateway/. .
-RUN pip install --no-cache-dir -r requirements.txt
-ENTRYPOINT ["python3", "-u", "main.py"]
+
+WORKDIR /analyzer
+COPY analyzer/comms ./comms
+COPY analyzer/go.* ./
+
+RUN go mod tidy
+RUN CGO_ENABLED=0 GOOS=linux go build -o binary gateway/main.go
+
+FROM busybox:1.37.0
+COPY --from=builder /analyzer/binary /binary
+ENTRYPOINT ["/binary"]

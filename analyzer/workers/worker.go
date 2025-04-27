@@ -5,9 +5,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"analyzer/workers/config"
 	"analyzer/comms"
-	"analyzer/comms/rabbit"
+	"analyzer/workers/config"
 
 	"github.com/op/go-logging"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -21,15 +20,15 @@ type IWorker interface {
 
 type Worker struct {
 	Log         *logging.Logger
-	mailer      *rabbit.Mailer
+	mailer      *Mailer
 	sigChan     chan os.Signal
 	inputQueues []amqp.Queue
-	eofsRecv int
+	eofsRecv    int
 	con         *config.Config
 }
 
 func New(con *config.Config, log *logging.Logger) (*Worker, error) {
-	mailer, err := rabbit.NewMailer(con, log)
+	mailer, err := NewMailer(con, log)
 	if err != nil {
 		return nil, err
 	}

@@ -64,6 +64,7 @@ func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) e
 		return fmt.Errorf("Couldn't send fileId %d: %v", fileId, err)
 	}
 
+	sentRecords := 0
 	reader := csv.NewReader(bufio.NewReader(fp))
 	reader.Read() // Skip header line
 	records := make([][]byte, 0, batchSize)
@@ -101,6 +102,7 @@ func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) e
 					return fmt.Errorf("couldn't send batch with fileId %d: %v", fileId, err)
 				}
 
+				sentRecords += len(records)
 				accSize = 0
 				records = records[:0]
 			}
@@ -111,11 +113,13 @@ func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) e
 	}
 
 	if len(records) > 0 {
+		sentRecords += len(records)
 		if err := s.sendBatch(records); err != nil {
 			return fmt.Errorf("couldn't send batch with fileId %d: %v", fileId, err)
 		}
 	}
 
+	fmt.Printf("sent %d records\n", sentRecords)
 	return nil
 }
 

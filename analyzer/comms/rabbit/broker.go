@@ -3,21 +3,17 @@ package rabbit
 import (
 	"fmt"
 
-	"analyzer/workers/config"
-
-	"github.com/op/go-logging"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Broker struct {
-	conn *amqp.Connection
-	ch   *amqp.Channel
-	con  *config.Config
-	log  *logging.Logger
+	conn               *amqp.Connection
+	ch                 *amqp.Channel
+	outputExchangeName string
 }
 
-func NewBroker(con *config.Config, log *logging.Logger) (*Broker, error) {
-	conn, err := amqp.Dial(con.Url)
+func NewBroker(url string) (*Broker, error) {
+	conn, err := amqp.Dial(url)
 	if err != nil {
 		return nil, err
 	}
@@ -27,20 +23,25 @@ func NewBroker(con *config.Config, log *logging.Logger) (*Broker, error) {
 		return nil, err
 	}
 
-	return &Broker{conn, ch, con, log}, nil
+	return &Broker{
+		conn:               conn,
+		ch:                 ch,
+		outputExchangeName: "",
+	}, nil
 }
 
-func (b *Broker) Init() ([]amqp.Queue, []string, error) {
-	inputQs, err := b.initInput()
+func (b *Broker) Init(id int, inExchNames []string, inQNames []string, outExchName string, outQNames []string, outCopies []int) ([]amqp.Queue, []string, error) {
+	inputQs, err := b.initInput(id, inExchNames, inQNames)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	outputQFmts, err := b.initOutput()
+	outputQFmts, err := b.initOutput(outExchName, outQNames, outCopies)
 	if err != nil {
 		return inputQs, nil, err
 	}
 
+	b.outputExchangeName = outExchName
 	return inputQs, outputQFmts, nil
 }
 
@@ -53,19 +54,16 @@ func (b *Broker) DeInit() {
 	}
 }
 
-func (b *Broker) initInput() ([]amqp.Queue, error) {
-	exchangeNames := b.con.InputExchangeNames
-	qNames := b.con.InputQueueNames
-
-	qs := make([]amqp.Queue, 0, len(b.con.InputQueueNames))
-	for i := range b.con.InputExchangeNames {
+func (b *Broker) initInput(id int, exchangeNames []string, qNames []string) ([]amqp.Queue, error) {
+	qs := make([]amqp.Queue, 0, len(qNames))
+	for i := range exchangeNames {
 		if err := b.exchangeDeclare(exchangeNames[i], "direct"); err != nil {
 			return nil, err
 		}
 
 		// Build queue name
 		nameFmt := qNames[i] + "-%d"
-		qName := fmt.Sprintf(nameFmt, b.con.Id)
+		qName := fmt.Sprintf(nameFmt, id)
 
 		q, err := b.queueDeclare(qName)
 		if err != nil {
@@ -83,11 +81,7 @@ func (b *Broker) initInput() ([]amqp.Queue, error) {
 }
 
 // Returns the format of output queue names
-func (b *Broker) initOutput() ([]string, error) {
-	exchangeName := b.con.OutputExchangeName
-	qNames := b.con.OutputQueueNames
-	qCopies := b.con.OutputCopies
-
+func (b *Broker) initOutput(exchangeName string, qNames []string, qCopies []int) ([]string, error) {
 	if err := b.exchangeDeclare(exchangeName, "direct"); err != nil {
 		return nil, err
 	}
@@ -151,7 +145,7 @@ func (b *Broker) Consume(q amqp.Queue, consumer string) (<-chan amqp.Delivery, e
 	return b.ch.Consume(
 		q.Name,
 		consumer,
-		true,  // auto-ack
+		false, // auto-ack
 		false, // exclusive
 		false, // no-local
 		false, // no-wait
@@ -161,7 +155,7 @@ func (b *Broker) Consume(q amqp.Queue, consumer string) (<-chan amqp.Delivery, e
 
 func (b *Broker) Publish(key string, body []byte) error {
 	return b.ch.Publish(
-		b.con.OutputExchangeName,
+		b.outputExchangeName,
 		key,
 		false, // mandatory
 		false, // immediate

@@ -1,31 +1,39 @@
-package rabbit
+package workers
 
 import (
 	"strings"
 
-	"analyzer/workers/config"
 	"analyzer/comms"
+	"analyzer/comms/rabbit"
+	"analyzer/workers/config"
 
 	"github.com/op/go-logging"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Mailer struct {
-	senders []Sender
-	broker  *Broker
+	senders []rabbit.Sender
+	broker  *rabbit.Broker
+	con     *config.Config
+	Log     *logging.Logger
 }
 
 func NewMailer(con *config.Config, log *logging.Logger) (*Mailer, error) {
-	broker, err := NewBroker(con, log)
+	broker, err := rabbit.NewBroker(con.Url)
 	if err != nil {
 		return nil, err
 	}
-
-	return &Mailer{nil, broker}, nil
+	return &Mailer{nil, broker, con, log}, nil
 }
 
 func (m *Mailer) Init() ([]amqp.Queue, error) {
-	inputQs, outputQFmts, err := m.broker.Init()
+	inExchNames := m.con.InputExchangeNames
+	inQNames := m.con.InputQueueNames
+	outExchName := m.con.OutputExchangeName
+	outQNames := m.con.OutputQueueNames
+	outCopies := m.con.OutputCopies
+
+	inputQs, outputQFmts, err := m.broker.Init(m.con.Id, inExchNames, inQNames, outExchName, outQNames, outCopies)
 	if err != nil {
 		return nil, err
 	}
@@ -34,19 +42,19 @@ func (m *Mailer) Init() ([]amqp.Queue, error) {
 	return inputQs, nil
 }
 
-func (m *Mailer) initSenders(outputQFmts []string) []Sender {
-	delTypes := m.broker.con.OutputDeliveryTypes
-	outputQCopies := m.broker.con.OutputCopies
-	senders := make([]Sender, 0, len(delTypes))
+func (m *Mailer) initSenders(outputQFmts []string) []rabbit.Sender {
+	delTypes := m.con.OutputDeliveryTypes
+	outputQCopies := m.con.OutputCopies
+	senders := make([]rabbit.Sender, 0, len(delTypes))
 
 	for i := range outputQFmts {
-		var sender Sender
+		var sender rabbit.Sender
 		if delTypes[i] == "robin" {
-			sender = NewRobin(m.broker, outputQFmts[i], outputQCopies[i], m.broker.log)
+			sender = rabbit.NewRobin(m.broker, outputQFmts[i], outputQCopies[i])
 		} else {
 			parts := strings.Split(delTypes[i], ":")
 			key := parts[1]
-			sender = NewShard(m.broker, outputQFmts[i], key, outputQCopies[i], m.broker.log)
+			sender = rabbit.NewShard(m.broker, outputQFmts[i], key, outputQCopies[i], m.Log)
 		}
 
 		senders = append(senders, sender)
@@ -65,7 +73,7 @@ func (m *Mailer) Consume(q amqp.Queue) (<-chan amqp.Delivery, error) {
 
 func (m *Mailer) PublishBatch(batch comms.Batch) error {
 	for _, sender := range m.senders {
-		if err := sender.Batch(batch, m.broker.con.Select); err != nil {
+		if err := sender.Batch(batch, m.con.Select); err != nil {
 			return err
 		}
 	}
@@ -74,7 +82,7 @@ func (m *Mailer) PublishBatch(batch comms.Batch) error {
 
 func (m *Mailer) PublishBatchWithQuery(batch comms.Batch, query int) error {
 	for _, sender := range m.senders {
-		if err := sender.BatchWithQuery(batch, m.broker.con.Select, query); err != nil {
+		if err := sender.BatchWithQuery(batch, m.con.Select, query); err != nil {
 			return err
 		}
 	}

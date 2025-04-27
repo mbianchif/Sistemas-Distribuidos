@@ -1,9 +1,9 @@
 FROM golang:1.24.2 AS builder
 
 WORKDIR /analyzer/workers
-COPY analyzer/workers/worker.go .
-COPY analyzer/workers/config    ./config
-COPY analyzer/workers/divider   ./divider
+COPY analyzer/workers/*.go    .
+COPY analyzer/workers/config  ./config
+COPY analyzer/workers/divider ./divider
 
 WORKDIR /analyzer
 COPY analyzer/comms ./comms
