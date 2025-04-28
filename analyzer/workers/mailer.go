@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"fmt"
 	"maps"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 
 type Mailer struct {
 	senders []rabbit.Sender
+	receivers map[string]*rabbit.Receiver
 	broker  *rabbit.Broker
 	con     *config.Config
 	Log     *logging.Logger
@@ -24,7 +26,7 @@ func NewMailer(con *config.Config, log *logging.Logger) (*Mailer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Mailer{nil, broker, con, log}, nil
+	return &Mailer{nil, nil, broker, con, log}, nil
 }
 
 func (m *Mailer) Init() ([]amqp.Queue, error) {
@@ -40,6 +42,7 @@ func (m *Mailer) Init() ([]amqp.Queue, error) {
 	}
 
 	m.senders = m.initSenders(outputQFmts)
+	m.receivers = m.initReceivers(inputQs)
 	return inputQs, nil
 }
 
@@ -64,12 +67,28 @@ func (m *Mailer) initSenders(outputQFmts []string) []rabbit.Sender {
 	return senders
 }
 
+func (m *Mailer) initReceivers(inputQs []amqp.Queue) map[string]*rabbit.Receiver {
+	receivers := make(map[string]*rabbit.Receiver, len(inputQs))
+
+	for _, q := range inputQs {
+		recv := rabbit.NewReceiver(m.broker, q)
+		receivers[q.Name] = recv
+	}
+
+	return receivers
+}
+
 func (m *Mailer) DeInit() {
 	m.broker.DeInit()
 }
 
 func (m *Mailer) Consume(q amqp.Queue) (<-chan amqp.Delivery, error) {
-	return m.broker.Consume(q, "")
+	recv, ok := m.receivers[q.Name]
+	if !ok {
+		return nil, fmt.Errorf("no receivers matches this queue name: %s", q.Name)
+	}
+
+	return recv.Consume("")
 }
 
 func mergeHeaders(base amqp.Table, headers []amqp.Table) amqp.Table {

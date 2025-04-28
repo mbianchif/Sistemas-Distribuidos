@@ -13,6 +13,7 @@ type SenderRobin struct {
 	fmt          string
 	i            int
 	outputCopies int
+	seq          []int
 }
 
 func NewRobin(broker *Broker, fmt string, outputCopies int) *SenderRobin {
@@ -20,13 +21,8 @@ func NewRobin(broker *Broker, fmt string, outputCopies int) *SenderRobin {
 		broker:       broker,
 		fmt:          fmt,
 		outputCopies: outputCopies,
+		seq:          make([]int, outputCopies),
 	}
-}
-
-func (s *SenderRobin) nextKey() string {
-	key := fmt.Sprintf(s.fmt, s.i)
-	s.i = (s.i + 1) % s.outputCopies
-	return key
 }
 
 func (s *SenderRobin) Batch(batch comms.Batch, filterCols map[string]struct{}, headers amqp.Table) error {
@@ -39,15 +35,24 @@ func (s *SenderRobin) Eof(eof comms.Eof, headers amqp.Table) error {
 	return s.Broadcast(body, headers)
 }
 
+func (s *SenderRobin) nextKeySeq() (string, int) {
+	key := fmt.Sprintf(s.fmt, s.i)
+	seq := s.seq[s.i]
+
+	s.seq[s.i] += 1
+	s.i = (s.i + 1) % s.outputCopies
+	return key, seq
+}
+
 func (s *SenderRobin) Direct(body []byte, headers amqp.Table) error {
-	key := s.nextKey()
+	key, seq := s.nextKeySeq()
+	headers["seq"] = seq
 	return s.broker.Publish(key, body, headers)
 }
 
 func (s *SenderRobin) Broadcast(body []byte, headers amqp.Table) error {
-	for i := range s.outputCopies {
-		key := fmt.Sprintf(s.fmt, i)
-		if err := s.broker.Publish(key, body, headers); err != nil {
+	for range s.outputCopies {
+		if err := s.Direct(body, headers); err != nil {
 			return err
 		}
 	}

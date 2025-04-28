@@ -15,6 +15,7 @@ type SenderShard struct {
 	key          string
 	outputCopies int
 	log          *logging.Logger
+	seq          []int
 }
 
 func NewShard(broker *Broker, fmt string, key string, outputCopies int, log *logging.Logger) *SenderShard {
@@ -24,6 +25,7 @@ func NewShard(broker *Broker, fmt string, key string, outputCopies int, log *log
 		key:          key,
 		outputCopies: outputCopies,
 		log:          log,
+		seq:          make([]int, outputCopies),
 	}
 }
 
@@ -53,6 +55,12 @@ func (s *SenderShard) shard(fieldMaps []map[string]string) (map[int][]map[string
 	return shards, nil
 }
 
+func (s *SenderShard) nextSeq(i int) int {
+	seq := s.seq[i]
+	s.seq[i] += 1
+	return seq
+}
+
 func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}, headers amqp.Table) error {
 	shards, err := s.shard(batch.FieldMaps)
 	if err != nil {
@@ -62,6 +70,7 @@ func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}, h
 	for i, shard := range shards {
 		key := fmt.Sprintf(s.fmt, i)
 		body := comms.NewBatch(shard).Encode(filterCols)
+		headers["seq"] = s.nextSeq(i)
 		if err := s.broker.Publish(key, body, headers); err != nil {
 			s.log.Errorf("error while publishing sharded message to %v", i)
 			continue
@@ -79,6 +88,7 @@ func (s *SenderShard) Eof(eof comms.Eof, headers amqp.Table) error {
 func (s *SenderShard) Broadcast(body []byte, headers amqp.Table) error {
 	for i := range s.outputCopies {
 		key := fmt.Sprintf(s.fmt, i)
+		headers["seq"] = s.nextSeq(i)
 		if err := s.broker.Publish(key, body, headers); err != nil {
 			return err
 		}

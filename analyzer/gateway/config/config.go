@@ -15,8 +15,8 @@ type Config struct {
 	Port               int
 	Backlog            int
 	Id                 int
-	InputExchangeName  string
-	InputQueueName     string
+	InputExchangeNames []string
+	InputQueueNames    []string
 	InputCopies        []int
 	OutputExchangeName string
 	OutputQueueNames   []string
@@ -48,16 +48,20 @@ func Create() (*Config, error) {
 	// ID
 	id := 0 // There's only one gateway
 
-	// INPUT_EXCHANGE_NAME
-	inputExchangeName := os.Getenv("INPUT_EXCHANGE_NAME")
-	if len(inputExchangeName) == 0 {
-		return nil, fmt.Errorf("the input exchange name was not provided")
+	// INPUT_EXCHANGE_NAMES
+	inputExchangeNames := strings.Split(os.Getenv("INPUT_EXCHANGE_NAMES"), ",")
+	if len(inputExchangeNames) == 0 {
+		return nil, fmt.Errorf("the input exchange names were not provided")
 	}
 
-	// INPUT_QUEUE_NAME
-	inputQueueName := os.Getenv("INPUT_QUEUE_NAME")
-	if len(inputQueueName) == 0 {
+	// INPUT_QUEUE_NAMES
+	inputQueueNames := strings.Split(os.Getenv("INPUT_QUEUE_NAMES"), ",")
+	if len(inputQueueNames) == 0 {
 		return nil, fmt.Errorf("the input queue names were not provided")
+	}
+
+	if len(inputExchangeNames) != len(inputQueueNames) {
+		return nil, fmt.Errorf("the length of input exchange names and input queue names don't match (exch: %d, names: %d)", len(inputExchangeNames), len(inputQueueNames))
 	}
 
 	// INPUT_COPIES
@@ -106,8 +110,8 @@ func Create() (*Config, error) {
 		Port:               port,
 		Backlog:            backlog,
 		Id:                 id,
-		InputExchangeName:  inputExchangeName,
-		InputQueueName:     inputQueueName,
+		InputExchangeNames: inputExchangeNames,
+		InputQueueNames:    inputQueueNames,
 		InputCopies:        inputCopies,
 		OutputExchangeName: outputExchangeName,
 		OutputQueueNames:   outputQueueNames,

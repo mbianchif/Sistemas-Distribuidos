@@ -4,6 +4,8 @@ import (
 	"analyzer/comms"
 	"analyzer/comms/rabbit"
 	"analyzer/gateway/config"
+	"fmt"
+	"reflect"
 
 	"github.com/op/go-logging"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -11,9 +13,11 @@ import (
 
 type SanitizeMailer struct {
 	broker      *rabbit.Broker
-	senders     []*rabbit.SenderRobin
 	con         *config.Config
+	senders     []*rabbit.SenderRobin
+	receivers   []*rabbit.Receiver
 	filename2Id map[string]int
+	log         *logging.Logger
 }
 
 func NewSanitizeMailer(con *config.Config, log *logging.Logger) (*SanitizeMailer, error) {
@@ -26,6 +30,7 @@ func NewSanitizeMailer(con *config.Config, log *logging.Logger) (*SanitizeMailer
 		broker:  broker,
 		senders: nil,
 		con:     con,
+		log:     log,
 		filename2Id: map[string]int{
 			"movies":  0,
 			"credits": 1,
@@ -46,30 +51,73 @@ func (s *SanitizeMailer) initSenders(outputQFmts []string) []*rabbit.SenderRobin
 	return senders
 }
 
-func (s *SanitizeMailer) Init() (amqp.Queue, map[int]int, error) {
-	inExchName := s.con.InputExchangeName
-	inQName := s.con.InputQueueName
+func (s *SanitizeMailer) initReceivers(inputQs []amqp.Queue) []*rabbit.Receiver {
+	receivers := make([]*rabbit.Receiver, 0, len(inputQs))
+
+	for _, q := range inputQs {
+		recv := rabbit.NewReceiver(s.broker, q)
+		receivers = append(receivers, recv)
+	}
+
+	return receivers
+}
+
+func (s *SanitizeMailer) Init() (map[int]int, error) {
+	inExchNames := s.con.InputExchangeNames
+	inQNames := s.con.InputQueueNames
 	outExchName := s.con.OutputExchangeName
 	outQNames := s.con.OutputQueueNames
 	outCopies := s.con.OutputCopies
 
-	inputQs, outputQFmts, err := s.broker.Init(s.con.Id, []string{inExchName}, []string{inQName}, outExchName, outQNames, outCopies)
+	inputQs, outputQFmts, err := s.broker.Init(s.con.Id, inExchNames, inQNames, outExchName, outQNames, outCopies)
 	if err != nil {
-		return amqp.Queue{}, nil, err
+		return nil, err
 	}
 
 	s.senders = s.initSenders(outputQFmts)
+	s.receivers = s.initReceivers(inputQs)
 
 	inputCopies := make(map[int]int, 0)
 	for i, copies := range s.con.InputCopies {
 		inputCopies[i+1] = copies
 	}
 
-	return inputQs[0], inputCopies, nil
+	return inputCopies, nil
 }
 
-func (s *SanitizeMailer) Consume(q amqp.Queue) (<-chan amqp.Delivery, error) {
-	return s.broker.Consume(q, "")
+func (s *SanitizeMailer) Consume() (<-chan amqp.Delivery, error) {
+	out := make(chan amqp.Delivery)
+
+	cases := make([]reflect.SelectCase, len(s.receivers))
+	for i, recv := range s.receivers {
+		ch, err := recv.Consume("")
+		if err != nil {
+			return nil, fmt.Errorf("couldn't start consuming: error with chan %d: %v", i, err)
+		}
+
+		cases[i] = reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(ch),
+		}
+	}
+
+	go func() {
+		defer close(out)
+
+		for len(cases) > 0 {
+			chosen, recv, ok := reflect.Select(cases)
+			if !ok {
+				cases[chosen] = cases[len(cases)-1]
+				cases = cases[:len(cases)-1]
+				continue
+			}
+
+			del := recv.Interface().(amqp.Delivery)
+			out <- del
+		}
+	}()
+
+	return out, nil
 }
 
 func (s *SanitizeMailer) PublishBatch(fileName string, body []byte) error {

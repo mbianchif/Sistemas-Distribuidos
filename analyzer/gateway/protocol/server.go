@@ -10,7 +10,6 @@ import (
 	"analyzer/gateway/config"
 
 	"github.com/op/go-logging"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Server struct {
@@ -19,7 +18,6 @@ type Server struct {
 	mailer      *SanitizeMailer
 	inputCopies map[int]int
 	log         *logging.Logger
-	inputQueue  amqp.Queue
 }
 
 func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {
@@ -28,7 +26,7 @@ func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {
 		return nil, err
 	}
 
-	inputQ, inputCopies, err := mailer.Init()
+	inputCopies, err := mailer.Init()
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +43,6 @@ func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {
 		lis:         lis,
 		con:         config,
 		mailer:      mailer,
-		inputQueue:  inputQ,
 		inputCopies: inputCopies,
 		log:         log,
 	}, nil
@@ -121,7 +118,7 @@ func (s *Server) sendEof(fileName string) error {
 }
 
 func (s *Server) recvResults(conn *CsvTransferStream) error {
-	recvChan, err := s.mailer.Consume(s.inputQueue)
+	recvChan, err := s.mailer.Consume()
 	if err != nil {
 		return fmt.Errorf("couldn't consume")
 	}
