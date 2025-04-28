@@ -18,7 +18,8 @@ func SendFiles(skt *CsvTransferStream, con *config.Config, log *logging.Logger, 
 		defer fp.Close()
 
 		log.Debugf("Sending %s", filename)
-		if err = skt.SendFile(fp, uint8(id), con.BatchSize); err != nil {
+		sentRecords, err := skt.SendFile(fp, uint8(id), con.BatchSize)
+		if err != nil {
 			log.Criticalf("Couldn't send batch of file %s: %v", filename, err)
 			skt.Error()
 			return err
@@ -27,6 +28,8 @@ func SendFiles(skt *CsvTransferStream, con *config.Config, log *logging.Logger, 
 		if err = skt.Confirm(); err != nil {
 			log.Criticalf("Couldn't send confirm fo file %s: %v", filename, err)
 		}
+
+		log.Debugf("Sent %d records of %s", sentRecords, filename)
 	}
 
 	log.Infof("Every file was sent successfully")
