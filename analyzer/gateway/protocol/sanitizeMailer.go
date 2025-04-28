@@ -113,6 +113,11 @@ func (s *SanitizeMailer) Consume() (<-chan amqp.Delivery, error) {
 			}
 
 			del := recv.Interface().(amqp.Delivery)
+
+			query := del.Headers["query"].(int32)
+			seq := del.Headers["seq"].(int32)
+			kind := del.Headers["kind"].(int32)
+			fmt.Printf("MAILER: query: %d, seq: %d, kind: %d\n", query, seq, kind)
 			out <- del
 		}
 	}()

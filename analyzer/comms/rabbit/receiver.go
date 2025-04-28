@@ -22,8 +22,6 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 	}
 	ordered := make(chan amqp.Delivery)
 
-	// co-routing will always finish first than main thread
-	// main thread should be always listening to returned channel
 	go func() {
 		expecting := 0
 		buf := make(map[int]amqp.Delivery)
@@ -31,17 +29,7 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 
 		for del := range recv {
 			seq := int(del.Headers["seq"].(int32))
-
-			kind := del.Headers["kind"].(int32)
-			if query, ok := del.Headers["query"]; ok {
-				fmt.Printf("query: %d, seq: %d, kind: %d\n", query, seq, kind)
-			} else {
-				fmt.Printf("seq: %d, kind: %d\n", seq, kind)
-			}
-
-			if _, ok := buf[seq]; !ok && seq >= expecting {
-				buf[seq] = del
-			}
+			buf[seq] = del
 
 			for {
 				ord, ok := buf[expecting]
@@ -51,7 +39,7 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 
 				ordered <- ord
 				delete(buf, expecting)
-				expecting += 1
+				expecting++
 			}
 		}
 	}()
