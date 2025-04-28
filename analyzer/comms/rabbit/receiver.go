@@ -7,12 +7,13 @@ import (
 )
 
 type Receiver struct {
-	broker   *Broker
-	q        amqp.Queue
+	broker *Broker
+	q      amqp.Queue
+	copies int
 }
 
-func NewReceiver(broker *Broker, q amqp.Queue) *Receiver {
-	return &Receiver{broker, q}
+func NewReceiver(broker *Broker, q amqp.Queue, copies int) *Receiver {
+	return &Receiver{broker, q, copies}
 }
 
 func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
@@ -23,23 +24,27 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 	ordered := make(chan amqp.Delivery)
 
 	go func() {
-		expecting := 0
-		buf := make(map[int]amqp.Delivery)
 		defer close(ordered)
+		expecting := make([]int, r.copies)
+		bufs := make([]map[int]amqp.Delivery, 0)
+		for range r.copies {
+			bufs = append(bufs, make(map[int]amqp.Delivery))
+		}
 
 		for del := range recv {
+			id := int(del.Headers["id"].(int32))
 			seq := int(del.Headers["seq"].(int32))
-			buf[seq] = del
+			bufs[id][seq] = del
 
 			for {
-				ord, ok := buf[expecting]
+				ord, ok := bufs[id][expecting[id]]
 				if !ok {
 					break
 				}
 
 				ordered <- ord
-				delete(buf, expecting)
-				expecting++
+				delete(bufs[id], expecting[id])
+				expecting[id]++
 			}
 		}
 	}()

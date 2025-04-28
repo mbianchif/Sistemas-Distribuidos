@@ -4,7 +4,6 @@ from pathlib import Path
 
 
 def generate_pipeline_compose(
-    gateway,
     sanitize_movies,
     sanitize_credits,
     sanitize_ratings,
@@ -27,11 +26,13 @@ def generate_pipeline_compose(
     sink_4,
     sink_5,
     minmax_rating,
-    top_10_count,
-    top_5_budget,
     join_id_movieid,
     join_id_id
 ) -> str:
+    GATEWAY = 1
+    TOP_10_COUNT = 1
+    TOP_5_BUDGET = 1
+
     docker_compose = "name: moviesanalyzer"
     docker_compose += f"""
 services:
@@ -63,7 +64,7 @@ services:
     env_file:
       - configs/gateway/.env
     environment:
-      - ID={gateway}
+      - ID=0
       - INPUT_COPIES={sink_1},{sink_2},{sink_3},{sink_4},{sink_5}
       - OUTPUT_COPIES={sanitize_movies},{sanitize_credits},{sanitize_ratings}
 """
@@ -85,7 +86,7 @@ services:
       - configs/workers/sanitize/.env.movies
     environment:
       - ID={i}
-      - INPUT_COPIES={gateway}
+      - INPUT_COPIES={GATEWAY}
       - OUTPUT_COPIES={divider},{filter_production_countries_length},{filter_release_date_since_2000}
 """
 
@@ -105,7 +106,7 @@ services:
       - configs/workers/sanitize/.env.credits
     environment:
       - ID={i}
-      - INPUT_COPIES={gateway}
+      - INPUT_COPIES={GATEWAY}
       - OUTPUT_COPIES={join_id_id}
 """
 
@@ -125,7 +126,7 @@ services:
       - configs/workers/sanitize/.env.ratings
     environment:
       - ID={i}
-      - INPUT_COPIES={gateway}
+      - INPUT_COPIES={GATEWAY}
       - OUTPUT_COPIES={join_id_movieid}
 """
 
@@ -329,7 +330,7 @@ services:
     environment:
       - ID={i}
       - INPUT_COPIES={explode_production_countries}
-      - OUTPUT_COPIES={top_5_budget}
+      - OUTPUT_COPIES={TOP_5_BUDGET}
 """
 
     for i in range(groupby_actor_count):
@@ -349,7 +350,7 @@ services:
     environment:
       - ID={i}
       - INPUT_COPIES={explode_cast}
-      - OUTPUT_COPIES={top_10_count}
+      - OUTPUT_COPIES={TOP_10_COUNT}
 """
 
     docker_compose += "\n# ======================= Dividers =======================\n"
@@ -395,7 +396,7 @@ services:
 """
 
     docker_compose += "\n# ======================= Tops =======================\n"
-    for i in range(top_10_count):
+    for i in range(TOP_10_COUNT):
         docker_compose += f"""
   top-10_count-{i}:
     container_name: top-10_count-{i}
@@ -415,7 +416,7 @@ services:
       - OUTPUT_COPIES={sink_4}
 """
 
-    for i in range(top_5_budget):
+    for i in range(TOP_5_BUDGET):
         docker_compose += f"""
   top-5_budget-{i}:
     container_name: top-5_budget-{i}
@@ -515,7 +516,7 @@ services:
     environment:
       - ID={i}
       - INPUT_COPIES={filter_release_date_upto_2010}
-      - OUTPUT_COPIES={gateway}
+      - OUTPUT_COPIES={GATEWAY}
 """
 
     for i in range(sink_2):
@@ -534,8 +535,8 @@ services:
       - configs/workers/sink/.env.2
     environment:
       - ID={i}
-      - INPUT_COPIES={top_5_budget}
-      - OUTPUT_COPIES={gateway}
+      - INPUT_COPIES={TOP_5_BUDGET}
+      - OUTPUT_COPIES={GATEWAY}
 """
 
     for i in range(sink_3):
@@ -555,7 +556,7 @@ services:
     environment:
       - ID={i}
       - INPUT_COPIES={minmax_rating}
-      - OUTPUT_COPIES={gateway}
+      - OUTPUT_COPIES={GATEWAY}
 """
 
     for i in range(sink_4):
@@ -574,8 +575,8 @@ services:
       - configs/workers/sink/.env.4
     environment:
       - ID={i}
-      - INPUT_COPIES={top_10_count}
-      - OUTPUT_COPIES={gateway}
+      - INPUT_COPIES={TOP_10_COUNT}
+      - OUTPUT_COPIES={GATEWAY}
 """
 
     for i in range(sink_5):
@@ -595,7 +596,7 @@ services:
     environment:
       - ID={i}
       - INPUT_COPIES={groupby_sentiment_mean_rate_revenue_budget}
-      - OUTPUT_COPIES={gateway}
+      - OUTPUT_COPIES={GATEWAY}
 """
 
     docker_compose += """

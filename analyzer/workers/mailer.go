@@ -41,8 +41,9 @@ func (m *Mailer) Init() ([]amqp.Queue, error) {
 		return nil, err
 	}
 
+	inputCopies := m.con.InputCopies
 	m.senders = m.initSenders(outputQFmts)
-	m.receivers = m.initReceivers(inputQs)
+	m.receivers = m.initReceivers(inputQs, inputCopies)
 	return inputQs, nil
 }
 
@@ -67,12 +68,12 @@ func (m *Mailer) initSenders(outputQFmts []string) []rabbit.Sender {
 	return senders
 }
 
-func (m *Mailer) initReceivers(inputQs []amqp.Queue) map[string]*rabbit.Receiver {
+func (m *Mailer) initReceivers(inputQs []amqp.Queue, inputCopies []int) map[string]*rabbit.Receiver {
 	receivers := make(map[string]*rabbit.Receiver, len(inputQs))
 
-	for _, q := range inputQs {
-		recv := rabbit.NewReceiver(m.broker, q)
-		receivers[q.Name] = recv
+	for i := range inputQs {
+		recv := rabbit.NewReceiver(m.broker, inputQs[i], inputCopies[i])
+		receivers[inputQs[i].Name] = recv
 	}
 
 	return receivers
@@ -101,6 +102,7 @@ func mergeHeaders(base amqp.Table, headers []amqp.Table) amqp.Table {
 func (m *Mailer) PublishBatch(batch comms.Batch, headers ...amqp.Table) error {
 	baseHeaders := amqp.Table{
 		"kind": comms.BATCH,
+		"id": m.con.Id,
 	}
 	merged := mergeHeaders(baseHeaders, headers)
 
@@ -115,6 +117,7 @@ func (m *Mailer) PublishBatch(batch comms.Batch, headers ...amqp.Table) error {
 func (m *Mailer) PublishEof(eof comms.Eof, headers ...amqp.Table) error {
 	baseHeaders := amqp.Table{
 		"kind": comms.EOF,
+		"id": m.con.Id,
 	}
 	merged := mergeHeaders(baseHeaders, headers)
 

@@ -51,11 +51,11 @@ func (s *SanitizeMailer) initSenders(outputQFmts []string) []*rabbit.SenderRobin
 	return senders
 }
 
-func (s *SanitizeMailer) initReceivers(inputQs []amqp.Queue) []*rabbit.Receiver {
+func (s *SanitizeMailer) initReceivers(inputQs []amqp.Queue, inputCopies []int) []*rabbit.Receiver {
 	receivers := make([]*rabbit.Receiver, 0, len(inputQs))
 
-	for _, q := range inputQs {
-		recv := rabbit.NewReceiver(s.broker, q)
+	for i := range inputQs {
+		recv := rabbit.NewReceiver(s.broker, inputQs[i], inputCopies[i])
 		receivers = append(receivers, recv)
 	}
 
@@ -74,8 +74,9 @@ func (s *SanitizeMailer) Init() (map[int]int, error) {
 		return nil, err
 	}
 
+	
 	s.senders = s.initSenders(outputQFmts)
-	s.receivers = s.initReceivers(inputQs)
+	s.receivers = s.initReceivers(inputQs, s.con.InputCopies)
 
 	inputCopies := make(map[int]int, 0)
 	for i, copies := range s.con.InputCopies {
@@ -122,6 +123,7 @@ func (s *SanitizeMailer) Consume() (<-chan amqp.Delivery, error) {
 func (s *SanitizeMailer) PublishBatch(fileName string, body []byte) error {
 	baseHeaders := amqp.Table{
 		"kind": comms.BATCH,
+		"id": s.con.Id,
 	}
 	return s.senders[s.filename2Id[fileName]].Direct(body, baseHeaders)
 }
@@ -129,6 +131,7 @@ func (s *SanitizeMailer) PublishBatch(fileName string, body []byte) error {
 func (s *SanitizeMailer) PublishEof(fileName string, body []byte) error {
 	baseHeaders := amqp.Table{
 		"kind": comms.EOF,
+		"id": s.con.Id,
 	}
 	return s.senders[s.filename2Id[fileName]].Broadcast(body, baseHeaders)
 }
