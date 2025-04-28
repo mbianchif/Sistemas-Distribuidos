@@ -29,7 +29,8 @@ type Join struct {
 	*workers.Worker
 	Con         *config.JoinConfig
 	readingLeft bool
-	chans       []chan tuple
+	recvchans []chan tuple
+	sendchans []chan []map[string]string
 }
 
 func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
@@ -42,21 +43,26 @@ func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
 		Worker:      base,
 		Con:         con,
 		readingLeft: true,
-		chans:       nil,
+		recvchans: nil,
+		sendchans: nil,
 	}
 
-	chans := make([]chan tuple, 0, con.NShards)
+	recvchans := make([]chan tuple, 0, con.NShards)
+	sendchans := make([]chan []map[string]string, 0, con.NShards)
 	for i := range con.NShards {
-		ch := make(chan tuple)
-		chans = append(chans, ch)
+		recv := make(chan tuple)
+		send := make(chan []map[string]string)
+		recvchans = append(recvchans, recv)
+		sendchans = append(sendchans, send)
 		go func(i int) {
-			if err := spawn_file_persistor(w, ch, i); err != nil {
+			if err := spawn_file_persistor(w, recv, send, i); err != nil {
 				w.Log.Errorf("error in spawn_file_persistor: %v", err)
 			}
 		}(i)
 	}
 
-	w.chans = chans
+	w.recvchans = recvchans
+	w.sendchans = sendchans
 	return w, nil
 }
 
@@ -89,7 +95,8 @@ func load(w *Join, fp *os.File, fieldMaps []map[string]string) ([]map[string]str
 
 		left, err := comms.DecodeLine(line)
 		if err != nil {
-			w.Log.Fatalf("failed to decode line: %v", err)
+			w.Log.Criticalf("failed to decode line: %v", err)
+			continue
 		}
 
 		valueLeft, ok := left[w.Con.LeftKey]
@@ -115,16 +122,17 @@ func load(w *Join, fp *os.File, fieldMaps []map[string]string) ([]map[string]str
 	return responseFieldMaps, nil
 }
 
-func spawn_file_persistor(w *Join, ch chan tuple, i int) error {
+func spawn_file_persistor(w *Join, recv chan tuple, send chan []map[string]string, i int) error {
 	path := fmt.Sprintf("/%d.csv", i)
 	fp, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("the file %v could not be created %v", i, err)
 	}
 	defer fp.Close()
+	defer os.Remove(path)
 
 	writer := bufio.NewWriter(fp)
-	for tup := range ch {
+	for tup := range recv {
 		switch tup.kind {
 		case STORE:
 			if err := store(writer, tup.fields); err != nil {
@@ -137,11 +145,12 @@ func spawn_file_persistor(w *Join, ch chan tuple, i int) error {
 				w.Log.Errorf("there was an error loading up field maps: %v", err)
 			}
 
-			ch <- tuple{LOAD, fieldMaps}
+			send <- fieldMaps
 		}
 	}
 
-	return os.Remove(path)
+	close(send)
+	return nil
 }
 
 func (w *Join) Run() error {
@@ -151,11 +160,11 @@ func (w *Join) Run() error {
 func (w *Join) Batch(data []byte) bool {
 	if w.readingLeft {
 		if err := handleLeft(w, data); err != nil {
-			w.Log.Errorf("error while handling batch in left side")
+			w.Log.Errorf("error while handling batch in left side: %v", err)
 		}
 	} else {
 		if err := handleRight(w, data); err != nil {
-			w.Log.Errorf("error while handling batch in right side")
+			w.Log.Errorf("error while handling batch in right side: %v", err)
 		}
 	}
 	return false
@@ -166,7 +175,7 @@ func (w *Join) Eof(data []byte) bool {
 		w.readingLeft = false
 	} else {
 		// Close channels and files
-		for _, ch := range w.chans {
+		for _, ch := range w.recvchans {
 			close(ch)
 		}
 
@@ -194,13 +203,13 @@ func shard(w *Join, fieldMaps []map[string]string, key string) map[int][]map[str
 	shards := make(map[int][]map[string]string, w.Con.NShards)
 
 	for _, fieldMap := range fieldMaps {
-		key, ok := fieldMap[key]
+		value, ok := fieldMap[key]
 		if !ok {
 			w.Log.Errorf("left key %v was not found in field map", w.Con.LeftKey)
 			continue
 		}
 
-		shardKey := keyHash(key, w.Con.NShards)
+		shardKey := keyHash(value, w.Con.NShards)
 		shards[shardKey] = append(shards[shardKey], fieldMap)
 	}
 
@@ -210,12 +219,13 @@ func shard(w *Join, fieldMaps []map[string]string, key string) map[int][]map[str
 func handleLeft(w *Join, data []byte) error {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
-		w.Log.Fatalf("failed to decode line: %v", err)
+		w.Log.Criticalf("failed to decode batch: %v", err)
+		return err
 	}
 	shards := shard(w, batch.FieldMaps, w.Con.LeftKey)
 
 	for i, shard := range shards {
-		w.chans[i] <- tuple{STORE, shard}
+		w.recvchans[i] <- tuple{STORE, shard}
 	}
 
 	return nil
@@ -229,12 +239,11 @@ func handleRight(w *Join, data []byte) error {
 	shards := shard(w, batch.FieldMaps, w.Con.RightKey)
 
 	for i, shard := range shards {
-		w.chans[i] <- tuple{LOAD, shard}
+		w.recvchans[i] <- tuple{LOAD, shard}
 	}
 
 	for i := range shards {
-		resultTuples := <-w.chans[i]
-		responseFieldMaps := resultTuples.fields
+		responseFieldMaps := <-w.sendchans[i]
 		if len(responseFieldMaps) > 0 {
 			w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 			batch := comms.NewBatch(responseFieldMaps)

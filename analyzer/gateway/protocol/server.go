@@ -101,8 +101,7 @@ func (s *Server) clientHandler(conn *CsvTransferStream) error {
 }
 
 func (s *Server) sendBatch(fileName string, records [][]byte) error {
-	body := make([]byte, 1, 24000)
-	body[0] = comms.BATCH
+	body := make([]byte, 0, 24000)
 	first := true
 
 	for _, record := range records {
@@ -118,8 +117,7 @@ func (s *Server) sendBatch(fileName string, records [][]byte) error {
 }
 
 func (s *Server) sendEof(fileName string) error {
-	body := []byte{comms.EOF}
-	return s.mailer.PublishEof(fileName, body)
+	return s.mailer.PublishEof(fileName, []byte{})
 }
 
 func (s *Server) recvResults(conn *CsvTransferStream) error {

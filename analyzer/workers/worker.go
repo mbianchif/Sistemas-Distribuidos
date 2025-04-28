@@ -89,6 +89,8 @@ func (base *Worker) Run(w IWorker) error {
 				default:
 					base.Log.Errorf("received an unknown message type %v", kind)
 				}
+				
+				del.Ack(false)
 			}
 		}
 	}
