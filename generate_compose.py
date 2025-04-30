@@ -25,13 +25,13 @@ def generate_pipeline_compose(
     sink_3,
     sink_4,
     sink_5,
-    minmax_rating,
     join_id_movieid,
     join_id_id
 ) -> str:
     GATEWAY = 1
     TOP_10_COUNT = 1
     TOP_5_BUDGET = 1
+    MINMAX_RATING = 1
 
     docker_compose = "name: moviesanalyzer"
     docker_compose += f"""
@@ -290,7 +290,7 @@ services:
     environment:
       - ID={i}
       - INPUT_COPIES={join_id_movieid}
-      - OUTPUT_COPIES={minmax_rating}
+      - OUTPUT_COPIES={MINMAX_RATING}
 """
 
     for i in range(groupby_sentiment_mean_rate_revenue_budget):
@@ -437,7 +437,7 @@ services:
 """
 
     docker_compose += "\n# ======================= MinMax =======================\n"
-    for i in range(minmax_rating):
+    for i in range(MINMAX_RATING):
         docker_compose += f"""
   minmax-rating-{i}:
     container_name: minmax-rating-{i}
@@ -555,7 +555,7 @@ services:
       - configs/workers/sink/.env.3
     environment:
       - ID={i}
-      - INPUT_COPIES={minmax_rating}
+      - INPUT_COPIES={MINMAX_RATING}
       - OUTPUT_COPIES={GATEWAY}
 """
 
