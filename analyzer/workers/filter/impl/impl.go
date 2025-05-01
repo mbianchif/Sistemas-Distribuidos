@@ -37,7 +37,7 @@ func (w *Filter) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Filter) Batch(data []byte) bool {
+func (w *Filter) Batch(clientId int, data []byte) bool {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Fatalf("failed to decode batch: %v", err)
@@ -59,7 +59,7 @@ func (w *Filter) Batch(data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		body := comms.NewBatch(responseFieldMaps)
-		if err := w.Mailer.PublishBatch(body); err != nil {
+		if err := w.Mailer.PublishBatch(body, clientId); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -67,9 +67,9 @@ func (w *Filter) Batch(data []byte) bool {
 	return false
 }
 
-func (w *Filter) Eof(data []byte) bool {
+func (w *Filter) Eof(clientId int, data []byte) bool {
 	eof := comms.DecodeEof(data)
-	if err := w.Mailer.PublishEof(eof); err != nil {
+	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 	return true

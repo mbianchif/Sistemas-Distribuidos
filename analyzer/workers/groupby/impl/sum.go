@@ -10,14 +10,21 @@ import (
 
 type Sum struct {
 	*Groupby
-	state map[string]int
+	state map[int]map[string]int
 }
 
 func NewSum(w *Groupby) GroupbyHandler {
-	return &Sum{w, make(map[string]int)}
+	return &Sum{
+		Groupby: w,
+		state:   make(map[int]map[string]int),
+	}
 }
 
-func (w *Sum) Add(fieldMap map[string]string, con *config.GroupbyConfig) error {
+func (w *Sum) Clean(clientId int) {
+	w.state[clientId] = make(map[string]int)
+}
+
+func (w *Sum) Add(clientId int, fieldMap map[string]string, con *config.GroupbyConfig) error {
 	sumValueStr, ok := fieldMap[con.AggKey]
 	if !ok {
 		return fmt.Errorf("value %v was not found", con.AggKey)
@@ -38,13 +45,17 @@ func (w *Sum) Add(fieldMap map[string]string, con *config.GroupbyConfig) error {
 	}
 
 	compKey := strings.Join(keys, SEP)
-	w.state[compKey] += sumValue
+	if _, ok := w.state[clientId]; !ok {
+		w.state[clientId] = make(map[string]int)
+	}
+
+	w.state[clientId][compKey] += sumValue
 	return nil
 }
 
-func (w *Sum) Result(con *config.GroupbyConfig) []map[string]string {
+func (w *Sum) Result(clientId int, con *config.GroupbyConfig) []map[string]string {
 	fieldMaps := make([]map[string]string, 0, len(w.state))
-	for compKey, v := range w.state {
+	for compKey, v := range w.state[clientId] {
 		fieldMap := make(map[string]string)
 
 		keys := strings.Split(compKey, SEP)

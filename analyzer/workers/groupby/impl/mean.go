@@ -15,14 +15,21 @@ type tuple struct {
 
 type Mean struct {
 	*Groupby
-	state map[string]tuple
+	state map[int]map[string]tuple
 }
 
 func NewMean(w *Groupby) GroupbyHandler {
-	return &Mean{w, make(map[string]tuple)}
+	return &Mean{
+		Groupby: w,
+		state:   make(map[int]map[string]tuple),
+	}
 }
 
-func (w *Mean) Add(fieldMap map[string]string, con *config.GroupbyConfig) error {
+func (w *Mean) Clean(clientId int) {
+	w.state[clientId] = make(map[string]tuple)
+}
+
+func (w *Mean) Add(clientId int, fieldMap map[string]string, con *config.GroupbyConfig) error {
 	sumValueStr, ok := fieldMap[con.AggKey]
 	if !ok {
 		return fmt.Errorf("value %v was not found", con.AggKey)
@@ -43,18 +50,18 @@ func (w *Mean) Add(fieldMap map[string]string, con *config.GroupbyConfig) error 
 	}
 
 	compKey := strings.Join(keys, SEP)
-	if tup, ok := w.state[compKey]; !ok {
-		w.state[compKey] = tuple{sumValue, 1}
-	} else {
-		w.state[compKey] = tuple{tup.sum + sumValue, tup.n + 1}
+	if _, ok := w.state[clientId]; !ok {
+		w.state[clientId] = make(map[string]tuple)
 	}
 
+	tup := w.state[clientId][compKey]
+	w.state[clientId][compKey] = tuple{tup.sum + sumValue, tup.n + 1}
 	return nil
 }
 
-func (w *Mean) Result(con *config.GroupbyConfig) []map[string]string {
+func (w *Mean) Result(clientId int, con *config.GroupbyConfig) []map[string]string {
 	fieldMaps := make([]map[string]string, 0, len(w.state))
-	for compKey, v := range w.state {
+	for compKey, v := range w.state[clientId] {
 		fieldMap := make(map[string]string)
 
 		keys := strings.Split(compKey, SEP)

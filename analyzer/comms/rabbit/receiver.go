@@ -24,41 +24,50 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 	}
 	ordered := make(chan amqp.Delivery)
 
+	copies := r.copies
+	eofsRecv := make(map[int]int)
+	expecting := make([]map[int]int, copies)
+	for i := range expecting {
+		expecting[i] = make(map[int]int)
+	}
+
+	bufs := make([]map[int]map[int]amqp.Delivery, copies)
+	for i := range bufs {
+		bufs[i] = make(map[int]map[int]amqp.Delivery)
+	}
+
 	go func() {
 		defer close(ordered)
-		expecting := make([]int, r.copies)
-		bufs := make([]map[int]amqp.Delivery, 0)
-		for range r.copies {
-			bufs = append(bufs, make(map[int]amqp.Delivery))
-		}
-
-		eofsRecv := 0
-		copies := r.copies
 
 		for del := range recv {
-			id := int(del.Headers["id"].(int32))
+			replica := int(del.Headers["replica-id"].(int32))
+			client := int(del.Headers["client-id"].(int32))
 			seq := int(del.Headers["seq"].(int32))
-			bufs[id][seq] = del
+
+			if _, ok := bufs[replica][client]; !ok {
+				bufs[replica][client] = make(map[int]amqp.Delivery)
+			}
+			bufs[replica][client][seq] = del
 
 			for {
-				ord, ok := bufs[id][expecting[id]]
+				next, ok := bufs[replica][client][expecting[replica][client]]
 				if !ok {
 					break
 				}
 
-				delete(bufs[id], expecting[id])
-				expecting[id]++
+				delete(bufs[replica][client], expecting[replica][client])
+				expecting[replica][client]++
 
-				kind := int(ord.Headers["kind"].(int32))
+				kind := int(next.Headers["kind"].(int32))
 				if kind == comms.EOF {
-					eofsRecv += 1
-					if eofsRecv < copies {
+					eofsRecv[client] += 1
+					if eofsRecv[client] < copies {
 						continue
 					}
-					eofsRecv = 0
+					delete(eofsRecv, client)
 				}
 
-				ordered <- ord
+				ordered <- next
 			}
 		}
 	}()

@@ -33,5 +33,6 @@ func main() {
 		log.Errorf("Couldn't start server: %v", err)
 		return
 	}
+
 	sv.Run()
 }

@@ -109,35 +109,26 @@ func (cts *CsvTransferStream) Close() error {
 }
 
 type CsvTransferListener struct {
-	listener net.Listener
-	shutdown bool
+	lis net.Listener
 }
 
 func Bind(host string, port int, backlog int) (*CsvTransferListener, error) {
 	addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
-	ln, err := net.Listen("tcp", addr)
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't bind through requested address %s: %v", addr, err)
 	}
-	return &CsvTransferListener{listener: ln, shutdown: false}, nil
+	return &CsvTransferListener{lis}, nil
 }
 
-func (s *CsvTransferListener) Accept() (*CsvTransferStream, net.Addr, error) {
-	if s.shutdown {
-		return nil, nil, nil
-	}
-
-	conn, err := s.listener.Accept()
+func (s *CsvTransferListener) Accept() (*CsvTransferStream, net.Addr) {
+	conn, err := s.lis.Accept()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil
 	}
-	return NewCsvTransferStream(conn), conn.RemoteAddr(), nil
-}
-
-func (s *CsvTransferListener) Shutdown() {
-	s.shutdown = true
+	return NewCsvTransferStream(conn), conn.RemoteAddr()
 }
 
 func (s *CsvTransferListener) Close() {
-	s.listener.Close()
+	s.lis.Close()
 }

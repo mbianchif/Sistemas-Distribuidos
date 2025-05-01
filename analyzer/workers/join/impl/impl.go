@@ -29,8 +29,8 @@ type Join struct {
 	*workers.Worker
 	Con         *config.JoinConfig
 	readingLeft bool
-	recvchans []chan tuple
-	sendchans []chan []map[string]string
+	recvchans   []chan tuple
+	sendchans   []chan []map[string]string
 }
 
 func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
@@ -40,16 +40,26 @@ func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
 	}
 
 	w := &Join{
-		Worker:      base,
-		Con:         con,
-		readingLeft: true,
-		recvchans: nil,
-		sendchans: nil,
+		Worker: base,
+		Con:    con,
+	}
+	w.Clean(0)
+
+	return w, nil
+}
+
+func (w *Join) Clean(_ int) {
+	if w.recvchans != nil {
+		for _, ch := range w.recvchans {
+			close(ch)
+		}
 	}
 
-	recvchans := make([]chan tuple, 0, con.NShards)
-	sendchans := make([]chan []map[string]string, 0, con.NShards)
-	for i := range con.NShards {
+	w.readingLeft = true
+
+	recvchans := make([]chan tuple, 0, w.Con.NShards)
+	sendchans := make([]chan []map[string]string, 0, w.Con.NShards)
+	for i := range w.Con.NShards {
 		recv := make(chan tuple)
 		send := make(chan []map[string]string)
 		recvchans = append(recvchans, recv)
@@ -63,7 +73,6 @@ func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
 
 	w.recvchans = recvchans
 	w.sendchans = sendchans
-	return w, nil
 }
 
 func store(writer *bufio.Writer, fieldMaps []map[string]string) error {
@@ -157,33 +166,29 @@ func (w *Join) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Join) Batch(data []byte) bool {
+func (w *Join) Batch(clientId int, data []byte) bool {
 	if w.readingLeft {
-		if err := handleLeft(w, data); err != nil {
+		if err := handleLeft(w, clientId, data); err != nil {
 			w.Log.Errorf("error while handling batch in left side: %v", err)
 		}
 	} else {
-		if err := handleRight(w, data); err != nil {
+		if err := handleRight(w, clientId, data); err != nil {
 			w.Log.Errorf("error while handling batch in right side: %v", err)
 		}
 	}
 	return false
 }
 
-func (w *Join) Eof(data []byte) bool {
+func (w *Join) Eof(clientId int, data []byte) bool {
 	if w.readingLeft {
 		w.readingLeft = false
 	} else {
-		// Close channels and files
-		for _, ch := range w.recvchans {
-			close(ch)
-		}
-
-		// Send Eof
 		eof := comms.DecodeEof(data)
-		if err := w.Mailer.PublishEof(eof); err != nil {
+		if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
+
+		w.Clean(clientId)
 	}
 
 	return true
@@ -216,7 +221,7 @@ func shard(w *Join, fieldMaps []map[string]string, key string) map[int][]map[str
 	return shards
 }
 
-func handleLeft(w *Join, data []byte) error {
+func handleLeft(w *Join, _ int, data []byte) error {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Criticalf("failed to decode batch: %v", err)
@@ -231,7 +236,7 @@ func handleLeft(w *Join, data []byte) error {
 	return nil
 }
 
-func handleRight(w *Join, data []byte) error {
+func handleRight(w *Join, clientId int, data []byte) error {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Fatalf("failed to decode batch: %v", err)
@@ -247,7 +252,7 @@ func handleRight(w *Join, data []byte) error {
 		if len(responseFieldMaps) > 0 {
 			w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 			batch := comms.NewBatch(responseFieldMaps)
-			if err := w.Mailer.PublishBatch(batch); err != nil {
+			if err := w.Mailer.PublishBatch(batch, clientId); err != nil {
 				w.Log.Errorf("failed to publish message: %v", err)
 			}
 		}

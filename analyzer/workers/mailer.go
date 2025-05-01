@@ -14,11 +14,11 @@ import (
 )
 
 type Mailer struct {
-	senders []rabbit.Sender
+	senders   []rabbit.Sender
 	receivers map[string]*rabbit.Receiver
-	broker  *rabbit.Broker
-	con     *config.Config
-	Log     *logging.Logger
+	broker    *rabbit.Broker
+	con       *config.Config
+	Log       *logging.Logger
 }
 
 func NewMailer(con *config.Config, log *logging.Logger) (*Mailer, error) {
@@ -99,10 +99,11 @@ func mergeHeaders(base amqp.Table, headers []amqp.Table) amqp.Table {
 	return base
 }
 
-func (m *Mailer) PublishBatch(batch comms.Batch, headers ...amqp.Table) error {
+func (m *Mailer) PublishBatch(batch comms.Batch, clientId int, headers ...amqp.Table) error {
 	baseHeaders := amqp.Table{
-		"kind": comms.BATCH,
-		"id": m.con.Id,
+		"kind":       comms.BATCH,
+		"replica-id": m.con.Id,
+		"client-id":  clientId,
 	}
 	merged := mergeHeaders(baseHeaders, headers)
 
@@ -114,10 +115,11 @@ func (m *Mailer) PublishBatch(batch comms.Batch, headers ...amqp.Table) error {
 	return nil
 }
 
-func (m *Mailer) PublishEof(eof comms.Eof, headers ...amqp.Table) error {
+func (m *Mailer) PublishEof(eof comms.Eof, clientId int, headers ...amqp.Table) error {
 	baseHeaders := amqp.Table{
-		"kind": comms.EOF,
-		"id": m.con.Id,
+		"kind":       comms.EOF,
+		"replica-id": m.con.Id,
+		"client-id":  clientId,
 	}
 	merged := mergeHeaders(baseHeaders, headers)
 

@@ -28,7 +28,7 @@ func (w *Divider) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Divider) Batch(data []byte) bool {
+func (w *Divider) Batch(clientId int, data []byte) bool {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Fatal("failed to decode line: %v", err)
@@ -50,7 +50,7 @@ func (w *Divider) Batch(data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		batch := comms.NewBatch(responseFieldMaps)
-		if err := w.Mailer.PublishBatch(batch); err != nil {
+		if err := w.Mailer.PublishBatch(batch, clientId); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -88,9 +88,9 @@ func handleDivider(fieldMap map[string]string) (map[string]string, error) {
 	return fieldMap, nil
 }
 
-func (w *Divider) Eof(data []byte) bool {
+func (w *Divider) Eof(clientId int, data []byte) bool {
 	body := comms.DecodeEof(data)
-	if err := w.Mailer.PublishEof(body); err != nil {
+	if err := w.Mailer.PublishEof(body, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 	return true

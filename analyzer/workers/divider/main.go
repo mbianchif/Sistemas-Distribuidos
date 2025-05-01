@@ -22,11 +22,11 @@ func main() {
 		log.Fatalf("failed init: %v", err)
 	}
 	log.Debug("successfull init")
+	defer w.Close()
 
 	if err := w.Run(); err != nil {
 		log.Criticalf("failed run: %v", err)
 	}
 
 	log.Infof("Terminating...")
-	w.Close()
 }

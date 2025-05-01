@@ -13,17 +13,16 @@ import (
 )
 
 type IWorker interface {
-	Batch([]byte) bool
-	Eof([]byte) bool
+	Batch(int, []byte) bool
+	Eof(int, []byte) bool
 }
 
 type Worker struct {
-	Log         *logging.Logger
-	Mailer      *Mailer
-	sigChan     chan os.Signal
-	inputQueues []amqp.Queue
-	eofsRecv    int
-	con         *config.Config
+	Log        *logging.Logger
+	Mailer     *Mailer
+	sigChan    chan os.Signal
+	inputChans []<-chan amqp.Delivery
+	con        *config.Config
 }
 
 func New(con *config.Config, log *logging.Logger) (*Worker, error) {
@@ -40,55 +39,59 @@ func New(con *config.Config, log *logging.Logger) (*Worker, error) {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM)
 
+	inputChans := make([]<-chan amqp.Delivery, 0, len(inputQueues))
+	for _, q := range inputQueues {
+		ch, err := mailer.Consume(q)
+		if err != nil {
+			return nil, err
+		}
+		inputChans = append(inputChans, ch)
+	}
+
 	return &Worker{
-		Log:         log,
-		Mailer:      mailer,
-		sigChan:     sigs,
-		inputQueues: inputQueues,
-		con:         con,
+		Log:        log,
+		Mailer:     mailer,
+		sigChan:    sigs,
+		inputChans: inputChans,
+		con:        con,
 	}, nil
 }
 
 func (base *Worker) Run(w IWorker) error {
 	base.Log.Infof("Running...")
-	for _, q := range base.inputQueues {
-		ch, err := base.Mailer.Consume(q)
-		if err != nil {
-			return err
-		}
+	for {
+		for _, ch := range base.inputChans {
+			exit := false
+			for !exit {
+				select {
+				case <-base.sigChan:
+					base.Log.Info("received SIGTERM")
+					return nil
 
-		exit := false
-		for !exit {
-			select {
-			case <-base.sigChan:
-				base.Log.Info("received SIGTERM")
-				return nil
+				case del, ok := <-ch:
+					if !ok {
+						base.Log.Warning("delivery channel was closed unexpectedly")
+						exit = true
+						break
+					}
+					defer del.Ack(false)
 
-			case del, ok := <-ch:
-				if !ok {
-					base.Log.Warning("delivery channel was closed unexpectedly")
-					exit = true
-					break
+					kind := int(del.Headers["kind"].(int32))
+					client := int(del.Headers["client-id"].(int32))
+					body := del.Body
+
+					switch kind {
+					case comms.BATCH:
+						exit = w.Batch(client, body)
+					case comms.EOF:
+						exit = w.Eof(client, body)
+					default:
+						base.Log.Errorf("received an unknown message type %v", kind)
+					}
 				}
-
-				kind := int(del.Headers["kind"].(int32))
-				body := del.Body
-
-				switch kind {
-				case comms.BATCH:
-					exit = w.Batch(body)
-				case comms.EOF:
-					exit = w.Eof(body)
-				default:
-					base.Log.Errorf("received an unknown message type %v", kind)
-				}
-				
-				del.Ack(false)
 			}
 		}
 	}
-
-	return nil
 }
 
 func (w *Worker) Close() {

@@ -29,7 +29,7 @@ func (w *Explode) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Explode) Batch(data []byte) bool {
+func (w *Explode) Batch(clientId int, data []byte) bool {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Fatal("failed to decode line: %v", err)
@@ -49,7 +49,7 @@ func (w *Explode) Batch(data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		body := comms.NewBatch(responseFieldMaps)
-		if err := w.Mailer.PublishBatch(body); err != nil {
+		if err := w.Mailer.PublishBatch(body, clientId); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -73,9 +73,9 @@ func handleExplode(fieldMap map[string]string, con *config.ExplodeConfig) ([]map
 	return fieldMaps, nil
 }
 
-func (w *Explode) Eof(data []byte) bool {
+func (w *Explode) Eof(clientId int, data []byte) bool {
 	eof := comms.DecodeEof(data)
-	if err := w.Mailer.PublishEof(eof); err != nil {
+	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 

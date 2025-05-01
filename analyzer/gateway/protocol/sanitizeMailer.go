@@ -74,7 +74,6 @@ func (s *SanitizeMailer) Init() error {
 		return err
 	}
 
-	
 	inputCopies := s.con.InputCopies
 	s.senders = s.initSenders(outputQFmts)
 	s.receivers = s.initReceivers(inputQs, inputCopies)
@@ -116,18 +115,20 @@ func (s *SanitizeMailer) Consume() (<-chan amqp.Delivery, error) {
 	return out, nil
 }
 
-func (s *SanitizeMailer) PublishBatch(fileName string, body []byte) error {
+func (s *SanitizeMailer) PublishBatch(fileName string, clientId int, body []byte) error {
 	baseHeaders := amqp.Table{
-		"kind": comms.BATCH,
-		"id": s.con.Id,
+		"kind":       comms.BATCH,
+		"replica-id": s.con.Id,
+		"client-id":  clientId,
 	}
 	return s.senders[s.filename2Id[fileName]].Direct(body, baseHeaders)
 }
 
-func (s *SanitizeMailer) PublishEof(fileName string, body []byte) error {
+func (s *SanitizeMailer) PublishEof(fileName string, clientId int, body []byte) error {
 	baseHeaders := amqp.Table{
-		"kind": comms.EOF,
-		"id": s.con.Id,
+		"kind":       comms.EOF,
+		"replica-id": s.con.Id,
+		"client-id":  clientId,
 	}
 	return s.senders[s.filename2Id[fileName]].Broadcast(body, baseHeaders)
 }

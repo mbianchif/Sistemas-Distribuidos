@@ -38,7 +38,7 @@ func (w *Sanitize) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Sanitize) Batch(data []byte) bool {
+func (w *Sanitize) Batch(clientId int, data []byte) bool {
 	reader := csv.NewReader(bytes.NewReader(data))
 	responseFieldMaps := make([]map[string]string, 0)
 
@@ -56,7 +56,7 @@ func (w *Sanitize) Batch(data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		batch := comms.NewBatch(responseFieldMaps)
-		if err := w.Mailer.PublishBatch(batch); err != nil {
+		if err := w.Mailer.PublishBatch(batch, clientId); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -186,9 +186,9 @@ func handleCredit(w *Sanitize, line []string) map[string]string {
 	return fields
 }
 
-func (w *Sanitize) Eof(data []byte) bool {
+func (w *Sanitize) Eof(clientId int, data []byte) bool {
 	eof := comms.DecodeEof(data)
-	if err := w.Mailer.PublishEof(eof); err != nil {
+	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 	return true

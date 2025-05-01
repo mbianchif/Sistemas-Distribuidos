@@ -10,14 +10,21 @@ import (
 
 type Count struct {
 	*Groupby
-	state map[string]int
+	state map[int]map[string]int
 }
 
 func NewCount(w *Groupby) GroupbyHandler {
-	return &Count{w, make(map[string]int)}
+	return &Count{
+		Groupby: w,
+		state:   make(map[int]map[string]int),
+	}
 }
 
-func (w *Count) Add(fieldMap map[string]string, con *config.GroupbyConfig) error {
+func (w *Count) Clean(clientId int) {
+	w.state[clientId] = make(map[string]int)
+}
+
+func (w *Count) Add(clientId int, fieldMap map[string]string, con *config.GroupbyConfig) error {
 	keys := make([]string, 0, len(con.GroupKeys))
 	for _, key := range con.GroupKeys {
 		field, ok := fieldMap[key]
@@ -28,13 +35,17 @@ func (w *Count) Add(fieldMap map[string]string, con *config.GroupbyConfig) error
 	}
 
 	compKey := strings.Join(keys, SEP)
-	w.state[compKey] += 1
+	if _, ok := w.state[clientId]; !ok {
+		w.state[clientId] = make(map[string]int)
+	}
+
+	w.state[clientId][compKey] += 1
 	return nil
 }
 
-func (w *Count) Result(con *config.GroupbyConfig) []map[string]string {
+func (w *Count) Result(clientId int, con *config.GroupbyConfig) []map[string]string {
 	fieldMaps := make([]map[string]string, 0, len(w.state))
-	for compKey, v := range w.state {
+	for compKey, v := range w.state[clientId] {
 		fieldMap := make(map[string]string)
 
 		keys := strings.Split(compKey, SEP)

@@ -17,8 +17,9 @@ type Groupby struct {
 }
 
 type GroupbyHandler interface {
-	Add(map[string]string, *config.GroupbyConfig) error
-	Result(*config.GroupbyConfig) []map[string]string
+	Add(int, map[string]string, *config.GroupbyConfig) error
+	Result(int, *config.GroupbyConfig) []map[string]string
+	Clean(int)
 }
 
 func New(con *config.GroupbyConfig, log *logging.Logger) (*Groupby, error) {
@@ -42,14 +43,18 @@ func (w *Groupby) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Groupby) Batch(data []byte) bool {
+func (w *Groupby) Clean(clientId int) {
+	w.Handler.Clean(clientId)
+}
+
+func (w *Groupby) Batch(clientId int, data []byte) bool {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Fatalf("failed to decode batch: %v", err)
 	}
 
 	for _, fieldMap := range batch.FieldMaps {
-		err := w.Handler.Add(fieldMap, w.Con)
+		err := w.Handler.Add(clientId, fieldMap, w.Con)
 		if err != nil {
 			w.Log.Errorf("failed to handle message: %v", err)
 			continue
@@ -59,21 +64,22 @@ func (w *Groupby) Batch(data []byte) bool {
 	return false
 }
 
-func (w *Groupby) Eof(data []byte) bool {
-	responseFieldMaps := w.Handler.Result(w.Con)
+func (w *Groupby) Eof(clientId int, data []byte) bool {
+	responseFieldMaps := w.Handler.Result(clientId, w.Con)
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		batch := comms.NewBatch(responseFieldMaps)
-		if err := w.Mailer.PublishBatch(batch); err != nil {
+		if err := w.Mailer.PublishBatch(batch, clientId); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
 
 	eof := comms.DecodeEof(data)
-	if err := w.Mailer.PublishEof(eof); err != nil {
+	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
+	w.Clean(clientId)
 	return true
 }
 

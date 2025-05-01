@@ -35,7 +35,7 @@ func (w *Sentiment) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Sentiment) Batch(data []byte) bool {
+func (w *Sentiment) Batch(clientId int, data []byte) bool {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Fatal("failed to decode batch: %v", err)
@@ -57,7 +57,7 @@ func (w *Sentiment) Batch(data []byte) bool {
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		batch := comms.NewBatch(responseFieldMaps)
-		if err := w.Mailer.PublishBatch(batch); err != nil {
+		if err := w.Mailer.PublishBatch(batch, clientId); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
@@ -87,9 +87,9 @@ func handleSentiment(w *Sentiment, fieldMap map[string]string) (map[string]strin
 	return fieldMap, nil
 }
 
-func (w *Sentiment) Eof(data []byte) bool {
+func (w *Sentiment) Eof(clientId int, data []byte) bool {
 	eof := comms.DecodeEof(data)
-	if err := w.Mailer.PublishEof(eof); err != nil {
+	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 

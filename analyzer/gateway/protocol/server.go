@@ -10,13 +10,15 @@ import (
 	"analyzer/gateway/config"
 
 	"github.com/op/go-logging"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Server struct {
-	lis         *CsvTransferListener
-	con         *config.Config
-	mailer      *SanitizeMailer
-	log         *logging.Logger
+	lis      *CsvTransferListener
+	con      *config.Config
+	mailer   *SanitizeMailer
+	log      *logging.Logger
+	recvChan <-chan amqp.Delivery
 }
 
 func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {
@@ -34,33 +36,33 @@ func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {
 		return nil, err
 	}
 
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGTERM)
+	recvChan, err := mailer.Consume()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Server{
-		lis:         lis,
-		con:         config,
-		mailer:      mailer,
-		log:         log,
+		lis:      lis,
+		con:      config,
+		mailer:   mailer,
+		log:      log,
+		recvChan: recvChan,
 	}, nil
 }
 
-func (s *Server) acceptNewConn() (*CsvTransferStream, error) {
+func (s *Server) acceptNewConn() *CsvTransferStream {
 	s.log.Infof("Waiting for connections...")
-	conn, addr, err := s.lis.Accept()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't accept new connection: %v", err)
-	}
+	conn, addr := s.lis.Accept()
 
 	if conn == nil {
-		return nil, nil
+		return nil
 	}
 
 	s.log.Infof("Got a new connection from %v", addr)
-	return conn, nil
+	return conn
 }
 
-func (s *Server) clientHandler(conn *CsvTransferStream) error {
+func (s *Server) clientHandler(conn *CsvTransferStream, clientId int) error {
 	for range 3 {
 		fileName, err := conn.Resource()
 		if err != nil {
@@ -76,11 +78,11 @@ func (s *Server) clientHandler(conn *CsvTransferStream) error {
 
 			if msg.Kind == MSG_EOF {
 				s.log.Infof("%s was successfully received", fileName)
-				s.sendEof(fileName)
+				s.sendEof(fileName, clientId)
 				break
 
 			} else if msg.Kind == MSG_BATCH {
-				s.sendBatch(fileName, msg.Data)
+				s.sendBatch(fileName, clientId, msg.Data)
 
 			} else if msg.Kind == MSG_ERR {
 				s.log.Criticalf("an error was received from the client, exiting...")
@@ -94,7 +96,7 @@ func (s *Server) clientHandler(conn *CsvTransferStream) error {
 	return nil
 }
 
-func (s *Server) sendBatch(fileName string, records [][]byte) error {
+func (s *Server) sendBatch(fileName string, clientId int, records [][]byte) error {
 	body := make([]byte, 0, 24000)
 	first := true
 
@@ -107,66 +109,75 @@ func (s *Server) sendBatch(fileName string, records [][]byte) error {
 		body = append(body, record...)
 	}
 
-	return s.mailer.PublishBatch(fileName, body)
+	return s.mailer.PublishBatch(fileName, clientId, body)
 }
 
-func (s *Server) sendEof(fileName string) error {
-	return s.mailer.PublishEof(fileName, []byte{})
+func (s *Server) sendEof(fileName string, clientId int) error {
+	return s.mailer.PublishEof(fileName, clientId, []byte{})
 }
 
 func (s *Server) recvResults(conn *CsvTransferStream) error {
-	recvChan, err := s.mailer.Consume()
-	if err != nil {
-		return fmt.Errorf("couldn't consume")
-	}
-
-	for del := range recvChan {
+	eofsRecv := 0
+	for del := range s.recvChan {
 		kind := int(del.Headers["kind"].(int32))
 		query := int(del.Headers["query"].(int32))
+		clientId := int(del.Headers["client-id"].(int32))
 		body := del.Body
 
 		if kind == comms.BATCH {
 			batch, err := comms.DecodeBatch(body)
 			if err != nil {
-				return fmt.Errorf("failed to decode batch from query %d", query)
+				return fmt.Errorf("[%d]: failed to decode batch from query %d", clientId, query)
 			}
 			result := batch.ToResult(query)
 			conn.Send(result)
-			s.log.Infof("Received batch for query %d: %v", query, batch)
+			s.log.Infof("[%d]: Received batch for query %d: %v", clientId, query, batch)
 
 		} else if kind == MSG_EOF {
 			eof := comms.DecodeEof(body)
 			result := eof.ToResult(query)
 			conn.Send(result)
-			s.log.Infof("Query %d has been successfully processed", query)
+			s.log.Infof("[%d]: Query %d has been successfully processed", query)
+			eofsRecv += 1
 
 		} else {
 			s.log.Errorf("Received an unknown data kind %d", kind)
 		}
 
 		del.Ack(false)
+		if eofsRecv == 5 {
+			break
+		}
 	}
 
 	return nil
 }
 
-func (s *Server) Run() error {
-	conn, err := s.acceptNewConn()
-	if err != nil {
-		return err
-	}
-	if conn == nil {
-		return nil
-	}
+func (s *Server) Run() {
 	defer s.mailer.DeInit()
-	defer conn.Close()
 
-	s.lis.Close()
 	go func() {
-		if err := s.clientHandler(conn); err != nil {
-			s.log.Errorf("error while handling client: %v", err)
-		}
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGTERM)
+
+		<-sigs
+		s.log.Info("Received SIGTERM")
+		s.lis.Close()
 	}()
 
-	return s.recvResults(conn)
+	for clientId := 0; ; clientId++ {
+		conn := s.acceptNewConn()
+		if conn == nil {
+			break
+		}
+		defer conn.Close()
+
+		go func() {
+			if err := s.clientHandler(conn, clientId); err != nil {
+				s.log.Errorf("error while handling client: %v", err)
+			}
+		}()
+
+		s.recvResults(conn)
+	}
 }
