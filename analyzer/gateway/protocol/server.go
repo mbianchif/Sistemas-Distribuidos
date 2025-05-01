@@ -16,7 +16,6 @@ type Server struct {
 	lis         *CsvTransferListener
 	con         *config.Config
 	mailer      *SanitizeMailer
-	inputCopies map[int]int
 	log         *logging.Logger
 }
 
@@ -26,8 +25,7 @@ func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {
 		return nil, err
 	}
 
-	inputCopies, err := mailer.Init()
-	if err != nil {
+	if err := mailer.Init(); err != nil {
 		return nil, err
 	}
 
@@ -43,7 +41,6 @@ func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {
 		lis:         lis,
 		con:         config,
 		mailer:      mailer,
-		inputCopies: inputCopies,
 		log:         log,
 	}, nil
 }
@@ -123,7 +120,6 @@ func (s *Server) recvResults(conn *CsvTransferStream) error {
 		return fmt.Errorf("couldn't consume")
 	}
 
-	eofsRecv := make(map[int]int, 0)
 	for del := range recvChan {
 		kind := int(del.Headers["kind"].(int32))
 		query := int(del.Headers["query"].(int32))
@@ -136,15 +132,14 @@ func (s *Server) recvResults(conn *CsvTransferStream) error {
 			}
 			result := batch.ToResult(query)
 			conn.Send(result)
+			s.log.Infof("Received batch for query %d: %v", query, batch)
 
 		} else if kind == MSG_EOF {
-			eofsRecv[query] += 1
-			if eofsRecv[query] >= s.inputCopies[query] {
-				eof := comms.DecodeEof(body)
-				result := eof.ToResult(query)
-				conn.Send(result)
-				s.log.Infof("Query %d has been successfully processed", query)
-			}
+			eof := comms.DecodeEof(body)
+			result := eof.ToResult(query)
+			conn.Send(result)
+			s.log.Infof("Query %d has been successfully processed", query)
+
 		} else {
 			s.log.Errorf("Received an unknown data kind %d", kind)
 		}

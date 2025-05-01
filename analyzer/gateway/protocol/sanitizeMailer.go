@@ -62,7 +62,7 @@ func (s *SanitizeMailer) initReceivers(inputQs []amqp.Queue, inputCopies []int) 
 	return receivers
 }
 
-func (s *SanitizeMailer) Init() (map[int]int, error) {
+func (s *SanitizeMailer) Init() error {
 	inExchNames := s.con.InputExchangeNames
 	inQNames := s.con.InputQueueNames
 	outExchName := s.con.OutputExchangeName
@@ -71,19 +71,15 @@ func (s *SanitizeMailer) Init() (map[int]int, error) {
 
 	inputQs, outputQFmts, err := s.broker.Init(s.con.Id, inExchNames, inQNames, outExchName, outQNames, outCopies)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	
+	inputCopies := s.con.InputCopies
 	s.senders = s.initSenders(outputQFmts)
-	s.receivers = s.initReceivers(inputQs, s.con.InputCopies)
+	s.receivers = s.initReceivers(inputQs, inputCopies)
 
-	inputCopies := make(map[int]int, 0)
-	for i, copies := range s.con.InputCopies {
-		inputCopies[i+1] = copies
-	}
-
-	return inputCopies, nil
+	return nil
 }
 
 func (s *SanitizeMailer) Consume() (<-chan amqp.Delivery, error) {

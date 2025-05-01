@@ -51,7 +51,7 @@ func New(con *config.Config, log *logging.Logger) (*Worker, error) {
 
 func (base *Worker) Run(w IWorker) error {
 	base.Log.Infof("Running...")
-	for i, q := range base.inputQueues {
+	for _, q := range base.inputQueues {
 		ch, err := base.Mailer.Consume(q)
 		if err != nil {
 			return err
@@ -78,13 +78,6 @@ func (base *Worker) Run(w IWorker) error {
 				case comms.BATCH:
 					exit = w.Batch(body)
 				case comms.EOF:
-					base.eofsRecv += 1
-
-					if base.eofsRecv < base.con.InputCopies[i] {
-						break
-					}
-
-					base.eofsRecv = 0
 					exit = w.Eof(body)
 				default:
 					base.Log.Errorf("received an unknown message type %v", kind)

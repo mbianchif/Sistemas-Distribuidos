@@ -1,6 +1,7 @@
 package rabbit
 
 import (
+	"analyzer/comms"
 	"fmt"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -31,6 +32,9 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 			bufs = append(bufs, make(map[int]amqp.Delivery))
 		}
 
+		eofsRecv := 0
+		copies := r.copies
+
 		for del := range recv {
 			id := int(del.Headers["id"].(int32))
 			seq := int(del.Headers["seq"].(int32))
@@ -42,9 +46,19 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 					break
 				}
 
-				ordered <- ord
 				delete(bufs[id], expecting[id])
 				expecting[id]++
+
+				kind := int(ord.Headers["kind"].(int32))
+				if kind == comms.EOF {
+					eofsRecv += 1
+					if eofsRecv < copies {
+						continue
+					}
+					eofsRecv = 0
+				}
+
+				ordered <- ord
 			}
 		}
 	}()
