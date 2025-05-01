@@ -11,9 +11,9 @@ import (
 type SenderRobin struct {
 	broker       *Broker
 	fmt          string
-	i            int
+	cur          map[int]int
 	outputCopies int
-	seq          []int
+	seq          []map[int]int
 }
 
 func NewRobin(broker *Broker, fmt string, outputCopies int) *SenderRobin {
@@ -21,7 +21,8 @@ func NewRobin(broker *Broker, fmt string, outputCopies int) *SenderRobin {
 		broker:       broker,
 		fmt:          fmt,
 		outputCopies: outputCopies,
-		seq:          make([]int, outputCopies),
+		cur:          make(map[int]int),
+		seq:          make([]map[int]int, outputCopies),
 	}
 }
 
@@ -35,17 +36,23 @@ func (s *SenderRobin) Eof(eof comms.Eof, headers amqp.Table) error {
 	return s.Broadcast(body, headers)
 }
 
-func (s *SenderRobin) nextKeySeq() (string, int) {
-	key := fmt.Sprintf(s.fmt, s.i)
-	seq := s.seq[s.i]
+func (s *SenderRobin) nextKeySeq(clientId int) (string, int) {
+	i := s.cur[clientId]
+	key := fmt.Sprintf(s.fmt, i)
+	seq := s.seq[i][clientId]
 
-	s.seq[s.i] += 1
-	s.i = (s.i + 1) % s.outputCopies
+	if _, ok := s.seq[i][clientId]; !ok {
+		s.seq[i] = make(map[int]int)
+	}
+
+	s.seq[i][clientId] += 1
+	s.cur[clientId] = (i + 1) % s.outputCopies
 	return key, seq
 }
 
 func (s *SenderRobin) Direct(body []byte, headers amqp.Table) error {
-	key, seq := s.nextKeySeq()
+	clientId := int(headers["client-id"].(int32))
+	key, seq := s.nextKeySeq(clientId)
 	headers["seq"] = seq
 	return s.broker.Publish(key, body, headers)
 }

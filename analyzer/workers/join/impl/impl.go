@@ -194,40 +194,17 @@ func (w *Join) Eof(clientId int, data []byte) bool {
 	return true
 }
 
-func keyHash(str string, mod int) int {
-	var hash uint64 = 5381
-
-	for _, c := range str {
-		hash = ((hash << 5) + hash) + uint64(c) // hash * 33 + c
-	}
-
-	return int(hash % uint64(mod))
-}
-
-func shard(w *Join, fieldMaps []map[string]string, key string) map[int][]map[string]string {
-	shards := make(map[int][]map[string]string, w.Con.NShards)
-
-	for _, fieldMap := range fieldMaps {
-		value, ok := fieldMap[key]
-		if !ok {
-			w.Log.Errorf("left key %v was not found in field map", w.Con.LeftKey)
-			continue
-		}
-
-		shardKey := keyHash(value, w.Con.NShards)
-		shards[shardKey] = append(shards[shardKey], fieldMap)
-	}
-
-	return shards
-}
-
 func handleLeft(w *Join, _ int, data []byte) error {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Criticalf("failed to decode batch: %v", err)
 		return err
 	}
-	shards := shard(w, batch.FieldMaps, w.Con.LeftKey)
+
+	shards, err := comms.Shard(batch.FieldMaps, w.Con.LeftKey, w.Con.NShards)
+	if err != nil {
+		return err
+	}
 
 	for i, shard := range shards {
 		w.recvchans[i] <- tuple{STORE, shard}
@@ -241,7 +218,10 @@ func handleRight(w *Join, clientId int, data []byte) error {
 	if err != nil {
 		w.Log.Fatalf("failed to decode batch: %v", err)
 	}
-	shards := shard(w, batch.FieldMaps, w.Con.RightKey)
+	shards, err := comms.Shard(batch.FieldMaps, w.Con.RightKey, w.Con.NShards)
+	if err != nil {
+		return err
+	}
 
 	for i, shard := range shards {
 		w.recvchans[i] <- tuple{LOAD, shard}

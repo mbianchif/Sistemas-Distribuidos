@@ -137,7 +137,7 @@ func (s *Server) recvResults(conn *CsvTransferStream) error {
 			eof := comms.DecodeEof(body)
 			result := eof.ToResult(query)
 			conn.Send(result)
-			s.log.Infof("[%d]: Query %d has been successfully processed", query)
+			s.log.Infof("[%d]: Query %d has been successfully processed", clientId, query)
 			eofsRecv += 1
 
 		} else {
@@ -146,10 +146,12 @@ func (s *Server) recvResults(conn *CsvTransferStream) error {
 
 		del.Ack(false)
 		if eofsRecv == 5 {
+			fmt.Printf("recibi 5 eofs del cliente %d\n", clientId)
 			break
 		}
 	}
 
+	fmt.Println("termine el loop de recvResults")
 	return nil
 }
 

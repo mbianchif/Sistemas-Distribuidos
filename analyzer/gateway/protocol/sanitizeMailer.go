@@ -119,7 +119,7 @@ func (s *SanitizeMailer) PublishBatch(fileName string, clientId int, body []byte
 	baseHeaders := amqp.Table{
 		"kind":       comms.BATCH,
 		"replica-id": s.con.Id,
-		"client-id":  clientId,
+		"client-id":  int32(clientId),
 	}
 	return s.senders[s.filename2Id[fileName]].Direct(body, baseHeaders)
 }
@@ -128,7 +128,7 @@ func (s *SanitizeMailer) PublishEof(fileName string, clientId int, body []byte) 
 	baseHeaders := amqp.Table{
 		"kind":       comms.EOF,
 		"replica-id": s.con.Id,
-		"client-id":  clientId,
+		"client-id":  int32(clientId),
 	}
 	return s.senders[s.filename2Id[fileName]].Broadcast(body, baseHeaders)
 }

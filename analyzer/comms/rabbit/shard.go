@@ -15,7 +15,7 @@ type SenderShard struct {
 	key          string
 	outputCopies int
 	log          *logging.Logger
-	seq          []int
+	seq          []map[int]int
 }
 
 func NewShard(broker *Broker, fmt string, key string, outputCopies int, log *logging.Logger) *SenderShard {
@@ -25,54 +25,35 @@ func NewShard(broker *Broker, fmt string, key string, outputCopies int, log *log
 		key:          key,
 		outputCopies: outputCopies,
 		log:          log,
-		seq:          make([]int, outputCopies),
+		seq:          make([]map[int]int, outputCopies),
 	}
 }
 
-func keyHash(str string, mod int) int {
-	var hash uint64 = 5381
+func (s *SenderShard) nextKeySeq(i int, clientId int) (string, int) {
+	key := fmt.Sprintf(s.fmt, i)
+	seq := s.seq[i][clientId]
 
-	for _, c := range str {
-		hash = ((hash << 5) + hash) + uint64(c) // hash * 33 + c
+	if _, ok := s.seq[i][clientId]; !ok {
+		s.seq[i] = make(map[int]int)
 	}
 
-	return int(hash % uint64(mod))
-}
-
-func (s *SenderShard) shard(fieldMaps []map[string]string) (map[int][]map[string]string, error) {
-	shards := make(map[int][]map[string]string, s.outputCopies)
-
-	for _, fieldMap := range fieldMaps {
-		key, ok := fieldMap[s.key]
-		if !ok {
-			return nil, fmt.Errorf("left key %v was not found in field map", s.key)
-		}
-
-		shardKey := keyHash(key, s.outputCopies)
-		shards[shardKey] = append(shards[shardKey], fieldMap)
-	}
-
-	return shards, nil
-}
-
-func (s *SenderShard) nextKeySeq(i int) (string, int) {
-	seq := s.seq[i]
-	s.seq[i] += 1
-	return fmt.Sprintf(s.fmt, i), seq
+	s.seq[i][clientId] += 1
+	return key, seq
 }
 
 func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}, headers amqp.Table) error {
-	shards, err := s.shard(batch.FieldMaps)
+	shards, err := comms.Shard(batch.FieldMaps, s.key, s.outputCopies)
 	if err != nil {
 		return err
 	}
+	clientId := int(headers["client-id"].(int32))
 
 	for i, shard := range shards {
-		key, seq := s.nextKeySeq(i)
+		key, seq := s.nextKeySeq(i, clientId)
 		body := comms.NewBatch(shard).Encode(filterCols)
 		headers["seq"] = seq
 		if err := s.broker.Publish(key, body, headers); err != nil {
-			s.log.Errorf("error while publishing sharded message to %v", i)
+			s.log.Errorf("error while publishing sharded message to %d: %v", i, err)
 			continue
 		}
 	}
@@ -86,12 +67,15 @@ func (s *SenderShard) Eof(eof comms.Eof, headers amqp.Table) error {
 }
 
 func (s *SenderShard) Broadcast(body []byte, headers amqp.Table) error {
+	clientId := int(headers["client-id"].(int32))
+
 	for i := range s.outputCopies {
-		key, seq := s.nextKeySeq(i)
+		key, seq := s.nextKeySeq(i, clientId)
 		headers["seq"] = seq
 		if err := s.broker.Publish(key, body, headers); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }

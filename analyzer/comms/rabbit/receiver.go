@@ -56,6 +56,9 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 				}
 
 				delete(bufs[replica][client], expecting[replica][client])
+				if _, ok := expecting[replica][client]; !ok {
+					expecting[replica][client] = 0
+				}
 				expecting[replica][client]++
 
 				kind := int(next.Headers["kind"].(int32))

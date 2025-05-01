@@ -103,7 +103,7 @@ func (m *Mailer) PublishBatch(batch comms.Batch, clientId int, headers ...amqp.T
 	baseHeaders := amqp.Table{
 		"kind":       comms.BATCH,
 		"replica-id": m.con.Id,
-		"client-id":  clientId,
+		"client-id":  int32(clientId),
 	}
 	merged := mergeHeaders(baseHeaders, headers)
 
@@ -119,7 +119,7 @@ func (m *Mailer) PublishEof(eof comms.Eof, clientId int, headers ...amqp.Table) 
 	baseHeaders := amqp.Table{
 		"kind":       comms.EOF,
 		"replica-id": m.con.Id,
-		"client-id":  clientId,
+		"client-id":  int32(clientId),
 	}
 	merged := mergeHeaders(baseHeaders, headers)
 

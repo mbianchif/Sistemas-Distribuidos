@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -70,9 +71,7 @@ func (base *Worker) Run(w IWorker) error {
 
 				case del, ok := <-ch:
 					if !ok {
-						base.Log.Warning("delivery channel was closed unexpectedly")
-						exit = true
-						break
+						return fmt.Errorf("delivery channel was closed unexpectedly")
 					}
 					defer del.Ack(false)
 
