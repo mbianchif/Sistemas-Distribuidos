@@ -54,7 +54,7 @@ func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}, h
 		headers["seq"] = seq
 		if err := s.broker.Publish(key, body, headers); err != nil {
 			s.log.Errorf("error while publishing sharded message to %d: %v", i, err)
-			continue
+			return err
 		}
 	}
 

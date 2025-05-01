@@ -73,7 +73,6 @@ func (base *Worker) Run(w IWorker) error {
 					if !ok {
 						return fmt.Errorf("delivery channel was closed unexpectedly")
 					}
-					defer del.Ack(false)
 
 					kind := int(del.Headers["kind"].(int32))
 					client := int(del.Headers["client-id"].(int32))
@@ -86,6 +85,9 @@ func (base *Worker) Run(w IWorker) error {
 						exit = w.Eof(client, body)
 					default:
 						base.Log.Errorf("received an unknown message type %v", kind)
+					}
+					if err := del.Ack(false); err != nil {
+						base.Log.Errorf("error while acknowledging message: %v", err)
 					}
 				}
 			}
