@@ -161,7 +161,7 @@ func (s *Server) recvResults() error {
 			}
 			result := batch.ToResult(query)
 			conn.Send(result)
-			s.log.Infof("[%d]: Received batch for query %d: %v", clientId, query, batch)
+			s.log.Debugf("[%d]: Received batch for query %d: %v", clientId, query, batch)
 
 		} else if kind == comms.EOF {
 			eof := comms.DecodeEof(body)

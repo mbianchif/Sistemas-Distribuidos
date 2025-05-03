@@ -77,7 +77,7 @@ func (w *Join) setupPersistors(clientId int) {
 		sends = append(sends, send)
 		go func(i int) {
 			if err := spawnFilePersistor(w, send, recv, clientId, i); err != nil {
-				w.Log.Errorf("error in spawn_file_persistor: %v", err)
+				w.Log.Errorf("error in spawnFilePersistor: %v", err)
 			}
 		}(i)
 	}
@@ -90,7 +90,7 @@ func (w *Join) setupOutOfOrder(clientId int) {
 	send := make(chan []map[string]string)
 	go func() {
 		if err := spawnOutOfOrderPersistor(w, send, recv, clientId); err != nil {
-			w.Log.Errorf("error in spawn_out_of_order_persistor: %v", err)
+			w.Log.Errorf("error in spawnOutOfOrderPersistor: %v", err)
 		}
 	}()
 

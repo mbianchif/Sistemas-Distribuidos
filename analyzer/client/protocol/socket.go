@@ -11,6 +11,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"sync"
 
 	"github.com/op/go-logging"
 )
@@ -56,12 +57,12 @@ func (s *CsvTransferStream) sendBatch(records [][]byte) error {
 
 func fits(currentSize int, csvRowSize int, batchSize int) bool {
 	// TYPE + COUNT + CURRSIZE + ROW_SIZE_SIZE + ROW_SIZE
-	return 1 + 4 + currentSize + 4 + csvRowSize < batchSize
+	return 1+4+currentSize+4+csvRowSize < batchSize
 }
 
 func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) (int, error) {
 	if err := writeAll(s.conn, []byte{fileId}); err != nil {
-		return 0, fmt.Errorf("Couldn't send fileId %d: %v", fileId, err)
+		return 0, fmt.Errorf("couldn't send fileId %d: %v", fileId, err)
 	}
 
 	sentRecords := 0
@@ -142,7 +143,7 @@ func writeAll(w io.Writer, data []byte) error {
 	return nil
 }
 
-func spawn_file_handler(query int, ch <-chan []byte, storage string) error {
+func spawnFileHandler(query int, ch <-chan []byte, storage string) error {
 	dirPath := fmt.Sprintf("/%s", storage)
 	if err := os.MkdirAll(dirPath, 0755); err != nil {
 		return err
@@ -157,59 +158,62 @@ func spawn_file_handler(query int, ch <-chan []byte, storage string) error {
 
 	writer := bufio.NewWriter(fp)
 	for data := range ch {
-		data = append(data, []byte("\n")...)
-		writeAll(writer, data)
-		writer.Flush()
+		writeAll(writer, append(data, []byte("\n")...))
 	}
 
-	return nil
+	return writer.Flush()
 }
 
 func (s *CsvTransferStream) RecvQueryResult(storage string, queryCount int) {
+	wg := &sync.WaitGroup{}
+	wg.Add(queryCount)
+
 	chans := make(map[int]chan<- []byte, queryCount)
 	for i := 1; i <= queryCount; i++ {
 		ch := make(chan []byte)
 		chans[i] = ch
 		go func(i int) {
-			if err := spawn_file_handler(i, ch, storage); err != nil {
-				s.log.Criticalf("error at spawn_file_handler: %v", err)
+			defer wg.Done()
+			if err := spawnFileHandler(i, ch, storage); err != nil {
+				s.log.Criticalf("error at spawnFileHandler: %v", err)
 			}
 		}(i)
 	}
 
 	headerSize := 6
-	done := make(map[int]struct{}, queryCount)
 	header := make([]byte, headerSize)
-	for len(done) < queryCount {
+	for doneQueries := 0; doneQueries < queryCount; {
 		n, err := io.ReadFull(s.conn, header)
 		if err != nil || n < headerSize {
 			s.log.Error("failed to recv message from gateway")
 			break
 		}
 
-		dataLength := binary.BigEndian.Uint32(header[:4])
+		dataLength := binary.BigEndian.Uint32(header)
 		kind := int(header[4])
 		query := int(header[5])
-		if kind == MSG_EOF {
-			s.log.Infof("query %v is ready!", query)
-			done[query] = struct{}{}
-			close(chans[query])
+		switch kind {
+		case MSG_BATCH:
+			data := make([]byte, dataLength)
+			n, err = io.ReadFull(s.conn, data)
+			if err != nil || n < int(dataLength) {
+				continue
+			}
+			chans[query] <- data
 			continue
-		} else if kind == MSG_ERR {
+
+		case MSG_EOF:
+			s.log.Infof("Query %v is ready!", query)
+
+		case MSG_ERR:
 			s.log.Errorf("an error occurred with query %v", query)
-			done[query] = struct{}{}
-			close(chans[query])
-			continue
 		}
 
-		data := make([]byte, dataLength)
-		n, err = io.ReadFull(s.conn, data)
-		if err != nil || n < int(dataLength) {
-			continue
-		}
-
-		chans[query] <- data
+		doneQueries++
+		close(chans[query])
 	}
+
+	wg.Wait()
 }
 
 func (s *CsvTransferStream) Close() {
