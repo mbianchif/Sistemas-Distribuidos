@@ -608,11 +608,12 @@ networks:
     return docker_compose
 
 def generate_client_compose(client) -> str:
-    compose = f"""name: clients
-services:
-"""
+    docker_compose = f"""name: clients
+services:"""
+
     for i in range(client):
-        compose += f"""  client-{i}:
+        docker_compose += f"""
+  client-{i}:
     container_name: client-{i}
     build:
       dockerfile: build/client.Dockerfile
@@ -622,13 +623,13 @@ services:
       - my-network
     env_file: configs/client/.env
 """
-    compose += """
+    docker_compose += """
 networks:
   my-network:
     name: moviesanalyzer_net
     external: true
 """
-    return compose
+    return docker_compose
 
 if __name__ == "__main__":
     # pipeline
