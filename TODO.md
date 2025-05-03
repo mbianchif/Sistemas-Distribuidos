@@ -5,8 +5,6 @@
 - hacer que el gateway sea multithreaded (tiene que asignar un id a cada cliente)
 - agregar la documentacion necesaria al informe/diagramas
 - agregar al generate_compose (por config de cliente) la cantidad de clientes
-- preparar el join (worder) para que pueda escuchar de varias colas al mismo tiempo
 
 ## Cosas que estarian bien
 - hacer que los mensajes de los workers esten acotados por tamaño
-- pasar a constantes los valores del generate que no sean replicables

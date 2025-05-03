@@ -607,11 +607,13 @@ networks:
 
     return docker_compose
 
-def generate_client_compose() -> str:
-    compose = """name: clients
+def generate_client_compose(client) -> str:
+    compose = f"""name: clients
 services:
-  client:
-    container_name: client
+"""
+    for i in range(client):
+        compose += f"""  client-{i}:
+    container_name: client-{i}
     build:
       dockerfile: build/client.Dockerfile
     volumes:
@@ -619,7 +621,8 @@ services:
     networks:
       - my-network
     env_file: configs/client/.env
-
+"""
+    compose += """
 networks:
   my-network:
     name: moviesanalyzer_net
@@ -637,7 +640,8 @@ if __name__ == "__main__":
 
     with open(config_path, "r") as config_file:
         config = json.load(config_file)
-
+        client = config.pop("client", None)
+        
     try:
         pipeline_docker_compose = generate_pipeline_compose(**config)
     except KeyError as e:
@@ -654,7 +658,7 @@ if __name__ == "__main__":
     # client
     client_compose_name = "client-compose.yaml"
 
-    docker_compose = generate_client_compose()
+    docker_compose = generate_client_compose(client)
     with open(client_compose_name, "w") as f:
         f.write(docker_compose)
 

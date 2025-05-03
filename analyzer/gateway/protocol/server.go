@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
+	"sync/atomic"
 	"syscall"
 
 	"analyzer/comms"
@@ -18,6 +20,8 @@ type Server struct {
 	con      *config.Config
 	mailer   *SanitizeMailer
 	log      *logging.Logger
+	conns    sync.Map
+	end      atomic.Bool
 	recvChan <-chan amqp.Delivery
 }
 
@@ -46,6 +50,8 @@ func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {
 		con:      config,
 		mailer:   mailer,
 		log:      log,
+		conns:    sync.Map{},
+		end:      atomic.Bool{},
 		recvChan: recvChan,
 	}, nil
 }
@@ -116,13 +122,24 @@ func (s *Server) sendEof(fileName string, clientId int) error {
 	return s.mailer.PublishEof(fileName, clientId, []byte{})
 }
 
-func (s *Server) recvResults(conn *CsvTransferStream) error {
-	eofsRecv := 0
+func (s *Server) recvResults() error {
+	eofsRecv := make(map[int]int)
+
 	for del := range s.recvChan {
 		kind := int(del.Headers["kind"].(int32))
 		query := int(del.Headers["query"].(int32))
 		clientId := int(del.Headers["client-id"].(int32))
 		body := del.Body
+
+		connInt, ok := s.conns.Load(clientId)
+		if !ok {
+			s.log.Errorf("tried to load %d's conn but failed, not present in conn map", clientId)
+			continue
+		}
+		conn := connInt.(*CsvTransferStream)
+		if _, ok := eofsRecv[clientId]; !ok {
+			eofsRecv[clientId] = 0
+		}
 
 		if kind == comms.BATCH {
 			batch, err := comms.DecodeBatch(body)
@@ -138,20 +155,26 @@ func (s *Server) recvResults(conn *CsvTransferStream) error {
 			result := eof.ToResult(query)
 			conn.Send(result)
 			s.log.Infof("[%d]: Query %d has been successfully processed", clientId, query)
-			eofsRecv += 1
+			eofsRecv[clientId] += 1
+
+			if eofsRecv[clientId] == 5 {
+				conn.Close()
+				s.conns.Delete(clientId)
+				delete(eofsRecv, clientId)
+			}
 
 		} else {
 			s.log.Errorf("Received an unknown data kind %d", kind)
 		}
 
 		del.Ack(false)
-		if eofsRecv == 5 {
-			fmt.Printf("recibi 5 eofs del cliente %d\n", clientId)
+
+		if len(s.conns) == 0 && s.end.Load() {
+			// si no hay clientes siendo atendidos y end es true, salir
 			break
 		}
 	}
 
-	fmt.Println("termine el loop de recvResults")
 	return nil
 }
 
@@ -164,7 +187,14 @@ func (s *Server) Run() {
 
 		<-sigs
 		s.log.Info("Received SIGTERM")
+		s.end.Store(true)
 		s.lis.Close()
+	}()
+
+	go func() {
+		if err := s.recvResults(); err != nil {
+			s.log.Errorf("error while receiving results: %v", err)
+		}
 	}()
 
 	for clientId := 0; ; clientId++ {
@@ -172,14 +202,12 @@ func (s *Server) Run() {
 		if conn == nil {
 			break
 		}
-		defer conn.Close()
 
+		s.conns.Store(clientId, conn)
 		go func() {
 			if err := s.clientHandler(conn, clientId); err != nil {
 				s.log.Errorf("error while handling client: %v", err)
 			}
 		}()
-
-		s.recvResults(conn)
 	}
 }
