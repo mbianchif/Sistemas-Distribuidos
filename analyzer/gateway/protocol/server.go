@@ -18,7 +18,7 @@ import (
 type Server struct {
 	lis      *CsvTransferListener
 	con      *config.Config
-	mailer   *SanitizeMailer
+	mailer   *SyncMailer
 	log      *logging.Logger
 	conns    sync.Map
 	end      atomic.Bool
@@ -26,7 +26,7 @@ type Server struct {
 }
 
 func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {
-	mailer, err := NewSanitizeMailer(config, log)
+	mailer, err := NewSyncMailer(config, log)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (s *Server) clientHandler(conn *CsvTransferStream, clientId int) error {
 	return nil
 }
 
-func (s *Server) sendBatch(fileName string, clientId int, records [][]byte) error {
+func (s *Server) sendBatch(fileName string, clientId int, records [][]byte) {
 	body := make([]byte, 0, 24000)
 	first := true
 
@@ -114,12 +114,22 @@ func (s *Server) sendBatch(fileName string, clientId int, records [][]byte) erro
 		first = false
 		body = append(body, record...)
 	}
-
-	return s.mailer.PublishBatch(fileName, clientId, body)
+	s.mailer.PublishBatch(fileName, clientId, body)
 }
 
-func (s *Server) sendEof(fileName string, clientId int) error {
-	return s.mailer.PublishEof(fileName, clientId, []byte{})
+func (s *Server) sendEof(fileName string, clientId int) {
+	s.mailer.PublishEof(fileName, clientId, []byte{})
+}
+
+func (s *Server) hasToTerminate() bool {
+	if s.end.Load() {
+		s.conns.Range(func(_, _ any) bool {
+			return false
+		})
+		return true
+	}
+
+	return false
 }
 
 func (s *Server) recvResults() error {
@@ -169,8 +179,9 @@ func (s *Server) recvResults() error {
 
 		del.Ack(false)
 
-		if len(s.conns) == 0 && s.end.Load() {
-			// si no hay clientes siendo atendidos y end es true, salir
+		// si no hay ningun cliente siendo atendidos y end es true, salir
+		if s.hasToTerminate() {
+			s.log.Info("No clients are being attended, exiting...")
 			break
 		}
 	}
@@ -204,10 +215,10 @@ func (s *Server) Run() {
 		}
 
 		s.conns.Store(clientId, conn)
-		go func() {
+		go func(conn *CsvTransferStream, clientId int) {
 			if err := s.clientHandler(conn, clientId); err != nil {
 				s.log.Errorf("error while handling client: %v", err)
 			}
-		}()
+		}(conn, clientId)
 	}
 }
