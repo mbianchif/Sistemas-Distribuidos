@@ -1,3 +1,2 @@
 .data
-compose.yaml
-client-compose.yaml
+compose**.yaml

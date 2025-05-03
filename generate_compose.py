@@ -657,7 +657,7 @@ if __name__ == "__main__":
     print(f"Pipeline compose file saved to {pipeline_compose_name}")
 
     # client
-    client_compose_name = "client-compose.yaml"
+    client_compose_name = "compose.client.yaml"
 
     docker_compose = generate_client_compose(client)
     with open(client_compose_name, "w") as f:
