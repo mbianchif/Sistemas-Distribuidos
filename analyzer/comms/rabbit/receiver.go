@@ -22,32 +22,40 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 	if err != nil {
 		return nil, fmt.Errorf("couldn't start consuming through receiver: %v", err)
 	}
+
 	ordered := make(chan amqp.Delivery)
-
-	copies := r.copies
-	eofsRecv := make(map[int]int)
-	expecting := make([]map[int]int, copies)
-	for i := range expecting {
-		expecting[i] = make(map[int]int)
-	}
-
-	bufs := make([]map[int]map[int]amqp.Delivery, copies)
-	for i := range bufs {
-		bufs[i] = make(map[int]map[int]amqp.Delivery)
-	}
-
 	go func() {
 		defer close(ordered)
+
+		copies := r.copies
+		expecting := make([]map[int]int, copies)
+		for i := range expecting {
+			expecting[i] = make(map[int]int)
+		}
+
+		bufs := make([]map[int]map[int]amqp.Delivery, copies)
+		for i := range bufs {
+			bufs[i] = make(map[int]map[int]amqp.Delivery)
+		}
 
 		for del := range recv {
 			replica := int(del.Headers["replica-id"].(int32))
 			client := int(del.Headers["client-id"].(int32))
 			seq := int(del.Headers["seq"].(int32))
 
+			fmt.Printf("replica: %d, client: %d, seq: %d\n", replica, client, seq)
+
 			if _, ok := bufs[replica][client]; !ok {
 				bufs[replica][client] = make(map[int]amqp.Delivery)
 			}
-			bufs[replica][client][seq] = del
+
+			if _, ok := expecting[replica][client]; !ok {
+				expecting[replica][client] = 0
+			}
+
+			if expecting[replica][client] <= seq {
+				bufs[replica][client][seq] = del
+			}
 
 			for {
 				next, ok := bufs[replica][client][expecting[replica][client]]
@@ -56,24 +64,33 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 				}
 
 				delete(bufs[replica][client], expecting[replica][client])
-				if _, ok := expecting[replica][client]; !ok {
-					expecting[replica][client] = 0
-				}
 				expecting[replica][client]++
-
-				kind := int(next.Headers["kind"].(int32))
-				if kind == comms.EOF {
-					eofsRecv[client] += 1
-					if eofsRecv[client] < copies {
-						continue
-					}
-					delete(eofsRecv, client)
-				}
-
 				ordered <- next
 			}
 		}
 	}()
 
-	return ordered, nil
+	eofsFiltered := make(chan amqp.Delivery)
+	go func() {
+		defer close(eofsFiltered)
+		eofsRecv := make(map[int]int)
+		copies := r.copies
+
+		for del := range ordered {
+			kind := int(del.Headers["kind"].(int32))
+			client := int(del.Headers["client-id"].(int32))
+
+			if kind == comms.EOF {
+				eofsRecv[client] = eofsRecv[client] + 1
+				if eofsRecv[client] < copies {
+					continue
+				}
+				delete(eofsRecv, client)
+			}
+
+			eofsFiltered <- del
+		}
+	}()
+
+	return eofsFiltered, nil
 }

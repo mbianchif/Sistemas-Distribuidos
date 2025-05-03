@@ -17,12 +17,17 @@ type SenderRobin struct {
 }
 
 func NewRobin(broker *Broker, fmt string, outputCopies int) *SenderRobin {
+	seq := make([]map[int]int, outputCopies)
+	for i := range seq {
+		seq[i] = make(map[int]int)
+	}
+
 	return &SenderRobin{
 		broker:       broker,
 		fmt:          fmt,
 		outputCopies: outputCopies,
 		cur:          make(map[int]int),
-		seq:          make([]map[int]int, outputCopies),
+		seq:          seq,
 	}
 }
 
@@ -41,11 +46,7 @@ func (s *SenderRobin) nextKeySeq(clientId int) (string, int) {
 	key := fmt.Sprintf(s.fmt, i)
 	seq := s.seq[i][clientId]
 
-	if _, ok := s.seq[i][clientId]; !ok {
-		s.seq[i] = make(map[int]int)
-	}
-
-	s.seq[i][clientId] += 1
+	s.seq[i][clientId]++
 	s.cur[clientId] = (i + 1) % s.outputCopies
 	return key, seq
 }

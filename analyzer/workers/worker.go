@@ -22,7 +22,6 @@ type IWorker interface {
 type Worker struct {
 	Log       *logging.Logger
 	Mailer    *Mailer
-	sigChan   chan os.Signal
 	recvCases []reflect.SelectCase
 	con       *config.Config
 }
@@ -101,5 +100,4 @@ func (base *Worker) Run(w IWorker) error {
 
 func (w *Worker) Close() {
 	w.Mailer.DeInit()
-	close(w.sigChan)
 }

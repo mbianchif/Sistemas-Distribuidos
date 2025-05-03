@@ -205,6 +205,10 @@ func spawnOutOfOrderPersistor(w *Join, recv <-chan []map[string]string, send cha
 	defer close(send)
 
 	dirPath := fmt.Sprintf("%s/%d", PERSITOR_DIR_PATH, clientId)
+	if err := os.MkdirAll(dirPath, 0755); err != nil {
+		return fmt.Errorf("couldn't create directory structure for client %d, out of order peristor: %v", clientId, err)
+	}
+
 	path := fmt.Sprintf("%s/out-of-order.csv", dirPath)
 	fp, err := os.Create(path)
 	if err != nil {

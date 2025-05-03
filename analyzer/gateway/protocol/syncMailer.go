@@ -11,8 +11,8 @@ import (
 type tuple struct {
 	fileName string
 	clientId int
-	kind     int
 	body     []byte
+	kind     int
 }
 
 type SyncMailer struct {
@@ -43,6 +43,8 @@ func (s *SyncMailer) Init() error {
 				if err := s.mailer.PublishEof(tup.fileName, tup.clientId, tup.body); err != nil {
 					s.log.Errorf("Error publishing EOF: %v", err)
 				}
+			default:
+				s.log.Errorf("got an unexpected message kind in sync mailer: %d", tup.kind)
 			}
 		}
 	}()
@@ -55,13 +57,14 @@ func (s *SyncMailer) Consume() (<-chan amqp.Delivery, error) {
 }
 
 func (s *SyncMailer) PublishBatch(fileName string, clientId int, body []byte) {
-	s.ch <- tuple{fileName: fileName, clientId: clientId, kind: comms.BATCH, body: body}
+	s.ch <- tuple{fileName, clientId, body, comms.BATCH}
 }
 
 func (s *SyncMailer) PublishEof(fileName string, clientId int, body []byte) {
-	s.ch <- tuple{fileName: fileName, clientId: clientId, kind: comms.EOF, body: body}
+	s.ch <- tuple{fileName, clientId, body, comms.EOF}
 }
 
 func (s *SyncMailer) DeInit() {
+	close(s.ch)
 	s.mailer.DeInit()
 }

@@ -93,6 +93,7 @@ func (s *Server) clientHandler(conn *CsvTransferStream, clientId int) error {
 			} else if msg.Kind == MSG_ERR {
 				s.log.Criticalf("an error was received from the client, exiting...")
 				return nil
+
 			} else {
 				return fmt.Errorf("an unknown msg kind was received: %d", msg.Kind)
 			}
@@ -114,6 +115,7 @@ func (s *Server) sendBatch(fileName string, clientId int, records [][]byte) {
 		first = false
 		body = append(body, record...)
 	}
+
 	s.mailer.PublishBatch(fileName, clientId, body)
 }
 
@@ -123,12 +125,13 @@ func (s *Server) sendEof(fileName string, clientId int) {
 
 func (s *Server) hasToTerminate() bool {
 	if s.end.Load() {
+		isEmpty := true
 		s.conns.Range(func(_, _ any) bool {
+			isEmpty = false
 			return false
 		})
-		return true
+		return isEmpty
 	}
-
 	return false
 }
 
@@ -160,13 +163,13 @@ func (s *Server) recvResults() error {
 			conn.Send(result)
 			s.log.Infof("[%d]: Received batch for query %d: %v", clientId, query, batch)
 
-		} else if kind == MSG_EOF {
+		} else if kind == comms.EOF {
 			eof := comms.DecodeEof(body)
 			result := eof.ToResult(query)
 			conn.Send(result)
 			s.log.Infof("[%d]: Query %d has been successfully processed", clientId, query)
-			eofsRecv[clientId] += 1
 
+			eofsRecv[clientId] += 1
 			if eofsRecv[clientId] == 5 {
 				conn.Close()
 				s.conns.Delete(clientId)
@@ -179,7 +182,6 @@ func (s *Server) recvResults() error {
 
 		del.Ack(false)
 
-		// si no hay ningun cliente siendo atendidos y end es true, salir
 		if s.hasToTerminate() {
 			s.log.Info("No clients are being attended, exiting...")
 			break

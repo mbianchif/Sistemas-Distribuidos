@@ -19,13 +19,18 @@ type SenderShard struct {
 }
 
 func NewShard(broker *Broker, fmt string, key string, outputCopies int, log *logging.Logger) *SenderShard {
+	seq := make([]map[int]int, outputCopies)
+	for i := range seq {
+		seq[i] = make(map[int]int)
+	}
+
 	return &SenderShard{
 		broker:       broker,
 		fmt:          fmt,
 		key:          key,
 		outputCopies: outputCopies,
 		log:          log,
-		seq:          make([]map[int]int, outputCopies),
+		seq:          seq,
 	}
 }
 
@@ -33,11 +38,7 @@ func (s *SenderShard) nextKeySeq(i int, clientId int) (string, int) {
 	key := fmt.Sprintf(s.fmt, i)
 	seq := s.seq[i][clientId]
 
-	if _, ok := s.seq[i][clientId]; !ok {
-		s.seq[i] = make(map[int]int)
-	}
-
-	s.seq[i][clientId] += 1
+	s.seq[i][clientId]++
 	return key, seq
 }
 
