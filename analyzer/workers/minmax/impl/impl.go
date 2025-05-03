@@ -48,44 +48,6 @@ func (w *MinMax) Clean(clientId int) {
 	w.maxs[clientId] = tuple{nil, 0}
 }
 
-func (w *MinMax) Batch(clientId int, data []byte) bool {
-	batch, err := comms.DecodeBatch(data)
-	if err != nil {
-		w.Log.Fatal("failed to decode batch: %v", err)
-	}
-
-	for _, fieldMap := range batch.FieldMaps {
-		err := handleMinMax(w, clientId, fieldMap)
-		if err != nil {
-			w.Log.Errorf("failed to handle message: %v", err)
-			continue
-		}
-	}
-
-	return false
-}
-
-func (w *MinMax) Eof(clientId int, data []byte) bool {
-	responseFieldMaps := []map[string]string{
-		w.mins[clientId].fieldMap,
-		w.maxs[clientId].fieldMap,
-	}
-
-	w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
-	batch := comms.NewBatch(responseFieldMaps)
-	if err := w.Mailer.PublishBatch(batch, clientId); err != nil {
-		w.Log.Errorf("failed to publish message: %v", err)
-	}
-
-	eof := comms.DecodeEof(data)
-	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
-		w.Log.Errorf("failed to publish message: %v", err)
-	}
-
-	w.Clean(clientId)
-	return true
-}
-
 func handleMinMax(w *MinMax, clientId int, fieldMap map[string]string) error {
 	if _, ok := fieldMap[w.Con.Key]; !ok {
 		return fmt.Errorf("key %v was not found in the field map", w.Con.Key)
@@ -116,4 +78,39 @@ func handleMinMax(w *MinMax, clientId int, fieldMap map[string]string) error {
 	w.maxs[clientId] = max
 	w.mins[clientId] = min
 	return nil
+}
+
+func (w *MinMax) Batch(clientId, qId int, data []byte) {
+	batch, err := comms.DecodeBatch(data)
+	if err != nil {
+		w.Log.Fatal("failed to decode batch: %v", err)
+	}
+
+	for _, fieldMap := range batch.FieldMaps {
+		err := handleMinMax(w, clientId, fieldMap)
+		if err != nil {
+			w.Log.Errorf("failed to handle message: %v", err)
+			continue
+		}
+	}
+}
+
+func (w *MinMax) Eof(clientId, qId int, data []byte) {
+	responseFieldMaps := []map[string]string{
+		w.mins[clientId].fieldMap,
+		w.maxs[clientId].fieldMap,
+	}
+
+	w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
+	batch := comms.NewBatch(responseFieldMaps)
+	if err := w.Mailer.PublishBatch(batch, clientId); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+
+	eof := comms.DecodeEof(data)
+	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+
+	w.Clean(clientId)
 }

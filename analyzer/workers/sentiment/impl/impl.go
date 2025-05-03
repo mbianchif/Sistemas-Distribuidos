@@ -35,7 +35,29 @@ func (w *Sentiment) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Sentiment) Batch(clientId int, data []byte) bool {
+func handleSentiment(w *Sentiment, fieldMap map[string]string) (map[string]string, error) {
+	overview, ok := fieldMap["overview"]
+	if !ok {
+		return nil, fmt.Errorf("no overview in field map")
+	}
+
+	if len(overview) == 0 {
+		return nil, nil
+	}
+
+	analysis := w.Model.SentimentAnalysis(overview, sentiment.English)
+	var result string
+	if analysis.Score == 0 {
+		result = "negative"
+	} else {
+		result = "positive"
+	}
+
+	fieldMap["sentiment"] = result
+	return fieldMap, nil
+}
+
+func (w *Sentiment) Batch(clientId, qId int, data []byte) {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Fatal("failed to decode batch: %v", err)
@@ -61,37 +83,11 @@ func (w *Sentiment) Batch(clientId int, data []byte) bool {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
-
-	return false
 }
 
-func handleSentiment(w *Sentiment, fieldMap map[string]string) (map[string]string, error) {
-	overview, ok := fieldMap["overview"]
-	if !ok {
-		return nil, fmt.Errorf("no overview in field map")
-	}
-
-	if len(overview) == 0 {
-		return nil, nil
-	}
-
-	analysis := w.Model.SentimentAnalysis(overview, sentiment.English)
-	var result string
-	if analysis.Score == 0 {
-		result = "negative"
-	} else {
-		result = "positive"
-	}
-
-	fieldMap["sentiment"] = result
-	return fieldMap, nil
-}
-
-func (w *Sentiment) Eof(clientId int, data []byte) bool {
+func (w *Sentiment) Eof(clientId, qId int, data []byte) {
 	eof := comms.DecodeEof(data)
 	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
-
-	return true
 }

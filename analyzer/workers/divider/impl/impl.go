@@ -28,36 +28,6 @@ func (w *Divider) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Divider) Batch(clientId int, data []byte) bool {
-	batch, err := comms.DecodeBatch(data)
-	if err != nil {
-		w.Log.Fatal("failed to decode line: %v", err)
-	}
-	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
-
-	for _, fieldMap := range batch.FieldMaps {
-		responseFieldMap, err := handleDivider(fieldMap)
-		if err != nil {
-			w.Log.Errorf("failed to handle message: %v", err)
-			continue
-		}
-
-		if responseFieldMap != nil {
-			responseFieldMaps = append(responseFieldMaps, responseFieldMap)
-		}
-	}
-
-	if len(responseFieldMaps) > 0 {
-		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
-		batch := comms.NewBatch(responseFieldMaps)
-		if err := w.Mailer.PublishBatch(batch, clientId); err != nil {
-			w.Log.Errorf("failed to publish message: %v", err)
-		}
-	}
-
-	return false
-}
-
 func handleDivider(fieldMap map[string]string) (map[string]string, error) {
 	revenueStr, ok := fieldMap["revenue"]
 	if !ok {
@@ -88,10 +58,38 @@ func handleDivider(fieldMap map[string]string) (map[string]string, error) {
 	return fieldMap, nil
 }
 
-func (w *Divider) Eof(clientId int, data []byte) bool {
+func (w *Divider) Batch(clientId, qId int, data []byte) {
+	batch, err := comms.DecodeBatch(data)
+	if err != nil {
+		w.Log.Fatal("failed to decode line: %v", err)
+	}
+	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
+
+	for _, fieldMap := range batch.FieldMaps {
+		responseFieldMap, err := handleDivider(fieldMap)
+		if err != nil {
+			w.Log.Errorf("failed to handle message: %v", err)
+			continue
+		}
+
+		if responseFieldMap != nil {
+			responseFieldMaps = append(responseFieldMaps, responseFieldMap)
+		}
+	}
+
+	if len(responseFieldMaps) > 0 {
+		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
+		batch := comms.NewBatch(responseFieldMaps)
+		if err := w.Mailer.PublishBatch(batch, clientId); err != nil {
+			w.Log.Errorf("failed to publish message: %v", err)
+		}
+	}
+
+}
+
+func (w *Divider) Eof(clientId, qId int, data []byte) {
 	body := comms.DecodeEof(data)
 	if err := w.Mailer.PublishEof(body, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
-	return true
 }

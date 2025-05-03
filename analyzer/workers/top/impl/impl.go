@@ -45,7 +45,27 @@ func (w *Top) Clean(clientId int) {
 	w.tops[clientId] = make([]tuple, w.Con.Amount+1)
 }
 
-func (w *Top) Batch(clientId int, data []byte) bool {
+func handleTop(w *Top, clientId int, fieldMap map[string]string) error {
+	value, err := strconv.ParseFloat(fieldMap[w.Con.Key], 64)
+	if err != nil {
+		return err
+	}
+
+	top := append(w.tops[clientId], tuple{value, fieldMap})
+
+	sort.Slice(top, func(i, j int) bool {
+		return top[i].value > top[j].value
+	})
+
+	if len(top) > w.Con.Amount {
+		top = top[:w.Con.Amount]
+	}
+
+	w.tops[clientId] = top
+	return nil
+}
+
+func (w *Top) Batch(clientId, qId int, data []byte) {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Fatal("failed to decode batch: %v", err)
@@ -58,11 +78,9 @@ func (w *Top) Batch(clientId int, data []byte) bool {
 			continue
 		}
 	}
-
-	return false
 }
 
-func (w *Top) Eof(clientId int, body []byte) bool {
+func (w *Top) Eof(clientId, qId int, body []byte) {
 	responseFieldMaps := make([]map[string]string, 0, w.Con.Amount)
 	for _, tup := range w.tops[clientId] {
 		responseFieldMaps = append(responseFieldMaps, tup.fieldMap)
@@ -82,25 +100,4 @@ func (w *Top) Eof(clientId int, body []byte) bool {
 	}
 
 	w.Clean(clientId)
-	return true
-}
-
-func handleTop(w *Top, clientId int, fieldMap map[string]string) error {
-	value, err := strconv.ParseFloat(fieldMap[w.Con.Key], 64)
-	if err != nil {
-		return err
-	}
-
-	top := append(w.tops[clientId], tuple{value, fieldMap})
-
-	sort.Slice(top, func(i, j int) bool {
-		return top[i].value > top[j].value
-	})
-
-	if len(top) > w.Con.Amount {
-		top = top[:w.Con.Amount]
-	}
-
-	w.tops[clientId] = top
-	return nil
 }

@@ -26,7 +26,7 @@ func (w *Sink) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Sink) Batch(clientId int, data []byte) bool {
+func (w *Sink) Batch(clientId, qId int, data []byte) {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Fatal("failed to decode batch: %v", err)
@@ -41,20 +41,12 @@ func (w *Sink) Batch(clientId int, data []byte) bool {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
 	}
-
-	return false
 }
 
-func (w *Sink) Eof(clientId int, data []byte) bool {
+func (w *Sink) Eof(clientId, qId int, data []byte) {
 	eof := comms.DecodeEof(data)
 	headers := amqp.Table{"query": w.Con.Query}
 	if err := w.Mailer.PublishEof(eof, clientId, headers); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
-	return true
-}
-
-func (w *Sink) Error(data []byte) bool {
-	w.Log.Error("Received an ERROR message kind")
-	return true
 }

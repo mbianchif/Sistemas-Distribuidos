@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"reflect"
 	"syscall"
 
 	"analyzer/comms"
@@ -14,16 +15,16 @@ import (
 )
 
 type IWorker interface {
-	Batch(int, []byte) bool
-	Eof(int, []byte) bool
+	Batch(int, int, []byte)
+	Eof(int, int, []byte)
 }
 
 type Worker struct {
-	Log        *logging.Logger
-	Mailer     *Mailer
-	sigChan    chan os.Signal
-	inputChans []<-chan amqp.Delivery
-	con        *config.Config
+	Log       *logging.Logger
+	Mailer    *Mailer
+	sigChan   chan os.Signal
+	recvCases []reflect.SelectCase
+	con       *config.Config
 }
 
 func New(con *config.Config, log *logging.Logger) (*Worker, error) {
@@ -39,58 +40,60 @@ func New(con *config.Config, log *logging.Logger) (*Worker, error) {
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM)
+	cases := []reflect.SelectCase{
+		{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(sigs)},
+	}
 
-	inputChans := make([]<-chan amqp.Delivery, 0, len(inputQueues))
-	for _, q := range inputQueues {
+	for i, q := range inputQueues {
 		ch, err := mailer.Consume(q)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("couldn't start consuming: error with queue %d: %v", i, err)
 		}
-		inputChans = append(inputChans, ch)
+
+		cases = append(cases, reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(ch),
+		})
 	}
 
 	return &Worker{
-		Log:        log,
-		Mailer:     mailer,
-		sigChan:    sigs,
-		inputChans: inputChans,
-		con:        con,
+		Log:       log,
+		Mailer:    mailer,
+		recvCases: cases,
+		con:       con,
 	}, nil
 }
 
 func (base *Worker) Run(w IWorker) error {
 	base.Log.Infof("Running...")
+	cases := base.recvCases
+
 	for {
-		for _, ch := range base.inputChans {
-			exit := false
-			for !exit {
-				select {
-				case <-base.sigChan:
-					base.Log.Info("received SIGTERM")
-					return nil
+		qId, value, ok := reflect.Select(cases)
+		if !ok {
+			base.Log.Criticalf("ok in reflective select is false, channel got closed unexpectidly for qId %d", qId)
+		}
 
-				case del, ok := <-ch:
-					if !ok {
-						return fmt.Errorf("delivery channel was closed unexpectedly")
-					}
+		if qId == 0 {
+			base.Log.Info("received SIGTERM")
+			return nil
+		}
 
-					kind := int(del.Headers["kind"].(int32))
-					client := int(del.Headers["client-id"].(int32))
-					body := del.Body
+		del := value.Interface().(amqp.Delivery)
+		kind := int(del.Headers["kind"].(int32))
+		client := int(del.Headers["client-id"].(int32))
+		body := del.Body
 
-					switch kind {
-					case comms.BATCH:
-						exit = w.Batch(client, body)
-					case comms.EOF:
-						exit = w.Eof(client, body)
-					default:
-						base.Log.Errorf("received an unknown message type %v", kind)
-					}
-					if err := del.Ack(false); err != nil {
-						base.Log.Errorf("error while acknowledging message: %v", err)
-					}
-				}
-			}
+		switch kind {
+		case comms.BATCH:
+			w.Batch(client, qId, body)
+		case comms.EOF:
+			w.Eof(client, qId, body)
+		default:
+			base.Log.Errorf("received an unknown message type %v", kind)
+		}
+		if err := del.Ack(false); err != nil {
+			base.Log.Errorf("error while acknowledging message: %v", err)
 		}
 	}
 }

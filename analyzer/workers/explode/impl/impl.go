@@ -29,7 +29,23 @@ func (w *Explode) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Explode) Batch(clientId int, data []byte) bool {
+func handleExplode(fieldMap map[string]string, con *config.ExplodeConfig) ([]map[string]string, error) {
+	values, ok := fieldMap[con.Key]
+	if !ok {
+		return nil, fmt.Errorf("%v is not a field in the message", con.Key)
+	}
+
+	fieldMaps := make([]map[string]string, 0)
+	for value := range strings.SplitSeq(values, ",") {
+		expCopy := maps.Clone(fieldMap)
+		expCopy[con.Rename] = value
+		fieldMaps = append(fieldMaps, expCopy)
+	}
+
+	return fieldMaps, nil
+}
+
+func (w *Explode) Batch(clientId, qId int, data []byte) {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Fatal("failed to decode line: %v", err)
@@ -54,30 +70,12 @@ func (w *Explode) Batch(clientId int, data []byte) bool {
 		}
 	}
 
-	return false
 }
 
-func handleExplode(fieldMap map[string]string, con *config.ExplodeConfig) ([]map[string]string, error) {
-	values, ok := fieldMap[con.Key]
-	if !ok {
-		return nil, fmt.Errorf("%v is not a field in the message", con.Key)
-	}
-
-	fieldMaps := make([]map[string]string, 0)
-	for value := range strings.SplitSeq(values, ",") {
-		expCopy := maps.Clone(fieldMap)
-		expCopy[con.Rename] = value
-		fieldMaps = append(fieldMaps, expCopy)
-	}
-
-	return fieldMaps, nil
-}
-
-func (w *Explode) Eof(clientId int, data []byte) bool {
+func (w *Explode) Eof(clientId, qId int, data []byte) {
 	eof := comms.DecodeEof(data)
 	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
-	return true
 }

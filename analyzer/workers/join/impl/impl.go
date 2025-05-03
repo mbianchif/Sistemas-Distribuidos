@@ -20,17 +20,34 @@ const (
 	LOAD
 )
 
-type tuple struct {
+const (
+	LEFT = iota + 1
+	RIGHT
+)
+
+const PERSITOR_DIR_PATH = "/persistors"
+
+type PersistMessage struct {
 	kind   int
 	fields []map[string]string
 }
 
+type PersistChannels struct {
+	recvs []<-chan []map[string]string
+	sends []chan<- PersistMessage
+}
+
+type OutOfOrderChannels struct {
+	recv <-chan []byte
+	send chan<- []map[string]string
+}
+
 type Join struct {
 	*workers.Worker
-	Con         *config.JoinConfig
-	readingLeft bool
-	recvchans   []chan tuple
-	sendchans   []chan []map[string]string
+	Con          *config.JoinConfig
+	readingRight map[int]struct{}
+	persistors   map[int]PersistChannels
+	outOfOrders  map[int]OutOfOrderChannels
 }
 
 func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
@@ -40,39 +57,56 @@ func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
 	}
 
 	w := &Join{
-		Worker: base,
-		Con:    con,
+		Worker:       base,
+		Con:          con,
+		readingRight: make(map[int]struct{}),
+		persistors:   make(map[int]PersistChannels),
+		outOfOrders:  make(map[int]OutOfOrderChannels),
 	}
-	w.Clean(0)
 
 	return w, nil
 }
 
-func (w *Join) Clean(_ int) {
-	if w.recvchans != nil {
-		for _, ch := range w.recvchans {
-			close(ch)
-		}
-	}
-
-	w.readingLeft = true
-
-	recvchans := make([]chan tuple, 0, w.Con.NShards)
-	sendchans := make([]chan []map[string]string, 0, w.Con.NShards)
+func (w *Join) setupPersistors(clientId int) {
+	recvs := make([]<-chan []map[string]string, 0, w.Con.NShards)
+	sends := make([]chan<- PersistMessage, 0, w.Con.NShards)
 	for i := range w.Con.NShards {
-		recv := make(chan tuple)
-		send := make(chan []map[string]string)
-		recvchans = append(recvchans, recv)
-		sendchans = append(sendchans, send)
+		recv := make(chan []map[string]string)
+		send := make(chan PersistMessage)
+		recvs = append(recvs, recv)
+		sends = append(sends, send)
 		go func(i int) {
-			if err := spawn_file_persistor(w, recv, send, i); err != nil {
+			if err := spawnFilePersistor(w, send, recv, clientId, i); err != nil {
 				w.Log.Errorf("error in spawn_file_persistor: %v", err)
 			}
 		}(i)
 	}
 
-	w.recvchans = recvchans
-	w.sendchans = sendchans
+	w.persistors[clientId] = PersistChannels{recvs, sends}
+}
+
+func (w *Join) setupOutOfOrder(clientId int) {
+	recv := make(chan []byte)
+	send := make(chan []map[string]string)
+	go func() {
+		if err := spawnOutOfOrderPersistor(w, send, recv, clientId); err != nil {
+			w.Log.Errorf("error in spawn_out_of_order_persistor: %v", err)
+		}
+	}()
+
+	w.outOfOrders[clientId] = OutOfOrderChannels{recv, send}
+}
+
+func (w *Join) clean(clientId int) {
+	delete(w.readingRight, clientId)
+	for _, send := range w.persistors[clientId].sends {
+		close(send)
+	}
+
+	delete(w.persistors, clientId)
+
+	clientDirPath := fmt.Sprintf("%s/%d", PERSITOR_DIR_PATH, clientId)
+	os.RemoveAll(clientDirPath)
 }
 
 func store(writer *bufio.Writer, fieldMaps []map[string]string) error {
@@ -131,14 +165,20 @@ func load(w *Join, fp *os.File, fieldMaps []map[string]string) ([]map[string]str
 	return responseFieldMaps, nil
 }
 
-func spawn_file_persistor(w *Join, recv chan tuple, send chan []map[string]string, i int) error {
-	path := fmt.Sprintf("/%d.csv", i)
+func spawnFilePersistor(w *Join, recv <-chan PersistMessage, send chan<- []map[string]string, clientId, i int) error {
+	defer close(send)
+
+	dirPath := fmt.Sprintf("%s/%d", PERSITOR_DIR_PATH, clientId)
+	if err := os.MkdirAll(dirPath, 0755); err != nil {
+		return fmt.Errorf("couldn't create directory structure for client %d, peristor %d: %v", clientId, i, err)
+	}
+
+	path := fmt.Sprintf("%s/%d.csv", dirPath, i)
 	fp, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("the file %v could not be created %v", i, err)
 	}
 	defer fp.Close()
-	defer os.Remove(path)
 
 	writer := bufio.NewWriter(fp)
 	for tup := range recv {
@@ -158,43 +198,38 @@ func spawn_file_persistor(w *Join, recv chan tuple, send chan []map[string]strin
 		}
 	}
 
-	close(send)
 	return nil
 }
 
-func (w *Join) Run() error {
-	return w.Worker.Run(w)
-}
+func spawnOutOfOrderPersistor(w *Join, recv <-chan []map[string]string, send chan<- []byte, clientId int) error {
+	defer close(send)
 
-func (w *Join) Batch(clientId int, data []byte) bool {
-	if w.readingLeft {
-		if err := handleLeft(w, clientId, data); err != nil {
-			w.Log.Errorf("error while handling batch in left side: %v", err)
-		}
-	} else {
-		if err := handleRight(w, clientId, data); err != nil {
-			w.Log.Errorf("error while handling batch in right side: %v", err)
+	dirPath := fmt.Sprintf("%s/%d", PERSITOR_DIR_PATH, clientId)
+	path := fmt.Sprintf("%s/out-of-order.csv", dirPath)
+	fp, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("the out of order file could not be created %v", err)
+	}
+	defer fp.Close()
+
+	writer := bufio.NewWriter(fp)
+	for fieldMaps := range recv {
+		if err := store(writer, fieldMaps); err != nil {
+			w.Log.Errorf("there was an error storing in the out of order file: %v", err)
 		}
 	}
-	return false
-}
 
-func (w *Join) Eof(clientId int, data []byte) bool {
-	if w.readingLeft {
-		w.readingLeft = false
-	} else {
-		eof := comms.DecodeEof(data)
-		if err := w.Mailer.PublishEof(eof, clientId); err != nil {
-			w.Log.Errorf("failed to publish message: %v", err)
-		}
-
-		w.Clean(clientId)
+	fp.Seek(0, 0)
+	data, err := io.ReadAll(fp)
+	if err != nil {
+		return fmt.Errorf("there was an error loading the out of order file: %v", err)
 	}
 
-	return true
+	send <- data
+	return nil
 }
 
-func handleLeft(w *Join, _ int, data []byte) error {
+func handleLeft(w *Join, clientId int, data []byte) error {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Criticalf("failed to decode batch: %v", err)
@@ -207,7 +242,7 @@ func handleLeft(w *Join, _ int, data []byte) error {
 	}
 
 	for i, shard := range shards {
-		w.recvchans[i] <- tuple{STORE, shard}
+		w.persistors[clientId].sends[i] <- PersistMessage{STORE, shard}
 	}
 
 	return nil
@@ -224,11 +259,11 @@ func handleRight(w *Join, clientId int, data []byte) error {
 	}
 
 	for i, shard := range shards {
-		w.recvchans[i] <- tuple{LOAD, shard}
+		w.persistors[clientId].sends[i] <- PersistMessage{LOAD, shard}
 	}
 
 	for i := range shards {
-		responseFieldMaps := <-w.sendchans[i]
+		responseFieldMaps := <-w.persistors[clientId].recvs[i]
 		if len(responseFieldMaps) > 0 {
 			w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 			batch := comms.NewBatch(responseFieldMaps)
@@ -239,4 +274,74 @@ func handleRight(w *Join, clientId int, data []byte) error {
 	}
 
 	return nil
+}
+
+func handleOutOfOrder(w *Join, clientId int, data []byte) error {
+	if _, ok := w.outOfOrders[clientId]; !ok {
+		w.setupOutOfOrder(clientId)
+	}
+
+	batch, err := comms.DecodeBatch(data)
+	if err != nil {
+		w.Log.Criticalf("failed to decode batch: %v", err)
+		return err
+	}
+
+	w.outOfOrders[clientId].send <- batch.FieldMaps
+	return nil
+}
+
+func (w *Join) Run() error {
+	return w.Worker.Run(w)
+}
+
+func (w *Join) Batch(clientId, qId int, data []byte) {
+	if _, ok := w.persistors[clientId]; !ok {
+		w.setupPersistors(clientId)
+	}
+
+	if _, ok := w.readingRight[clientId]; !ok && qId == LEFT {
+		// Reading left and given data is from LEFT queue
+		if err := handleLeft(w, clientId, data); err != nil {
+			w.Log.Errorf("error while handling batch in left side: %v", err)
+		}
+
+	} else if _, ok := w.readingRight[clientId]; ok && qId == RIGHT {
+		// Reading right and given data is from RIGHT queue
+		if err := handleRight(w, clientId, data); err != nil {
+			w.Log.Errorf("error while handling batch in right side: %v", err)
+		}
+
+	} else if _, ok := w.readingRight[clientId]; !ok && qId == RIGHT {
+		// Reading left and given data is from RIGHT queue
+		if err := handleOutOfOrder(w, clientId, data); err != nil {
+			w.Log.Errorf("error while handling batch out of order: %v", err)
+		}
+
+	} else {
+		// Reading right and given data is from LEFT queue
+		w.Log.Errorf("unexpected left side message when expecting right for client %d in qId %d", clientId, qId)
+	}
+}
+
+func (w *Join) Eof(clientId, qId int, data []byte) {
+	if _, ok := w.readingRight[clientId]; !ok {
+		w.readingRight[clientId] = struct{}{}
+
+		if chans, ok := w.outOfOrders[clientId]; ok {
+			close(chans.send)
+			data := <-chans.recv
+
+			w.Batch(clientId, RIGHT, data)
+			delete(w.outOfOrders, clientId)
+		}
+
+	} else {
+		eof := comms.DecodeEof(data)
+		if err := w.Mailer.PublishEof(eof, clientId); err != nil {
+			w.Log.Errorf("failed to publish message: %v", err)
+		}
+
+		w.clean(clientId)
+	}
 }

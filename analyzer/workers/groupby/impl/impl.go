@@ -47,7 +47,7 @@ func (w *Groupby) Clean(clientId int) {
 	w.Handler.Clean(clientId)
 }
 
-func (w *Groupby) Batch(clientId int, data []byte) bool {
+func (w *Groupby) Batch(clientId, qId int, data []byte) {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Fatalf("failed to decode batch: %v", err)
@@ -60,11 +60,9 @@ func (w *Groupby) Batch(clientId int, data []byte) bool {
 			continue
 		}
 	}
-
-	return false
 }
 
-func (w *Groupby) Eof(clientId int, data []byte) bool {
+func (w *Groupby) Eof(clientId, qId int, data []byte) {
 	responseFieldMaps := w.Handler.Result(clientId, w.Con)
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
@@ -80,10 +78,4 @@ func (w *Groupby) Eof(clientId int, data []byte) bool {
 	}
 
 	w.Clean(clientId)
-	return true
-}
-
-func (w *Groupby) Error(data []byte) bool {
-	w.Log.Error("Received an ERROR message kind")
-	return true
 }

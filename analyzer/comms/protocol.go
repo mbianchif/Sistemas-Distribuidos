@@ -107,6 +107,10 @@ func DecodeBatch(data []byte) (*Batch, error) {
 	fieldMaps := make([]map[string]string, 0, len(lines))
 
 	for _, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+
 		fieldMap, err := DecodeLine(line)
 		if err != nil {
 			return nil, err

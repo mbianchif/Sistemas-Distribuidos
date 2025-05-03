@@ -37,49 +37,6 @@ func (w *Filter) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Filter) Batch(clientId int, data []byte) bool {
-	batch, err := comms.DecodeBatch(data)
-	if err != nil {
-		w.Log.Fatalf("failed to decode batch: %v", err)
-	}
-	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
-
-	for _, fieldMap := range batch.FieldMaps {
-		responseFieldMap, err := w.Handler(w, fieldMap)
-		if err != nil {
-			w.Log.Errorf("failed to handle message: %v", err)
-			continue
-		}
-
-		if responseFieldMap != nil {
-			responseFieldMaps = append(responseFieldMaps, responseFieldMap)
-		}
-	}
-
-	if len(responseFieldMaps) > 0 {
-		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
-		body := comms.NewBatch(responseFieldMaps)
-		if err := w.Mailer.PublishBatch(body, clientId); err != nil {
-			w.Log.Errorf("failed to publish message: %v", err)
-		}
-	}
-
-	return false
-}
-
-func (w *Filter) Eof(clientId int, data []byte) bool {
-	eof := comms.DecodeEof(data)
-	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
-		w.Log.Errorf("failed to publish message: %v", err)
-	}
-	return true
-}
-
-func (w *Filter) Error(data []byte) bool {
-	w.Log.Error("Received an ERROR message kind")
-	return true
-}
-
 func handleRange(w *Filter, msg map[string]string) (map[string]string, error) {
 	yearRange, err := parseMathRange(w.Con.Value)
 	if err != nil {
@@ -139,4 +96,40 @@ func handleContains(w *Filter, msg map[string]string) (map[string]string, error)
 	}
 
 	return msg, nil
+}
+
+func (w *Filter) Batch(clientId, qId int, data []byte) {
+	batch, err := comms.DecodeBatch(data)
+	if err != nil {
+		w.Log.Fatalf("failed to decode batch: %v", err)
+	}
+	responseFieldMaps := make([]map[string]string, 0, len(batch.FieldMaps))
+
+	for _, fieldMap := range batch.FieldMaps {
+		responseFieldMap, err := w.Handler(w, fieldMap)
+		if err != nil {
+			w.Log.Errorf("failed to handle message: %v", err)
+			continue
+		}
+
+		if responseFieldMap != nil {
+			responseFieldMaps = append(responseFieldMaps, responseFieldMap)
+		}
+	}
+
+	if len(responseFieldMaps) > 0 {
+		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
+		body := comms.NewBatch(responseFieldMaps)
+		if err := w.Mailer.PublishBatch(body, clientId); err != nil {
+			w.Log.Errorf("failed to publish message: %v", err)
+		}
+	}
+
+}
+
+func (w *Filter) Eof(clientId, qId int, data []byte) {
+	eof := comms.DecodeEof(data)
+	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
 }

@@ -38,32 +38,6 @@ func (w *Sanitize) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Sanitize) Batch(clientId int, data []byte) bool {
-	reader := csv.NewReader(bytes.NewReader(data))
-	responseFieldMaps := make([]map[string]string, 0)
-
-	for {
-		line, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-
-		if responseFieldMap := w.Handler(w, line); responseFieldMap != nil {
-			responseFieldMaps = append(responseFieldMaps, responseFieldMap)
-		}
-	}
-
-	if len(responseFieldMaps) > 0 {
-		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
-		batch := comms.NewBatch(responseFieldMaps)
-		if err := w.Mailer.PublishBatch(batch, clientId); err != nil {
-			w.Log.Errorf("failed to publish message: %v", err)
-		}
-	}
-
-	return false
-}
-
 func parseNamesFromJson(field string) []string {
 	subStr := "'name': '"
 	names := make([]string, 0)
@@ -186,10 +160,33 @@ func handleCredit(w *Sanitize, line []string) map[string]string {
 	return fields
 }
 
-func (w *Sanitize) Eof(clientId int, data []byte) bool {
+func (w *Sanitize) Batch(clientId, qId int, data []byte) {
+	reader := csv.NewReader(bytes.NewReader(data))
+	responseFieldMaps := make([]map[string]string, 0)
+
+	for {
+		line, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+
+		if responseFieldMap := w.Handler(w, line); responseFieldMap != nil {
+			responseFieldMaps = append(responseFieldMaps, responseFieldMap)
+		}
+	}
+
+	if len(responseFieldMaps) > 0 {
+		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
+		batch := comms.NewBatch(responseFieldMaps)
+		if err := w.Mailer.PublishBatch(batch, clientId); err != nil {
+			w.Log.Errorf("failed to publish message: %v", err)
+		}
+	}
+}
+
+func (w *Sanitize) Eof(clientId, qId int, data []byte) {
 	eof := comms.DecodeEof(data)
 	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
-	return true
 }
