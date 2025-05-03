@@ -43,8 +43,6 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 			client := int(del.Headers["client-id"].(int32))
 			seq := int(del.Headers["seq"].(int32))
 
-			fmt.Printf("replica: %d, client: %d, seq: %d\n", replica, client, seq)
-
 			if _, ok := bufs[replica][client]; !ok {
 				bufs[replica][client] = make(map[int]amqp.Delivery)
 			}
