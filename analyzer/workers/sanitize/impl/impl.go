@@ -68,9 +68,6 @@ func isValidRow(fields map[string]string) bool {
 		if len(value) == 0 {
 			return false
 		}
-		if len(value) != len(strings.TrimSpace(value)) {
-			return false
-		}
 	}
 	return true
 }
