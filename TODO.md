@@ -1,5 +1,8 @@
 # TODO
 
+## Cosas que salieron mal en la presentacion
+- Parece que hay un memory leak, se observa facil en sanitize-ratings
+
 ## Requisitos para la proxima entrega
 - chequear que todos los recursos se cierren correctamente
 - agregar la documentacion necesaria al informe/diagramas
