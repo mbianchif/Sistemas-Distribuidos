@@ -70,7 +70,7 @@ func (base *Worker) Run(w IWorker) error {
 	for {
 		qId, value, ok := reflect.Select(cases)
 		if !ok {
-			return fmt.Errorf("ok in reflective select is false, channel got closed unexpectidly for qId %d", qId)
+			return fmt.Errorf("ok in reflective select is false, channel got closed unexpectedly for qId %d", qId)
 		}
 
 		if qId == 0 {
