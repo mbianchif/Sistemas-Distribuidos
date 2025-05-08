@@ -37,6 +37,7 @@ func NewConnection(ip string, port uint16, log *logging.Logger) (*CsvTransferStr
 }
 
 func (s *CsvTransferStream) sendBatch(batch []byte, headerSize int) error {
+	batch[0] = MSG_BATCH
 	binary.BigEndian.PutUint32(batch[1:], uint32(len(batch)-headerSize))
 	return writeAll(s.conn, batch)
 }
@@ -55,7 +56,6 @@ func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) e
 
 	headerSize := 5 // 1:type + 4:dataSize
 	records := make([]byte, headerSize, batchSize)
-	records[0] = MSG_BATCH
 
 	var buf bytes.Buffer
 	csvWriter := csv.NewWriter(&buf)
@@ -79,7 +79,7 @@ func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) e
 
 			size := buf.Len()
 			if !fits(len(records), size, batchSize) {
-				if len(records) == 0 {
+				if len(records) == headerSize {
 					return fmt.Errorf("BATCH_SIZE should be incremented to let record of size %dB through", size)
 				}
 
