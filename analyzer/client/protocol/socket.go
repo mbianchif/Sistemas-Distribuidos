@@ -9,7 +9,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"slices"
 	"strconv"
 	"sync"
 
@@ -37,39 +36,26 @@ func NewConnection(ip string, port uint16, log *logging.Logger) (*CsvTransferStr
 	return &CsvTransferStream{conn, log}, nil
 }
 
-func (s *CsvTransferStream) sendBatch(records [][]byte) error {
-	writer := bufio.NewWriter(s.conn)
-	writer.WriteByte(MSG_BATCH)
-
-	quantBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(quantBytes, uint32(len(records)))
-	writer.Write(quantBytes)
-
-	lengthBytes := make([]byte, 4)
-	for _, record := range records {
-		binary.BigEndian.PutUint32(lengthBytes, uint32(len(record)))
-		writer.Write(lengthBytes)
-		writer.Write(record)
-	}
-
-	return writer.Flush()
+func (s *CsvTransferStream) sendBatch(batch []byte, headerSize int) error {
+	binary.BigEndian.PutUint32(batch[1:], uint32(len(batch)-headerSize))
+	return writeAll(s.conn, batch)
 }
 
 func fits(currentSize int, csvRowSize int, batchSize int) bool {
-	// TYPE + COUNT + CURRSIZE + ROW_SIZE_SIZE + ROW_SIZE
-	return 1+4+currentSize+4+csvRowSize < batchSize
+	return currentSize+1+csvRowSize <= batchSize
 }
 
-func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) (int, error) {
+func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) error {
 	if err := writeAll(s.conn, []byte{fileId}); err != nil {
-		return 0, fmt.Errorf("couldn't send fileId %d: %v", fileId, err)
+		return fmt.Errorf("couldn't send fileId %d: %v", fileId, err)
 	}
 
-	sentRecords := 0
 	reader := csv.NewReader(bufio.NewReader(fp))
 	reader.Read() // Skip header line
-	records := make([][]byte, 0, batchSize)
-	accSize := 0
+
+	headerSize := 5 // 1:type + 4:dataSize
+	records := make([]byte, headerSize, batchSize)
+	records[0] = MSG_BATCH
 
 	var buf bytes.Buffer
 	csvWriter := csv.NewWriter(&buf)
@@ -92,35 +78,32 @@ func (s *CsvTransferStream) SendFile(fp *os.File, fileId uint8, batchSize int) (
 			csvWriter.Flush()
 
 			size := buf.Len()
-			bytes := slices.Clone(buf.Bytes())
-
-			if !fits(accSize, size, batchSize) {
+			if !fits(len(records), size, batchSize) {
 				if len(records) == 0 {
-					return sentRecords, fmt.Errorf("BATCH_SIZE should be incremented to let record of size ~%dB through", size)
+					return fmt.Errorf("BATCH_SIZE should be incremented to let record of size %dB through", size)
 				}
 
-				if err := s.sendBatch(records); err != nil {
-					return sentRecords, fmt.Errorf("couldn't send batch with fileId %d: %v", fileId, err)
+				if err := s.sendBatch(records, headerSize); err != nil {
+					return fmt.Errorf("couldn't send batch with fileId %d: %v", fileId, err)
 				}
 
-				sentRecords += len(records)
-				accSize = 0
-				records = records[:0]
+				records = records[:headerSize]
 			}
 
-			accSize += size
-			records = append(records, bytes)
+			if len(records) > headerSize {
+				records = append(records, []byte("\n")...)
+			}
+			records = append(records, buf.Bytes()...)
 		}
 	}
 
 	if len(records) > 0 {
-		sentRecords += len(records)
-		if err := s.sendBatch(records); err != nil {
-			return sentRecords, fmt.Errorf("couldn't send batch with fileId %d: %v", fileId, err)
+		if err := s.sendBatch(records, headerSize); err != nil {
+			return fmt.Errorf("couldn't send batch with fileId %d: %v", fileId, err)
 		}
 	}
 
-	return sentRecords, nil
+	return nil
 }
 
 func (s *CsvTransferStream) Confirm() error {

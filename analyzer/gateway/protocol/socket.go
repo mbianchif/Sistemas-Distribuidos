@@ -22,7 +22,7 @@ const (
 
 type Message struct {
 	Kind int
-	Data [][]byte
+	Data []byte
 }
 
 type CsvTransferStream struct {
@@ -66,26 +66,15 @@ func (s *CsvTransferStream) Recv() (*Message, error) {
 	if err != nil || read < len(batchSizeBytes) {
 		return nil, fmt.Errorf("didn't read full %d bytes of batch size: %v", len(batchSizeBytes), err)
 	}
+
 	batchSize := int(binary.BigEndian.Uint32(batchSizeBytes))
-
-	lenBytes := make([]byte, 4)
-	lines := make([][]byte, 0, batchSize)
-	for range batchSize {
-		read, err := io.ReadFull(s.conn, lenBytes)
-		if err != nil || read < len(lenBytes) {
-			return nil, fmt.Errorf("didn't read full %d bytes of length: %v", len(lenBytes), err)
-		}
-		lineLen := int(binary.BigEndian.Uint32(lenBytes))
-
-		line := make([]byte, lineLen)
-		read, err = io.ReadFull(s.conn, line)
-		if err != nil || read < len(line) {
-			return nil, fmt.Errorf("didn't read full %d bytes of line: %v", len(line), err)
-		}
-		lines = append(lines, line)
+	batch := make([]byte, batchSize)
+	read, err = io.ReadFull(s.conn, batch)
+	if err != nil || read < batchSize {
+		return nil, fmt.Errorf("didn't read full %d bytes of batch: %v", batchSize, err)
 	}
 
-	return &Message{Kind: msgKind, Data: lines}, nil
+	return &Message{Kind: msgKind, Data: batch}, nil
 }
 
 func writeAll(writer io.Writer, data []byte) error {

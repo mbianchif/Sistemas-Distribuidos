@@ -103,19 +103,7 @@ func (s *Server) clientHandler(conn *CsvTransferStream, clientId int) error {
 	return nil
 }
 
-func (s *Server) sendBatch(fileName string, clientId int, records [][]byte) {
-	body := make([]byte, 0, 24000)
-	first := true
-
-	for _, record := range records {
-		if !first {
-			body = append(body, '\n')
-		}
-
-		first = false
-		body = append(body, record...)
-	}
-
+func (s *Server) sendBatch(fileName string, clientId int, body []byte) {
 	s.mailer.PublishBatch(fileName, clientId, body)
 }
 
