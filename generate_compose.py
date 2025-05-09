@@ -26,7 +26,7 @@ def generate_pipeline_compose(
     sink_4,
     sink_5,
     join_id_movieid,
-    join_id_id
+    join_id_id,
 ) -> str:
     GATEWAY = 1
     TOP_10_COUNT = 1
@@ -49,6 +49,10 @@ services:
       timeout: 3s
       retries: 10
       start_period: 50s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   gateway:
     container_name: gateway
@@ -607,6 +611,7 @@ networks:
 
     return docker_compose
 
+
 def generate_client_compose(client) -> str:
     docker_compose = f"""name: clients
 services:"""
@@ -631,6 +636,7 @@ networks:
 """
     return docker_compose
 
+
 if __name__ == "__main__":
     # pipeline
     config_path = Path("configs/compose/config.json")
@@ -642,7 +648,7 @@ if __name__ == "__main__":
     with open(config_path, "r") as config_file:
         config = json.load(config_file)
         client = config.pop("client", None)
-        
+
     try:
         pipeline_docker_compose = generate_pipeline_compose(**config)
     except KeyError as e:
@@ -664,4 +670,3 @@ if __name__ == "__main__":
         f.write(docker_compose)
 
     print(f"Client compose file saved to {client_compose_name}")
-
