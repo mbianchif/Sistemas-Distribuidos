@@ -53,6 +53,8 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 
 			if expecting[replica][client] <= seq {
 				bufs[replica][client][seq] = del
+			} else {
+				del.Ack(false)
 			}
 
 			for {
@@ -64,6 +66,12 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 				delete(bufs[replica][client], expecting[replica][client])
 				expecting[replica][client]++
 				ordered <- next
+
+				kind := int(next.Headers["kind"].(int32))
+				if kind == comms.EOF {
+					delete(bufs[replica], client)
+					delete(expecting[replica], client)
+				}
 			}
 		}
 	}()
@@ -76,13 +84,19 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 
 		for del := range ordered {
 			kind := int(del.Headers["kind"].(int32))
-			client := int(del.Headers["client-id"].(int32))
 
 			if kind == comms.EOF {
-				eofsRecv[client] = eofsRecv[client] + 1
+				client := int(del.Headers["client-id"].(int32))
+
+				eofsRecv[client]++
 				if eofsRecv[client] < copies {
+					// TODO: habria que guardar el estado interno del receiver
+					// para que recuerde cuantos eofs recibio de este cliente
+					// antes de mandar el ack
+					del.Ack(false)
 					continue
 				}
+
 				delete(eofsRecv, client)
 			}
 
@@ -91,4 +105,6 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 	}()
 
 	return eofsFiltered, nil
+
+	// return ordered, nil
 }
