@@ -90,7 +90,6 @@ func (base *Worker) Run(w IWorker) error {
 		case comms.EOF:
 			w.Eof(client, qId, body)
 		case comms.FLUSH:
-			base.Log.Infof("received flush message for client %d", client)
 			w.Flush(client, qId, body)
 		default:
 			base.Log.Errorf("received an unknown message type %v", kind)
