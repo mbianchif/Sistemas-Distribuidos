@@ -83,8 +83,8 @@ func (w *Groupby) Eof(clientId, qId int, data []byte) {
 func (w *Groupby) Flush(clientId, qId int, data []byte) {
 	w.clean(clientId)
 
-	eof := comms.DecodeEof(data)
-	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
+	flush := comms.DecodeFlush(data)
+	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }

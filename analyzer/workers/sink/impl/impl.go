@@ -53,7 +53,8 @@ func (w *Sink) Eof(clientId, qId int, data []byte) {
 
 func (w *Sink) Flush(clientId, qId int, data []byte) {
 	body := comms.DecodeFlush(data)
-	if err := w.Mailer.PublishFlush(body, clientId); err != nil {
+	headers := amqp.Table{"query": w.Con.Query}
+	if err := w.Mailer.PublishFlush(body, clientId, headers); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }

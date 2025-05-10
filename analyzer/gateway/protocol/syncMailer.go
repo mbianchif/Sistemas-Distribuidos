@@ -43,6 +43,10 @@ func (s *SyncMailer) Init() error {
 				if err := s.mailer.PublishEof(tup.fileName, tup.clientId, tup.body); err != nil {
 					s.log.Errorf("Error publishing EOF: %v", err)
 				}
+			case comms.FLUSH:
+				if err := s.mailer.PublishFlush(tup.clientId, tup.body); err != nil {
+					s.log.Errorf("Error publishing flush: %v", err)
+				}
 			default:
 				s.log.Errorf("got an unexpected message kind in sync mailer: %d", tup.kind)
 			}
@@ -62,6 +66,10 @@ func (s *SyncMailer) PublishBatch(fileName string, clientId int, body []byte) {
 
 func (s *SyncMailer) PublishEof(fileName string, clientId int, body []byte) {
 	s.ch <- tuple{fileName, clientId, body, comms.EOF}
+}
+
+func (s *SyncMailer) PublishFlush(clientId int, body []byte) {
+	s.ch <- tuple{"", clientId, body, comms.FLUSH}
 }
 
 func (s *SyncMailer) DeInit() {
