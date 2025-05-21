@@ -1,7 +1,9 @@
 package rabbit
 
 import (
+	"bytes"
 	"fmt"
+	"strconv"
 
 	"analyzer/comms"
 
@@ -84,4 +86,17 @@ func (s *SenderShard) Broadcast(body []byte, headers amqp.Table) error {
 	}
 
 	return nil
+}
+
+// Example: "shard <seq> ... <seq>"
+func (s *SenderShard) Encode(clientId int) []byte {
+	builder := bytes.NewBuffer([]byte("shard"))
+
+	for replicaId := range s.seq {
+		seq := s.seq[replicaId][clientId]
+		builder.WriteRune(' ')
+		builder.WriteString(strconv.Itoa(seq))
+	}
+
+	return builder.Bytes()
 }

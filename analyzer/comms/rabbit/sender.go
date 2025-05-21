@@ -10,4 +10,5 @@ type Sender interface {
 	Batch(comms.Batch, map[string]struct{}, amqp.Table) error
 	Eof(comms.Eof, amqp.Table) error
 	Flush(comms.Flush, amqp.Table) error
+	Encode(int) []byte
 }

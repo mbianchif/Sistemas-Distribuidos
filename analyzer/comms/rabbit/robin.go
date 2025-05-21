@@ -1,7 +1,9 @@
 package rabbit
 
 import (
+	"bytes"
 	"fmt"
+	"strconv"
 
 	"analyzer/comms"
 
@@ -70,4 +72,19 @@ func (s *SenderRobin) Broadcast(body []byte, headers amqp.Table) error {
 		}
 	}
 	return nil
+}
+
+// Example: "robin <cur> <seq>  ... <seq>"
+func (s *SenderRobin) Encode(clientId int) []byte {
+
+	init := fmt.Appendf(nil, "robin %d", s.cur[clientId])
+	builder := bytes.NewBuffer(init)
+
+	for replicaId := range s.seq {
+		seq := s.seq[replicaId][clientId]
+		builder.WriteRune(' ')
+		builder.WriteString(strconv.Itoa(seq))
+	}
+
+	return builder.Bytes()
 }

@@ -96,6 +96,7 @@ func mergeHeaders(base amqp.Table, headers []amqp.Table) amqp.Table {
 	for _, h := range headers {
 		maps.Copy(base, h)
 	}
+
 	return base
 }
 
@@ -112,6 +113,7 @@ func (m *Mailer) PublishBatch(batch comms.Batch, clientId int, headers ...amqp.T
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -128,6 +130,7 @@ func (m *Mailer) PublishEof(eof comms.Eof, clientId int, headers ...amqp.Table) 
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -144,5 +147,45 @@ func (m *Mailer) PublishFlush(flush comms.Flush, clientId int, headers ...amqp.T
 			return err
 		}
 	}
+
+	return nil
+}
+
+/*
+
+0:
+	replica-0:
+		data.csv
+
+*/
+
+func (m *Mailer) Dump(clientId int) error {
+	// se tienen que guardar los datos de todas las replicas dado un cliente
+	// puede pasar que los senders sean de tipo shard, por lo que no solo va
+	// a cambiar uno, entonces, un archivo por cliente con todos sus senders
+	// uno por linea.
+	//
+	// Basta con modificar el archivo del último cliente.
+	//
+	// Ejemplo:
+	//
+	// # persistors/0/sender-data.txt
+	// shard <seq> ... <seq>
+	// robin <cur> <seq> ... <seq>
+	// ...
+	// robin <cur> <seq> ... <seq>
+	//
+
+	// 1. Conseguir los datos de todos los senders
+	lines := make([]byte, 0)
+
+	for _, sender := range m.senders {
+		encoded := sender.Encode(clientId)
+		lines = append(lines, encoded...)
+		lines = append(lines, "\n"...)
+	}
+
+	// Write atomico a mailer/:clientId/sender-data.txt
+
 	return nil
 }
