@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"bytes"
 	"fmt"
 	"maps"
 	"strings"
@@ -169,23 +170,30 @@ func (m *Mailer) Dump(clientId int) error {
 	//
 	// Ejemplo:
 	//
-	// # persistors/0/sender-data.txt
+	// # mailer/<clientId>/state.txt
+	// recv <name> <seq>
+	// ...
+	// recv <name> <seq>
+	// <empty-line>
 	// shard <seq> ... <seq>
 	// robin <cur> <seq> ... <seq>
 	// ...
 	// robin <cur> <seq> ... <seq>
+	buf := bytes.NewBuffer(nil)
+
+	// 1. Conseguir los datos del receiver
+	// for name, receiver := range m.receivers {
 	//
+	// }
 
-	// 1. Conseguir los datos de todos los senders
-	lines := make([]byte, 0)
-
+	// 2. Conseguir los datos de todos los senders
 	for _, sender := range m.senders {
 		encoded := sender.Encode(clientId)
-		lines = append(lines, encoded...)
-		lines = append(lines, "\n"...)
+		buf.Write(encoded)
+		buf.WriteByte('\n')
 	}
 
-	// Write atomico a mailer/:clientId/sender-data.txt
+	// 3. Write atomico a mailer/<clientId/state.txt
 
 	return nil
 }

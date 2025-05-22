@@ -52,13 +52,6 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 			}
 
 			if expecting[replica][client] <= seq {
-				kind := int(del.Headers["kind"].(int32))
-				if kind == comms.FLUSH {
-					if expecting[replica][client] == 0 {
-						seq = 0
-					}
-				}
-
 				bufs[replica][client][seq] = del
 			} else {
 				del.Ack(false)
@@ -75,7 +68,7 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 				ordered <- next
 
 				kind := int(next.Headers["kind"].(int32))
-				if kind == comms.EOF || kind == comms.FLUSH {
+				if kind == comms.FLUSH {
 					delete(bufs[replica], client)
 					delete(expecting[replica], client)
 				}
@@ -113,6 +106,4 @@ func (r *Receiver) Consume(consumer string) (<-chan amqp.Delivery, error) {
 	}()
 
 	return eofsFiltered, nil
-
-	// return ordered, nil
 }
