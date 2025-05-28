@@ -55,7 +55,7 @@ func (s *SanitizeMailer) initReceivers(inputQs []amqp.Queue, inputCopies []int) 
 	receivers := make([]*rabbit.Receiver, 0, len(inputQs))
 
 	for i := range inputQs {
-		recv := rabbit.NewReceiver(s.broker, inputQs[i], inputCopies[i])
+		recv := rabbit.NewReceiver(s.broker, inputQs[i], inputCopies[i], nil)
 		receivers = append(receivers, recv)
 	}
 
@@ -81,8 +81,8 @@ func (s *SanitizeMailer) Init() error {
 	return nil
 }
 
-func (s *SanitizeMailer) Consume() (<-chan amqp.Delivery, error) {
-	out := make(chan amqp.Delivery)
+func (s *SanitizeMailer) Consume() (<-chan comms.Delivery, error) {
+	out := make(chan comms.Delivery)
 
 	cases := make([]reflect.SelectCase, len(s.receivers))
 	for i, recv := range s.receivers {
@@ -108,7 +108,7 @@ func (s *SanitizeMailer) Consume() (<-chan amqp.Delivery, error) {
 				continue
 			}
 
-			out <- recv.Interface().(amqp.Delivery)
+			out <- recv.Interface().(comms.Delivery)
 		}
 	}()
 

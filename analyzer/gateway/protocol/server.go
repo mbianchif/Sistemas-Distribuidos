@@ -12,7 +12,6 @@ import (
 	"analyzer/gateway/config"
 
 	"github.com/op/go-logging"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Server struct {
@@ -22,7 +21,7 @@ type Server struct {
 	log      *logging.Logger
 	conns    sync.Map
 	end      atomic.Bool
-	recvChan <-chan amqp.Delivery
+	recvChan <-chan comms.Delivery
 }
 
 func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {

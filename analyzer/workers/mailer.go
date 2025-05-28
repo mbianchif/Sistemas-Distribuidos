@@ -49,6 +49,8 @@ func (m *Mailer) Init() ([]amqp.Queue, error) {
 }
 
 func (m *Mailer) initSenders(outputQFmts []string) []rabbit.Sender {
+	// TODO: check recovery file, else run default behaviour
+
 	delTypes := m.con.OutputDeliveryTypes
 	outputQCopies := m.con.OutputCopies
 	senders := make([]rabbit.Sender, 0, len(delTypes))
@@ -70,10 +72,12 @@ func (m *Mailer) initSenders(outputQFmts []string) []rabbit.Sender {
 }
 
 func (m *Mailer) initReceivers(inputQs []amqp.Queue, inputCopies []int) map[string]*rabbit.Receiver {
+	// TODO: check recovery file, else run default behaviour
+
 	receivers := make(map[string]*rabbit.Receiver, len(inputQs))
 
 	for i := range inputQs {
-		recv := rabbit.NewReceiver(m.broker, inputQs[i], inputCopies[i])
+		recv := rabbit.NewReceiver(m.broker, inputQs[i], inputCopies[i], m)
 		receivers[inputQs[i].Name] = recv
 	}
 
@@ -84,7 +88,7 @@ func (m *Mailer) DeInit() {
 	m.broker.DeInit()
 }
 
-func (m *Mailer) Consume(q amqp.Queue) (<-chan amqp.Delivery, error) {
+func (m *Mailer) Consume(q amqp.Queue) (<-chan comms.Delivery, error) {
 	recv, ok := m.receivers[q.Name]
 	if !ok {
 		return nil, fmt.Errorf("no receivers matches this queue name: %s", q.Name)
@@ -152,48 +156,26 @@ func (m *Mailer) PublishFlush(flush comms.Flush, clientId int, headers ...amqp.T
 	return nil
 }
 
-/*
-
-0:
-	replica-0:
-		data.csv
-
-*/
-
 func (m *Mailer) Dump(clientId int) error {
-	// se tienen que guardar los datos de todas las replicas dado un cliente
-	// puede pasar que los senders sean de tipo shard, por lo que no solo va
-	// a cambiar uno, entonces, un archivo por cliente con todos sus senders
-	// uno por linea.
-	//
-	// Basta con modificar el archivo del último cliente.
-	//
-	// Ejemplo:
-	//
-	// # mailer/<clientId>/state.txt
-	// recv <name> <seq>
-	// ...
-	// recv <name> <seq>
-	// <empty-line>
-	// shard <seq> ... <seq>
-	// robin <cur> <seq> ... <seq>
-	// ...
-	// robin <cur> <seq> ... <seq>
 	buf := bytes.NewBuffer(nil)
 
-	// 1. Conseguir los datos del receiver
-	// for name, receiver := range m.receivers {
-	//
-	// }
+	// 1. Write receivers' data
+	for _, receiver := range m.receivers {
+		encoded := receiver.Encode(clientId)
+		buf.Write(encoded)
+		buf.WriteByte('\n')
 
-	// 2. Conseguir los datos de todos los senders
+	}
+
+	// 2. Write senders' data
 	for _, sender := range m.senders {
 		encoded := sender.Encode(clientId)
 		buf.Write(encoded)
 		buf.WriteByte('\n')
 	}
 
-	// 3. Write atomico a mailer/<clientId/state.txt
-
-	return nil
+	// 3. Atomic write
+	dirPath := fmt.Sprintf("/mailer/%d", clientId)
+	fileName := "state"
+	return comms.AtomicWrite(dirPath, fileName, buf.Bytes())
 }

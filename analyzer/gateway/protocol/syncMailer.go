@@ -5,7 +5,6 @@ import (
 	"analyzer/gateway/config"
 
 	"github.com/op/go-logging"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type tuple struct {
@@ -56,7 +55,7 @@ func (s *SyncMailer) Init() error {
 	return s.mailer.Init()
 }
 
-func (s *SyncMailer) Consume() (<-chan amqp.Delivery, error) {
+func (s *SyncMailer) Consume() (<-chan comms.Delivery, error) {
 	return s.mailer.Consume()
 }
 

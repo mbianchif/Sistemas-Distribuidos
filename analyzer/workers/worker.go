@@ -11,7 +11,6 @@ import (
 	"analyzer/workers/config"
 
 	"github.com/op/go-logging"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type IWorker interface {
@@ -79,22 +78,27 @@ func (base *Worker) Run(w IWorker) error {
 			return nil
 		}
 
-		del := value.Interface().(amqp.Delivery)
+		del := value.Interface().(comms.Delivery)
 		kind := int(del.Headers["kind"].(int32))
-		client := int(del.Headers["client-id"].(int32))
+		clientId := int(del.Headers["client-id"].(int32))
 		body := del.Body
 
+		// Process + Send
 		switch kind {
 		case comms.BATCH:
-			w.Batch(client, qId, body)
+			w.Batch(clientId, qId, body)
 		case comms.EOF:
-			w.Eof(client, qId, body)
+			w.Eof(clientId, qId, body)
 		case comms.FLUSH:
-			w.Flush(client, qId, body)
+			w.Flush(clientId, qId, body)
 		default:
 			base.Log.Errorf("received an unknown message type %v", kind)
 		}
 
+		// Dump
+		base.Mailer.Dump(clientId)
+
+		// Ack
 		if err := del.Ack(false); err != nil {
 			base.Log.Errorf("error while acknowledging message: %v", err)
 		}

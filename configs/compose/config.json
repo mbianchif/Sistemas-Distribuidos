@@ -1,7 +1,7 @@
 {
     "sanitize_movies": 1,
     "sanitize_credits": 1,
-    "sanitize_ratings": 5,
+    "sanitize_ratings": 1,
     "filter_production_countries_length": 1,
     "filter_production_countries_argentina_spain": 1,
     "filter_production_countries_argentina": 1,
@@ -15,12 +15,12 @@
     "groupby_id_title_mean_rating": 1,
     "divider": 1,
     "sentiment": 1,
-    "join_id_movieid": 5,
+    "join_id_movieid": 1,
     "join_id_id": 1,
     "sink_1": 1,
     "sink_2": 1,
     "sink_3": 1,
     "sink_4": 1,
     "sink_5": 1,
-    "client": 5
+    "client": 1
 }

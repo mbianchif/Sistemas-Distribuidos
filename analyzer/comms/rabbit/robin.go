@@ -76,7 +76,6 @@ func (s *SenderRobin) Broadcast(body []byte, headers amqp.Table) error {
 
 // Example: "robin <cur> <seq>  ... <seq>"
 func (s *SenderRobin) Encode(clientId int) []byte {
-
 	init := fmt.Appendf(nil, "robin %d", s.cur[clientId])
 	builder := bytes.NewBuffer(init)
 
