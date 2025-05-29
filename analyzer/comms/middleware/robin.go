@@ -1,4 +1,4 @@
-package rabbit
+package middleware
 
 import (
 	"bytes"
@@ -12,10 +12,12 @@ import (
 
 type SenderRobin struct {
 	broker       *Broker
-	fmt          string
-	cur          map[int]int
 	outputCopies int
-	seq          []map[int]int
+
+	// Persisted
+	fmt string
+	cur map[int]int
+	seq []map[int]int
 }
 
 func NewRobin(broker *Broker, fmt string, outputCopies int) *SenderRobin {
@@ -74,9 +76,9 @@ func (s *SenderRobin) Broadcast(body []byte, headers amqp.Table) error {
 	return nil
 }
 
-// Example: "robin <cur> <seq>  ... <seq>"
+// Example: "robin <fmt> <cur> <seq>  ... <seq>"
 func (s *SenderRobin) Encode(clientId int) []byte {
-	init := fmt.Appendf(nil, "robin %d", s.cur[clientId])
+	init := fmt.Appendf(nil, "robin %s %d", s.fmt, s.cur[clientId])
 	builder := bytes.NewBuffer(init)
 
 	for replicaId := range s.seq {

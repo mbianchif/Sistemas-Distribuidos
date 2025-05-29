@@ -2,7 +2,7 @@ package protocol
 
 import (
 	"analyzer/comms"
-	"analyzer/comms/rabbit"
+	"analyzer/comms/middleware"
 	"analyzer/gateway/config"
 	"fmt"
 	"reflect"
@@ -12,16 +12,16 @@ import (
 )
 
 type SanitizeMailer struct {
-	broker      *rabbit.Broker
+	broker      *middleware.Broker
 	con         *config.Config
-	senders     []*rabbit.SenderRobin
-	receivers   []*rabbit.Receiver
+	senders     []*middleware.SenderRobin
+	receivers   []*middleware.Receiver
 	filename2Id map[string]int
 	log         *logging.Logger
 }
 
 func NewSanitizeMailer(con *config.Config, log *logging.Logger) (*SanitizeMailer, error) {
-	broker, err := rabbit.NewBroker(con.Url)
+	broker, err := middleware.NewBroker(con.Url)
 	if err != nil {
 		return nil, err
 	}
@@ -39,23 +39,23 @@ func NewSanitizeMailer(con *config.Config, log *logging.Logger) (*SanitizeMailer
 	}, nil
 }
 
-func (s *SanitizeMailer) initSenders(outputQFmts []string) []*rabbit.SenderRobin {
+func (s *SanitizeMailer) initSenders(outputQFmts []string) []*middleware.SenderRobin {
 	outputQCopies := s.con.OutputCopies
-	senders := make([]*rabbit.SenderRobin, 0, len(outputQCopies))
+	senders := make([]*middleware.SenderRobin, 0, len(outputQCopies))
 
 	for i := range outputQFmts {
-		sender := rabbit.NewRobin(s.broker, outputQFmts[i], outputQCopies[i])
+		sender := middleware.NewRobin(s.broker, outputQFmts[i], outputQCopies[i])
 		senders = append(senders, sender)
 	}
 
 	return senders
 }
 
-func (s *SanitizeMailer) initReceivers(inputQs []amqp.Queue, inputCopies []int) []*rabbit.Receiver {
-	receivers := make([]*rabbit.Receiver, 0, len(inputQs))
+func (s *SanitizeMailer) initReceivers(inputQs []amqp.Queue, inputCopies []int) []*middleware.Receiver {
+	receivers := make([]*middleware.Receiver, 0, len(inputQs))
 
 	for i := range inputQs {
-		recv := rabbit.NewReceiver(s.broker, inputQs[i], inputCopies[i], nil)
+		recv := middleware.NewReceiver(s.broker, inputQs[i], inputCopies[i], nil)
 		receivers = append(receivers, recv)
 	}
 
@@ -81,8 +81,8 @@ func (s *SanitizeMailer) Init() error {
 	return nil
 }
 
-func (s *SanitizeMailer) Consume() (<-chan comms.Delivery, error) {
-	out := make(chan comms.Delivery)
+func (s *SanitizeMailer) Consume() (<-chan middleware.Delivery, error) {
+	out := make(chan middleware.Delivery)
 
 	cases := make([]reflect.SelectCase, len(s.receivers))
 	for i, recv := range s.receivers {
@@ -108,7 +108,7 @@ func (s *SanitizeMailer) Consume() (<-chan comms.Delivery, error) {
 				continue
 			}
 
-			out <- recv.Interface().(comms.Delivery)
+			out <- recv.Interface().(middleware.Delivery)
 		}
 	}()
 

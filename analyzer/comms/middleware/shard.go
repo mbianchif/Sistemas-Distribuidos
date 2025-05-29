@@ -1,4 +1,4 @@
-package rabbit
+package middleware
 
 import (
 	"bytes"
@@ -13,11 +13,13 @@ import (
 
 type SenderShard struct {
 	broker       *Broker
-	fmt          string
-	key          string
-	outputCopies int
 	log          *logging.Logger
-	seq          []map[int]int
+	outputCopies int
+
+	// Persisted
+	fmt string
+	key string
+	seq []map[int]int
 }
 
 func NewShard(broker *Broker, fmt string, key string, outputCopies int, log *logging.Logger) *SenderShard {
@@ -88,9 +90,10 @@ func (s *SenderShard) Broadcast(body []byte, headers amqp.Table) error {
 	return nil
 }
 
-// Example: "shard <seq> ... <seq>"
+// Example: "shard <fmt> <key> <seq> ... <seq>"
 func (s *SenderShard) Encode(clientId int) []byte {
-	builder := bytes.NewBuffer([]byte("shard"))
+	init := fmt.Appendf(nil, "shard %s %s", s.fmt, s.key)
+	builder := bytes.NewBuffer(init)
 
 	for replicaId := range s.seq {
 		seq := s.seq[replicaId][clientId]

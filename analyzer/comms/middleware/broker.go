@@ -1,4 +1,4 @@
-package rabbit
+package middleware
 
 import (
 	"fmt"
@@ -162,9 +162,9 @@ func (b *Broker) queueBind(q amqp.Queue, key string, exchangeName string) error 
 	)
 }
 
-func (b *Broker) Consume(q amqp.Queue, consumer string) (<-chan amqp.Delivery, error) {
+func (b *Broker) Consume(qName, consumer string) (<-chan amqp.Delivery, error) {
 	return b.conCh.Consume(
-		q.Name,
+		qName,
 		consumer,
 		false, // auto-ack
 		false, // exclusive

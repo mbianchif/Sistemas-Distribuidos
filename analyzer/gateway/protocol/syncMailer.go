@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"analyzer/comms"
+	"analyzer/comms/middleware"
 	"analyzer/gateway/config"
 
 	"github.com/op/go-logging"
@@ -55,7 +56,7 @@ func (s *SyncMailer) Init() error {
 	return s.mailer.Init()
 }
 
-func (s *SyncMailer) Consume() (<-chan comms.Delivery, error) {
+func (s *SyncMailer) Consume() (<-chan middleware.Delivery, error) {
 	return s.mailer.Consume()
 }
 

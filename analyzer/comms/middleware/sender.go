@@ -1,4 +1,4 @@
-package rabbit
+package middleware
 
 import (
 	"analyzer/comms"

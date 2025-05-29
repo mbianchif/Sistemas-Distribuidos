@@ -1,33 +1,94 @@
 package workers
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"maps"
+	"os"
+	"strconv"
 	"strings"
 
 	"analyzer/comms"
-	"analyzer/comms/rabbit"
+	"analyzer/comms/middleware"
 	"analyzer/workers/config"
 
 	"github.com/op/go-logging"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+const (
+	PERSISTANCE_DIR      = "/mailer"
+	PERSISTANCE_FILENAME = "state"
+)
+
 type Mailer struct {
-	senders   []rabbit.Sender
-	receivers map[string]*rabbit.Receiver
-	broker    *rabbit.Broker
+	senders   []middleware.Sender
+	receivers map[string]*middleware.Receiver
+	broker    *middleware.Broker
 	con       *config.Config
 	Log       *logging.Logger
 }
 
 func NewMailer(con *config.Config, log *logging.Logger) (*Mailer, error) {
-	broker, err := rabbit.NewBroker(con.Url)
+	broker, err := middleware.NewBroker(con.Url)
 	if err != nil {
 		return nil, err
 	}
 	return &Mailer{nil, nil, broker, con, log}, nil
+}
+
+func (m *Mailer) tryRecover(inputQs []amqp.Queue, outputQFmts []string) ([]middleware.Sender, map[string]*middleware.Receiver) {
+	senders := m.initSenders(outputQFmts)
+	receivers := m.initReceivers(inputQs, m.con.InputCopies)
+
+	mailerDir, err := os.ReadDir(PERSISTANCE_DIR)
+	if err != nil {
+		m.Log.Infof("Failed to recover node, didn't find recovery directory")
+		return senders, receivers
+	}
+
+	for _, clientDir := range mailerDir {
+		clientIdStr := clientDir.Name()
+		clientId, err := strconv.Atoi(clientIdStr)
+		if err != nil {
+			m.Log.Errorf("Failed to parse clientId for client %s: ", clientIdStr, err)
+			continue
+		}
+
+		statePath := fmt.Sprintf("%s/%d/%s", PERSISTANCE_DIR, clientId, PERSISTANCE_FILENAME)
+		fp, err := os.Open(statePath)
+		if err != nil {
+			m.Log.Errorf("Failed to recover client %s mailer's state:", err)
+			continue
+		}
+
+		reader := bufio.NewReader(fp)
+		sendIdx := 0
+		for {
+			lineBytes, err := reader.ReadBytes('\n')
+			if err != nil {
+				break
+			}
+			line := strings.TrimSpace(string(lineBytes))
+
+			// 1. leer la linea y fijarse que tipo es
+			// 2. Pedirle a la entidad que devuelva los datos correspondientes
+			// 3. Asignarlos a los receivers/senders correspondientes
+
+			if strings.HasPrefix(line, "recv") {
+				qName, eofs, seqs, err := middleware.DecodeLineRecv(line)
+				if err != nil {
+					m.Log.Errorf("Failed to decode line for client-%d's receiver: %v", clientId, err)
+					continue
+				}
+
+				// setear para el receiver con qName los datos
+			} else if 
+		}
+	}
+
+	return senders, receivers
 }
 
 func (m *Mailer) Init() ([]amqp.Queue, error) {
@@ -42,27 +103,23 @@ func (m *Mailer) Init() ([]amqp.Queue, error) {
 		return nil, err
 	}
 
-	inputCopies := m.con.InputCopies
-	m.senders = m.initSenders(outputQFmts)
-	m.receivers = m.initReceivers(inputQs, inputCopies)
+	m.senders, m.receivers = m.tryRecover(inputQs, outputQFmts)
 	return inputQs, nil
 }
 
-func (m *Mailer) initSenders(outputQFmts []string) []rabbit.Sender {
-	// TODO: check recovery file, else run default behaviour
-
+func (m *Mailer) initSenders(outputQFmts []string) []middleware.Sender {
 	delTypes := m.con.OutputDeliveryTypes
 	outputQCopies := m.con.OutputCopies
-	senders := make([]rabbit.Sender, 0, len(delTypes))
+	senders := make([]middleware.Sender, 0, len(delTypes))
 
 	for i := range outputQFmts {
-		var sender rabbit.Sender
+		var sender middleware.Sender
 		if delTypes[i] == "robin" {
-			sender = rabbit.NewRobin(m.broker, outputQFmts[i], outputQCopies[i])
+			sender = middleware.NewRobin(m.broker, outputQFmts[i], outputQCopies[i])
 		} else {
 			parts := strings.Split(delTypes[i], ":")
 			key := parts[1]
-			sender = rabbit.NewShard(m.broker, outputQFmts[i], key, outputQCopies[i], m.Log)
+			sender = middleware.NewShard(m.broker, outputQFmts[i], key, outputQCopies[i], m.Log)
 		}
 
 		senders = append(senders, sender)
@@ -71,13 +128,11 @@ func (m *Mailer) initSenders(outputQFmts []string) []rabbit.Sender {
 	return senders
 }
 
-func (m *Mailer) initReceivers(inputQs []amqp.Queue, inputCopies []int) map[string]*rabbit.Receiver {
-	// TODO: check recovery file, else run default behaviour
-
-	receivers := make(map[string]*rabbit.Receiver, len(inputQs))
+func (m *Mailer) initReceivers(inputQs []amqp.Queue, inputCopies []int) map[string]*middleware.Receiver {
+	receivers := make(map[string]*middleware.Receiver, len(inputQs))
 
 	for i := range inputQs {
-		recv := rabbit.NewReceiver(m.broker, inputQs[i], inputCopies[i], m)
+		recv := middleware.NewReceiver(m.broker, inputQs[i], inputCopies[i], m)
 		receivers[inputQs[i].Name] = recv
 	}
 
@@ -88,7 +143,7 @@ func (m *Mailer) DeInit() {
 	m.broker.DeInit()
 }
 
-func (m *Mailer) Consume(q amqp.Queue) (<-chan comms.Delivery, error) {
+func (m *Mailer) Consume(q amqp.Queue) (<-chan middleware.Delivery, error) {
 	recv, ok := m.receivers[q.Name]
 	if !ok {
 		return nil, fmt.Errorf("no receivers matches this queue name: %s", q.Name)
@@ -175,7 +230,6 @@ func (m *Mailer) Dump(clientId int) error {
 	}
 
 	// 3. Atomic write
-	dirPath := fmt.Sprintf("/mailer/%d", clientId)
-	fileName := "state"
-	return comms.AtomicWrite(dirPath, fileName, buf.Bytes())
+	dirPath := fmt.Sprintf("/%d", PERSISTANCE_DIR, clientId)
+	return comms.AtomicWrite(dirPath, PERSISTANCE_FILENAME, buf.Bytes())
 }

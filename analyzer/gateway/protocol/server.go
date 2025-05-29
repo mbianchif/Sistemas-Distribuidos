@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"analyzer/comms"
+	"analyzer/comms/middleware"
 	"analyzer/gateway/config"
 
 	"github.com/op/go-logging"
@@ -21,7 +22,7 @@ type Server struct {
 	log      *logging.Logger
 	conns    sync.Map
 	end      atomic.Bool
-	recvChan <-chan comms.Delivery
+	recvChan <-chan middleware.Delivery
 }
 
 func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {

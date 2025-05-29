@@ -1,4 +1,4 @@
-package comms
+package middleware
 
 import (
 	"sync"

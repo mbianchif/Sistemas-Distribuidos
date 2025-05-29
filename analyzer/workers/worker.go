@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"analyzer/comms"
+	"analyzer/comms/middleware"
 	"analyzer/workers/config"
 
 	"github.com/op/go-logging"
@@ -78,7 +79,7 @@ func (base *Worker) Run(w IWorker) error {
 			return nil
 		}
 
-		del := value.Interface().(comms.Delivery)
+		del := value.Interface().(middleware.Delivery)
 		kind := int(del.Headers["kind"].(int32))
 		clientId := int(del.Headers["client-id"].(int32))
 		body := del.Body
