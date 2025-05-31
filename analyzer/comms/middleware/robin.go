@@ -79,7 +79,7 @@ func (s *SenderRobin) Broadcast(body []byte, headers amqp.Table) error {
 
 // Example: "robin <fmt> <cur> <seq>  ... <seq>"
 func (s *SenderRobin) Encode(clientId int) []byte {
-	init := fmt.Appendf(nil, "robin %s %d", s.fmt, s.cur[clientId])
+	init := fmt.Appendf(nil, "robin %d", s.cur[clientId])
 	builder := bytes.NewBuffer(init)
 
 	for replicaId := range s.seq {
@@ -125,7 +125,6 @@ func (s *SenderRobin) SetState(clientId int, cur int, seqs []int) error {
 	}
 
 	s.cur[clientId] = cur
-	s.seq = make([]map[int]int, s.outputCopies)
 
 	for i := range s.seq {
 		s.seq[i][clientId] = seqs[i]

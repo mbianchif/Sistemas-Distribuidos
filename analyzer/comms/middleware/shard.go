@@ -93,7 +93,7 @@ func (s *SenderShard) Broadcast(body []byte, headers amqp.Table) error {
 
 // Example: "shard <seq> ... <seq>"
 func (s *SenderShard) Encode(clientId int) []byte {
-	init := fmt.Appendf(nil, "shard %s %s", s.fmt, s.key)
+	init := []byte("shard")
 	builder := bytes.NewBuffer(init)
 
 	for replicaId := range s.seq {
