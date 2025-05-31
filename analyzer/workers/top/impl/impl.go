@@ -1,7 +1,10 @@
 package impl
 
 import (
+	"bufio"
 	"bytes"
+	"fmt"
+	"os"
 	"sort"
 	"strconv"
 
@@ -25,9 +28,28 @@ type Top struct {
 	*workers.Worker
 	Con       *config.TopConfig
 	persistor persistance.Persistor
+	count     int
 
 	// Persisted
 	tops map[int][]tuple
+}
+
+func (w *Top) tryRecover() error {
+	persistedFiles, err := w.persistor.Recover()
+	if err != nil {
+		return err
+	}
+
+	for pf := range persistedFiles {
+		clientId := pf.ClientId
+		state := pf.State
+
+		if err := w.Decode(clientId, state); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func New(con *config.TopConfig, log *logging.Logger) (*Top, error) {
@@ -36,12 +58,18 @@ func New(con *config.TopConfig, log *logging.Logger) (*Top, error) {
 		return nil, err
 	}
 
-	return &Top{
+	w := Top{
 		Worker:    base,
 		Con:       con,
 		persistor: persistance.New(log),
 		tops:      make(map[int][]tuple),
-	}, nil
+	}
+
+	if err := w.tryRecover(); err != nil {
+		return nil, err
+	}
+
+	return &w, nil
 }
 
 func (w *Top) Run() error {
@@ -86,7 +114,29 @@ func (w *Top) Encode(clientId int) []byte {
 	return buf.Bytes()
 }
 
+func (w *Top) Decode(clientId int, state []byte) error {
+	reader := bufio.NewReader(bytes.NewReader(state))
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err != nil {
+			break
+		}
+
+		line = bytes.TrimSpace(line)
+		fieldMap, err := comms.DecodeLine(line)
+		if err != nil {
+			return fmt.Errorf("failed to decode line: %v", err)
+		}
+
+		handleTop(w, clientId, fieldMap)
+	}
+
+	return nil
+}
+
 func (w *Top) Batch(qId int, del middleware.Delivery) {
+	w.count++
+
 	body := del.Body
 	batch, err := comms.DecodeBatch(body)
 	if err != nil {
@@ -113,6 +163,11 @@ func (w *Top) Batch(qId int, del middleware.Delivery) {
 }
 
 func (w *Top) Eof(qId int, del middleware.Delivery) {
+	w.count++
+	if w.count == 2 {
+		os.Exit(1)
+	}
+
 	clientId := del.Headers.ClientId
 	responseFieldMaps := make([]map[string]string, 0, w.Con.Amount)
 	for _, tup := range w.tops[clientId] {
