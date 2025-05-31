@@ -50,33 +50,34 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 		defer close(ordered)
 		wg := new(sync.WaitGroup)
 
-		for del := range recv {
+		for rabbitDel := range recv {
 			// Stop here until worker has Ack'd it's last delivery
 			// so not to change `expecting` table before it got the
 			// chance to persist it's state.
 			wg.Wait()
 			wg.Add(1)
 
-			replica := int(del.Headers["replica-id"].(int32))
-			clientId := int(del.Headers["client-id"].(int32))
-			seq := int(del.Headers["seq"].(int32))
-			kind := int(del.Headers["kind"].(int32))
+			del := NewDelivery(rabbitDel, wg)
+			replicaId := del.Headers.ReplicaId
+			clientId := del.Headers.ClientId
+			seq := del.Headers.Seq
+			kind := del.Headers.Kind
 
-			if _, ok := r.expecting[replica][clientId]; !ok {
-				r.expecting[replica][clientId] = seq
+			if _, ok := r.expecting[replicaId][clientId]; !ok {
+				r.expecting[replicaId][clientId] = seq
 			}
 
 			if kind == comms.FLUSH {
-				delete(r.expecting[replica], clientId)
+				delete(r.expecting[replicaId], clientId)
 			}
 
-			if seq < r.expecting[replica][clientId] {
+			if seq < r.expecting[replicaId][clientId] {
 				del.Ack(false)
 				continue
 			}
 
-			r.expecting[replica][clientId] = seq + 1
-			ordered <- NewDelivery(del, wg)
+			r.expecting[replicaId][clientId] = seq + 1
+			ordered <- del
 		}
 	}()
 
@@ -86,8 +87,8 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 		copies := r.copies
 
 		for del := range ordered {
-			kind := int(del.Headers["kind"].(int32))
-			clientId := int(del.Headers["client-id"].(int32))
+			kind := del.Headers.Kind
+			clientId := del.Headers.ClientId
 
 			if kind == comms.EOF {
 				r.eofs[clientId]++

@@ -15,9 +15,9 @@ import (
 )
 
 type IWorker interface {
-	Batch(int, int, []byte)
-	Eof(int, int, []byte)
-	Flush(int, int, []byte)
+	Batch(int, middleware.Delivery)
+	Eof(int, middleware.Delivery)
+	Flush(int, middleware.Delivery)
 }
 
 type Worker struct {
@@ -80,23 +80,22 @@ func (base *Worker) Run(w IWorker) error {
 		}
 
 		del := value.Interface().(middleware.Delivery)
-		kind := int(del.Headers["kind"].(int32))
-		clientId := int(del.Headers["client-id"].(int32))
-		body := del.Body
+		kind := del.Headers.Kind
 
 		// Process + Send
 		switch kind {
 		case comms.BATCH:
-			w.Batch(clientId, qId, body)
+			w.Batch(qId, del)
 		case comms.EOF:
-			w.Eof(clientId, qId, body)
+			w.Eof(qId, del)
 		case comms.FLUSH:
-			w.Flush(clientId, qId, body)
+			w.Flush(qId, del)
 		default:
 			base.Log.Errorf("received an unknown message type %v", kind)
 		}
 
 		// Dump
+		clientId := del.Headers.ClientId
 		base.Mailer.Dump(clientId)
 
 		// Ack

@@ -2,31 +2,48 @@ package persistance
 
 import (
 	"analyzer/comms"
+	"analyzer/comms/middleware"
 	"bytes"
 	"fmt"
+	"iter"
 	"os"
+	"slices"
 	"strconv"
+	"strings"
+
+	"github.com/op/go-logging"
 )
 
 const (
 	PERSISTOR_DIRNAME = "persistors"
 )
 
-type Persistor struct {
-	decoder func([]byte) (any, error)
+type PersistedFile struct {
+	ClientId int
+	FileName string
+	State    []byte
 }
 
-func New(decoder func([]byte) (any, error)) *Persistor {
-	return &Persistor{decoder: decoder}
+type Persistor struct {
+	lastDeliveries map[int]middleware.DelId // maps clientId to last delivery id
+	log            *logging.Logger
+}
+
+func New(log *logging.Logger) Persistor {
+	return Persistor{
+		lastDeliveries: make(map[int]middleware.DelId),
+		log:            log,
+	}
 }
 
 func buildHeader(replicaId, seq int) []byte {
 	return fmt.Appendf(nil, "%d %d\n", replicaId, seq)
 }
 
-func (p *Persistor) Persist(replicaId, clientId, seq int, fileName string, data []byte) error {
-	header := buildHeader(replicaId, seq)
-	dirPath := fmt.Sprintf("%s/%d", PERSISTOR_DIRNAME, clientId)
+func (p Persistor) Store(id middleware.DelId, fileName string, data []byte) error {
+	header := buildHeader(id.ReplicaId, id.Seq)
+	dirPath := fmt.Sprintf("%s/%d", PERSISTOR_DIRNAME, id.ClientId)
+	p.lastDeliveries[id.ClientId] = id
 	return comms.AtomicWrite(dirPath, fileName, append(header, data...))
 }
 
@@ -49,7 +66,7 @@ func parseHeader(header []byte) (int, int, error) {
 	return replicaId, seq, nil
 }
 
-func (p *Persistor) Load(clientId int, fileName string) (int, int, any, error) {
+func (p Persistor) Load(clientId int, fileName string) (int, int, []byte, error) {
 	dirPath := fmt.Sprintf("%s/%d", PERSISTOR_DIRNAME, clientId)
 	path := fmt.Sprintf("%s/%s", dirPath, fileName)
 
@@ -68,6 +85,80 @@ func (p *Persistor) Load(clientId int, fileName string) (int, int, any, error) {
 		return 0, 0, nil, fmt.Errorf("failed to parse header in persistor file %s for client %d: %w", path, clientId, err)
 	}
 
-	decoded, err := p.decoder(fields[1])
-	return replicaId, seq, decoded, err
+	return replicaId, seq, fields[1], nil
+}
+
+func (p Persistor) Recover() (iter.Seq[PersistedFile], error) {
+	files, err := os.ReadDir(PERSISTOR_DIRNAME)
+	if err != nil {
+		return slices.Values([]PersistedFile{}), nil
+	}
+
+	return func(yield func(PersistedFile) bool) {
+		for _, clientDir := range files {
+			if !clientDir.IsDir() {
+				continue
+			}
+
+			clientId, err := strconv.Atoi(clientDir.Name())
+			if err != nil {
+				p.log.Errorf("failed to parse clientId from directory name %s: %v", clientDir.Name(), err)
+				continue
+			}
+
+			files, err := os.ReadDir(fmt.Sprintf("%s/%s", PERSISTOR_DIRNAME, clientDir.Name()))
+			if err != nil {
+				p.log.Errorf("failed to read files in directory %s: %v", clientDir.Name(), err)
+				continue
+			}
+
+			for _, file := range files {
+				if file.IsDir() {
+					continue
+				}
+
+				name := file.Name()
+				if strings.HasSuffix(name, ".tmp") {
+					continue
+				}
+
+				replicaId, seq, state, err := p.Load(clientId, name)
+				if err != nil {
+					p.log.Errorf("failed to load file %s for client %d: %v", file.Name(), clientId, err)
+					continue
+				}
+
+				p.lastDeliveries[clientId] = middleware.DelId{
+					ReplicaId: replicaId,
+					Seq:       seq,
+					ClientId:  clientId,
+				}
+
+				pf := PersistedFile{
+					ClientId: clientId,
+					FileName: name,
+					State:    state,
+				}
+
+				if !yield(pf) {
+					return
+				}
+			}
+		}
+	}, nil
+}
+
+func (p *Persistor) IsDup(del middleware.Delivery) bool {
+	clientId := del.Headers.ClientId
+	replicaId := del.Headers.ReplicaId
+	seq := del.Headers.Seq
+
+	if lastDelId, ok := p.lastDeliveries[clientId]; ok {
+		if seq <= lastDelId.Seq && replicaId == lastDelId.ReplicaId {
+			p.log.Debugf("client %v: delivery is already processed, skipping", clientId)
+			return true
+		}
+	}
+
+	return false
 }

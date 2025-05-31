@@ -2,6 +2,7 @@ package impl
 
 import (
 	"analyzer/comms"
+	"analyzer/comms/middleware"
 	"analyzer/workers"
 	"analyzer/workers/groupby/config"
 
@@ -47,8 +48,11 @@ func (w *Groupby) clean(clientId int) {
 	w.Handler.clean(clientId)
 }
 
-func (w *Groupby) Batch(clientId, qId int, data []byte) {
-	batch, err := comms.DecodeBatch(data)
+func (w *Groupby) Batch(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
+
+	batch, err := comms.DecodeBatch(body)
 	if err != nil {
 		w.Log.Fatalf("failed to decode batch: %v", err)
 	}
@@ -62,7 +66,10 @@ func (w *Groupby) Batch(clientId, qId int, data []byte) {
 	}
 }
 
-func (w *Groupby) Eof(clientId, qId int, data []byte) {
+func (w *Groupby) Eof(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
+
 	responseFieldMaps := w.Handler.Result(clientId, w.Con)
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
@@ -72,7 +79,7 @@ func (w *Groupby) Eof(clientId, qId int, data []byte) {
 		}
 	}
 
-	eof := comms.DecodeEof(data)
+	eof := comms.DecodeEof(body)
 	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
@@ -80,10 +87,12 @@ func (w *Groupby) Eof(clientId, qId int, data []byte) {
 	w.clean(clientId)
 }
 
-func (w *Groupby) Flush(clientId, qId int, data []byte) {
-	w.clean(clientId)
+func (w *Groupby) Flush(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
 
-	flush := comms.DecodeFlush(data)
+	w.clean(clientId)
+	flush := comms.DecodeFlush(body)
 	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}

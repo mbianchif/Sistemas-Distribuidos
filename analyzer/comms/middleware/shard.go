@@ -9,7 +9,6 @@ import (
 	"analyzer/comms"
 
 	"github.com/op/go-logging"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type SenderShard struct {
@@ -47,7 +46,7 @@ func (s *SenderShard) nextKeySeq(i int, clientId int) (string, int) {
 	return key, seq
 }
 
-func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}, headers amqp.Table) error {
+func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}, headers Table) error {
 	shards, err := comms.Shard(batch.FieldMaps, s.key, s.outputCopies)
 	if err != nil {
 		return err
@@ -67,17 +66,17 @@ func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}, h
 	return nil
 }
 
-func (s *SenderShard) Eof(eof comms.Eof, headers amqp.Table) error {
+func (s *SenderShard) Eof(eof comms.Eof, headers Table) error {
 	body := eof.Encode()
 	return s.Broadcast(body, headers)
 }
 
-func (s *SenderShard) Flush(flush comms.Flush, headers amqp.Table) error {
+func (s *SenderShard) Flush(flush comms.Flush, headers Table) error {
 	body := flush.Encode()
 	return s.Broadcast(body, headers)
 }
 
-func (s *SenderShard) Broadcast(body []byte, headers amqp.Table) error {
+func (s *SenderShard) Broadcast(body []byte, headers Table) error {
 	clientId := int(headers["client-id"].(int32))
 
 	for i := range s.outputCopies {

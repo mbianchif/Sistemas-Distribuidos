@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"analyzer/comms"
+	"analyzer/comms/middleware"
 	"analyzer/workers"
 	"analyzer/workers/sentiment/config"
 
@@ -57,8 +58,11 @@ func handleSentiment(w *Sentiment, fieldMap map[string]string) (map[string]strin
 	return fieldMap, nil
 }
 
-func (w *Sentiment) Batch(clientId, qId int, data []byte) {
-	batch, err := comms.DecodeBatch(data)
+func (w *Sentiment) Batch(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
+
+	batch, err := comms.DecodeBatch(body)
 	if err != nil {
 		w.Log.Fatal("failed to decode batch: %v", err)
 	}
@@ -85,15 +89,21 @@ func (w *Sentiment) Batch(clientId, qId int, data []byte) {
 	}
 }
 
-func (w *Sentiment) Eof(clientId, qId int, data []byte) {
-	eof := comms.DecodeEof(data)
+func (w *Sentiment) Eof(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
+
+	eof := comms.DecodeEof(body)
 	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
 
-func (w *Sentiment) Flush(clientId, qId int, data []byte) {
-	flush := comms.DecodeFlush(data)
+func (w *Sentiment) Flush(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
+
+	flush := comms.DecodeFlush(body)
 	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}

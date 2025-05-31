@@ -166,7 +166,7 @@ func (m *Mailer) Consume(q amqp.Queue) (<-chan middleware.Delivery, error) {
 	return recv.Consume("")
 }
 
-func mergeHeaders(base amqp.Table, headers []amqp.Table) amqp.Table {
+func mergeHeaders(base middleware.Table, headers []middleware.Table) middleware.Table {
 	for _, h := range headers {
 		maps.Copy(base, h)
 	}
@@ -174,8 +174,8 @@ func mergeHeaders(base amqp.Table, headers []amqp.Table) amqp.Table {
 	return base
 }
 
-func (m *Mailer) PublishBatch(batch comms.Batch, clientId int, headers ...amqp.Table) error {
-	baseHeaders := amqp.Table{
+func (m *Mailer) PublishBatch(batch comms.Batch, clientId int, headers ...middleware.Table) error {
+	baseHeaders := middleware.Table{
 		"kind":       comms.BATCH,
 		"replica-id": m.con.Id,
 		"client-id":  int32(clientId),
@@ -191,8 +191,8 @@ func (m *Mailer) PublishBatch(batch comms.Batch, clientId int, headers ...amqp.T
 	return nil
 }
 
-func (m *Mailer) PublishEof(eof comms.Eof, clientId int, headers ...amqp.Table) error {
-	baseHeaders := amqp.Table{
+func (m *Mailer) PublishEof(eof comms.Eof, clientId int, headers ...middleware.Table) error {
+	baseHeaders := middleware.Table{
 		"kind":       comms.EOF,
 		"replica-id": m.con.Id,
 		"client-id":  int32(clientId),
@@ -208,8 +208,8 @@ func (m *Mailer) PublishEof(eof comms.Eof, clientId int, headers ...amqp.Table) 
 	return nil
 }
 
-func (m *Mailer) PublishFlush(flush comms.Flush, clientId int, headers ...amqp.Table) error {
-	baseHeaders := amqp.Table{
+func (m *Mailer) PublishFlush(flush comms.Flush, clientId int, headers ...middleware.Table) error {
+	baseHeaders := middleware.Table{
 		"kind":       comms.FLUSH,
 		"replica-id": m.con.Id,
 		"client-id":  int32(clientId),

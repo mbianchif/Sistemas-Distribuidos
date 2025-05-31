@@ -2,13 +2,11 @@ package middleware
 
 import (
 	"analyzer/comms"
-
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Sender interface {
-	Batch(comms.Batch, map[string]struct{}, amqp.Table) error
-	Eof(comms.Eof, amqp.Table) error
-	Flush(comms.Flush, amqp.Table) error
+	Batch(comms.Batch, map[string]struct{}, Table) error
+	Eof(comms.Eof, Table) error
+	Flush(comms.Flush, Table) error
 	Encode(int) []byte
 }

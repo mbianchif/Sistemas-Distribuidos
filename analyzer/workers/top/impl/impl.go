@@ -1,15 +1,20 @@
 package impl
 
 import (
+	"bytes"
 	"sort"
 	"strconv"
 
 	"analyzer/comms"
+	"analyzer/comms/middleware"
+	"analyzer/comms/persistance"
 	"analyzer/workers"
 	"analyzer/workers/top/config"
 
 	"github.com/op/go-logging"
 )
+
+const PERSISTOR_FILENAME = "state"
 
 type tuple struct {
 	value    float64
@@ -18,7 +23,10 @@ type tuple struct {
 
 type Top struct {
 	*workers.Worker
-	Con  *config.TopConfig
+	Con       *config.TopConfig
+	persistor persistance.Persistor
+
+	// Persisted
 	tops map[int][]tuple
 }
 
@@ -28,13 +36,12 @@ func New(con *config.TopConfig, log *logging.Logger) (*Top, error) {
 		return nil, err
 	}
 
-	top := Top{
-		Worker: base,
-		Con:    con,
-		tops:   make(map[int][]tuple),
-	}
-
-	return &top, nil
+	return &Top{
+		Worker:    base,
+		Con:       con,
+		persistor: persistance.New(log),
+		tops:      make(map[int][]tuple),
+	}, nil
 }
 
 func (w *Top) Run() error {
@@ -65,12 +72,33 @@ func handleTop(w *Top, clientId int, fieldMap map[string]string) error {
 	return nil
 }
 
-func (w *Top) Batch(clientId, qId int, data []byte) {
-	batch, err := comms.DecodeBatch(data)
+func (w *Top) Encode(clientId int) []byte {
+	buf := bytes.NewBuffer(nil)
+
+	fieldMaps := make([]map[string]string, 0, len(w.tops[clientId]))
+	for _, tup := range w.tops[clientId] {
+		fieldMaps = append(fieldMaps, tup.fieldMap)
+	}
+
+	// Write the field maps to the buffer
+	batch := comms.NewBatch(fieldMaps)
+	buf.Write(batch.EncodeForPersistance())
+	return buf.Bytes()
+}
+
+func (w *Top) Batch(qId int, del middleware.Delivery) {
+	body := del.Body
+	batch, err := comms.DecodeBatch(body)
 	if err != nil {
 		w.Log.Fatal("failed to decode batch: %v", err)
 	}
 
+	// Check for duplicated deliveries
+	if w.persistor.IsDup(del) {
+		return
+	}
+
+	clientId := del.Headers.ClientId
 	for _, fieldMap := range batch.FieldMaps {
 		err := handleTop(w, clientId, fieldMap)
 		if err != nil {
@@ -78,12 +106,22 @@ func (w *Top) Batch(clientId, qId int, data []byte) {
 			continue
 		}
 	}
+
+	// Persist once the entire delivery is processed
+	state := w.Encode(clientId)
+	w.persistor.Store(del.Id(), PERSISTOR_FILENAME, state)
 }
 
-func (w *Top) Eof(clientId, qId int, body []byte) {
+func (w *Top) Eof(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
 	responseFieldMaps := make([]map[string]string, 0, w.Con.Amount)
 	for _, tup := range w.tops[clientId] {
 		responseFieldMaps = append(responseFieldMaps, tup.fieldMap)
+	}
+
+	// Check for duplicated deliveries
+	if w.persistor.IsDup(del) {
+		return
 	}
 
 	if len(responseFieldMaps) > 0 {
@@ -94,19 +132,24 @@ func (w *Top) Eof(clientId, qId int, body []byte) {
 		}
 	}
 
+	body := del.Body
 	eof := comms.DecodeEof(body)
 	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 
-	w.clean(clientId)
+	// Persist once the entire delivery is processed
+	state := w.Encode(clientId)
+	w.persistor.Store(del.Id(), PERSISTOR_FILENAME, state)
 }
 
-func (w *Top) Flush(clientId, qId int, data []byte) {
-	w.clean(clientId)
+func (w *Top) Flush(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
 
-	body := comms.DecodeFlush(data)
-	if err := w.Mailer.PublishFlush(body, clientId); err != nil {
+	w.clean(clientId)
+	flush := comms.DecodeFlush(body)
+	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }

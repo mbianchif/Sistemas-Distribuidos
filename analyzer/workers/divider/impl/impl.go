@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"analyzer/comms"
+	"analyzer/comms/middleware"
 	"analyzer/workers"
 	"analyzer/workers/divider/config"
 
@@ -58,8 +59,10 @@ func handleDivider(fieldMap map[string]string) (map[string]string, error) {
 	return fieldMap, nil
 }
 
-func (w *Divider) Batch(clientId, qId int, data []byte) {
-	batch, err := comms.DecodeBatch(data)
+func (w *Divider) Batch(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
+	batch, err := comms.DecodeBatch(body)
 	if err != nil {
 		w.Log.Fatal("failed to decode line: %v", err)
 	}
@@ -87,14 +90,18 @@ func (w *Divider) Batch(clientId, qId int, data []byte) {
 
 }
 
-func (w *Divider) Eof(clientId, qId int, data []byte) {
+func (w *Divider) Eof(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	data := del.Body
 	body := comms.DecodeEof(data)
 	if err := w.Mailer.PublishEof(body, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
 
-func (w *Divider) Flush(clientId, qId int, data []byte) {
+func (w *Divider) Flush(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	data := del.Body
 	body := comms.DecodeFlush(data)
 	if err := w.Mailer.PublishFlush(body, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)

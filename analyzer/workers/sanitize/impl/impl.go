@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"analyzer/comms"
+	"analyzer/comms/middleware"
 	"analyzer/workers"
 	"analyzer/workers/sanitize/config"
 
@@ -157,8 +158,11 @@ func handleCredit(w *Sanitize, line []string) map[string]string {
 	return fields
 }
 
-func (w *Sanitize) Batch(clientId, qId int, data []byte) {
-	reader := csv.NewReader(bytes.NewReader(data))
+func (w *Sanitize) Batch(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
+
+	reader := csv.NewReader(bytes.NewReader(body))
 	responseFieldMaps := make([]map[string]string, 0)
 
 	for {
@@ -181,16 +185,22 @@ func (w *Sanitize) Batch(clientId, qId int, data []byte) {
 	}
 }
 
-func (w *Sanitize) Eof(clientId, qId int, data []byte) {
-	eof := comms.DecodeEof(data)
+func (w *Sanitize) Eof(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
+
+	eof := comms.DecodeEof(body)
 	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
 
-func (w *Sanitize) Flush(clientId, qId int, data []byte) {
-	body := comms.DecodeFlush(data)
-	if err := w.Mailer.PublishFlush(body, clientId); err != nil {
+func (w *Sanitize) Flush(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
+
+	flush := comms.DecodeFlush(body)
+	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }

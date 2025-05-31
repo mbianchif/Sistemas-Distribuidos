@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"analyzer/comms"
-
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type SenderRobin struct {
@@ -36,17 +34,17 @@ func NewRobin(broker *Broker, fmt string, outputCopies int) *SenderRobin {
 	}
 }
 
-func (s *SenderRobin) Batch(batch comms.Batch, filterCols map[string]struct{}, headers amqp.Table) error {
+func (s *SenderRobin) Batch(batch comms.Batch, filterCols map[string]struct{}, headers Table) error {
 	body := batch.Encode(filterCols)
 	return s.Direct(body, headers)
 }
 
-func (s *SenderRobin) Eof(eof comms.Eof, headers amqp.Table) error {
+func (s *SenderRobin) Eof(eof comms.Eof, headers Table) error {
 	body := eof.Encode()
 	return s.Broadcast(body, headers)
 }
 
-func (s *SenderRobin) Flush(flush comms.Flush, headers amqp.Table) error {
+func (s *SenderRobin) Flush(flush comms.Flush, headers Table) error {
 	body := flush.Encode()
 	return s.Broadcast(body, headers)
 }
@@ -61,14 +59,14 @@ func (s *SenderRobin) nextKeySeq(clientId int) (string, int) {
 	return key, seq
 }
 
-func (s *SenderRobin) Direct(body []byte, headers amqp.Table) error {
+func (s *SenderRobin) Direct(body []byte, headers Table) error {
 	clientId := int(headers["client-id"].(int32))
 	key, seq := s.nextKeySeq(clientId)
 	headers["seq"] = seq
 	return s.broker.Publish(key, body, headers)
 }
 
-func (s *SenderRobin) Broadcast(body []byte, headers amqp.Table) error {
+func (s *SenderRobin) Broadcast(body []byte, headers Table) error {
 	for range s.outputCopies {
 		if err := s.Direct(body, headers); err != nil {
 			return err

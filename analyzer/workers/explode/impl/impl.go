@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"analyzer/comms"
+	"analyzer/comms/middleware"
 	"analyzer/workers"
 	"analyzer/workers/explode/config"
 
@@ -45,7 +46,9 @@ func handleExplode(fieldMap map[string]string, con *config.ExplodeConfig) ([]map
 	return fieldMaps, nil
 }
 
-func (w *Explode) Batch(clientId, qId int, data []byte) {
+func (w *Explode) Batch(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	data := del.Body
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Fatal("failed to decode line: %v", err)
@@ -72,7 +75,9 @@ func (w *Explode) Batch(clientId, qId int, data []byte) {
 
 }
 
-func (w *Explode) Eof(clientId, qId int, data []byte) {
+func (w *Explode) Eof(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	data := del.Body
 	eof := comms.DecodeEof(data)
 	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
@@ -80,7 +85,9 @@ func (w *Explode) Eof(clientId, qId int, data []byte) {
 
 }
 
-func (w *Explode) Flush(clientId, qId int, data []byte) {
+func (w *Explode) Flush(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	data := del.Body
 	flush := comms.DecodeFlush(data)
 	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)

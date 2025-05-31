@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"analyzer/comms"
+	"analyzer/comms/middleware"
 	"analyzer/workers"
 	"analyzer/workers/join/config"
 
@@ -305,26 +306,29 @@ func (w *Join) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Join) Batch(clientId, qId int, data []byte) {
+func (w *Join) Batch(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
+
 	if _, ok := w.persistors[clientId]; !ok {
 		w.setupPersistors(clientId)
 	}
 
 	if _, ok := w.readingRight[clientId]; !ok && qId == LEFT {
 		// Reading left and given data is from LEFT queue
-		if err := handleLeft(w, clientId, data); err != nil {
+		if err := handleLeft(w, clientId, body); err != nil {
 			w.Log.Errorf("error while handling batch in left side: %v", err)
 		}
 
 	} else if _, ok := w.readingRight[clientId]; ok && qId == RIGHT {
 		// Reading right and given data is from RIGHT queue
-		if err := handleRight(w, clientId, data); err != nil {
+		if err := handleRight(w, clientId, body); err != nil {
 			w.Log.Errorf("error while handling batch in right side: %v", err)
 		}
 
 	} else if _, ok := w.readingRight[clientId]; !ok && qId == RIGHT {
 		// Reading left and given data is from RIGHT queue
-		if err := handleOutOfOrder(w, clientId, data); err != nil {
+		if err := handleOutOfOrder(w, clientId, body); err != nil {
 			w.Log.Errorf("error while handling batch out of order: %v", err)
 		}
 
@@ -334,20 +338,23 @@ func (w *Join) Batch(clientId, qId int, data []byte) {
 	}
 }
 
-func (w *Join) Eof(clientId, qId int, data []byte) {
+func (w *Join) Eof(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
+
 	if _, ok := w.readingRight[clientId]; !ok {
 		w.readingRight[clientId] = struct{}{}
 
 		if chans, ok := w.outOfOrders[clientId]; ok {
 			close(chans.send)
-			data := <-chans.recv
+			del.Body = <-chans.recv
 
-			w.Batch(clientId, RIGHT, data)
+			w.Batch(RIGHT, del)
 			delete(w.outOfOrders, clientId)
 		}
 
 	} else {
-		eof := comms.DecodeEof(data)
+		eof := comms.DecodeEof(body)
 		if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
 		}
@@ -356,10 +363,12 @@ func (w *Join) Eof(clientId, qId int, data []byte) {
 	}
 }
 
-func (w *Join) Flush(clientId, qId int, data []byte) {
-	w.clean(clientId)
+func (w *Join) Flush(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
 
-	flush := comms.DecodeFlush(data)
+	w.clean(clientId)
+	flush := comms.DecodeFlush(body)
 	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}

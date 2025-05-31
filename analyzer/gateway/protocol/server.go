@@ -137,9 +137,9 @@ func (s *Server) recvResults() error {
 	eofsRecv := make(map[int]int)
 
 	for del := range s.recvChan {
-		kind := int(del.Headers["kind"].(int32))
-		query := int(del.Headers["query"].(int32))
-		clientId := int(del.Headers["client-id"].(int32))
+		kind := del.Headers.Kind
+		query := del.Headers.Query
+		clientId := del.Headers.ClientId
 		body := del.Body
 
 		connInt, ok := s.conns.Load(clientId)

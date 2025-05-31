@@ -116,7 +116,7 @@ func (s *SanitizeMailer) Consume() (<-chan middleware.Delivery, error) {
 }
 
 func (s *SanitizeMailer) PublishBatch(fileName string, clientId int, body []byte) error {
-	baseHeaders := amqp.Table{
+	baseHeaders := middleware.Table{
 		"kind":       comms.BATCH,
 		"replica-id": s.con.Id,
 		"client-id":  int32(clientId),
@@ -125,7 +125,7 @@ func (s *SanitizeMailer) PublishBatch(fileName string, clientId int, body []byte
 }
 
 func (s *SanitizeMailer) PublishEof(fileName string, clientId int, body []byte) error {
-	baseHeaders := amqp.Table{
+	baseHeaders := middleware.Table{
 		"kind":       comms.EOF,
 		"replica-id": s.con.Id,
 		"client-id":  int32(clientId),
@@ -134,7 +134,7 @@ func (s *SanitizeMailer) PublishEof(fileName string, clientId int, body []byte) 
 }
 
 func (s *SanitizeMailer) PublishFlush(clientId int, body []byte) error {
-	baseHeaders := amqp.Table{
+	baseHeaders := middleware.Table{
 		"kind":       comms.FLUSH,
 		"replica-id": s.con.Id,
 		"client-id":  int32(clientId),

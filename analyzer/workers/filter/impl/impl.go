@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"analyzer/comms"
+	"analyzer/comms/middleware"
 	"analyzer/workers"
 	"analyzer/workers/filter/config"
 
@@ -99,8 +100,11 @@ func handleContains(w *Filter, msg map[string]string) (map[string]string, error)
 	return msg, nil
 }
 
-func (w *Filter) Batch(clientId, qId int, data []byte) {
-	batch, err := comms.DecodeBatch(data)
+func (w *Filter) Batch(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	body := del.Body
+
+	batch, err := comms.DecodeBatch(body)
 	if err != nil {
 		w.Log.Fatalf("failed to decode batch: %v", err)
 	}
@@ -128,14 +132,20 @@ func (w *Filter) Batch(clientId, qId int, data []byte) {
 
 }
 
-func (w *Filter) Eof(clientId, qId int, data []byte) {
+func (w *Filter) Eof(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	data := del.Body
+
 	eof := comms.DecodeEof(data)
 	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
 
-func (w *Filter) Flush(clientId, qId int, data []byte) {
+func (w *Filter) Flush(qId int, del middleware.Delivery) {
+	clientId := del.Headers.ClientId
+	data := del.Body
+
 	flush := comms.DecodeFlush(data)
 	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
