@@ -16,6 +16,7 @@ type Filter struct {
 	*workers.Worker
 	Con     *config.FilterConfig
 	Handler func(*Filter, map[string]string) (map[string]string, error)
+	count   int
 }
 
 func New(con *config.FilterConfig, log *logging.Logger) (*Filter, error) {
@@ -30,7 +31,7 @@ func New(con *config.FilterConfig, log *logging.Logger) (*Filter, error) {
 		"length":   handleLength,
 	}[con.Handler]
 
-	return &Filter{base, con, handler}, nil
+	return &Filter{base, con, handler, 0}, nil
 }
 
 func (w *Filter) Run() error {
