@@ -1,10 +1,13 @@
 package impl
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"analyzer/comms/middleware"
+	"analyzer/comms/persistance"
 	"analyzer/workers/groupby/config"
 )
 
@@ -14,22 +17,18 @@ type tuple struct {
 }
 
 type Mean struct {
-	*Groupby
-	state map[int]map[string]tuple
+	*GroupBy
+	state map[string]tuple
 }
 
-func NewMean(w *Groupby) GroupbyHandler {
+func NewMean(w *GroupBy) GroupByHandler {
 	return &Mean{
-		Groupby: w,
-		state:   make(map[int]map[string]tuple),
+		GroupBy: w,
+		state:   make(map[string]tuple),
 	}
 }
 
-func (w *Mean) clean(clientId int) {
-	delete(w.state, clientId)
-}
-
-func (w *Mean) Add(clientId int, fieldMap map[string]string, con *config.GroupbyConfig) error {
+func (w *Mean) add(fieldMap map[string]string, con *config.GroupbyConfig) error {
 	sumValueStr, ok := fieldMap[con.AggKey]
 	if !ok {
 		return fmt.Errorf("value %v was not found", con.AggKey)
@@ -50,28 +49,88 @@ func (w *Mean) Add(clientId int, fieldMap map[string]string, con *config.Groupby
 	}
 
 	compKey := strings.Join(keys, SEP)
-	if _, ok := w.state[clientId]; !ok {
-		w.state[clientId] = make(map[string]tuple)
-	}
-
-	tup := w.state[clientId][compKey]
-	w.state[clientId][compKey] = tuple{tup.sum + sumValue, tup.n + 1}
+	tup := w.state[compKey]
+	w.state[compKey] = tuple{tup.sum + sumValue, tup.n + 1}
 	return nil
 }
 
-func (w *Mean) Result(clientId int, con *config.GroupbyConfig) []map[string]string {
-	fieldMaps := make([]map[string]string, 0, len(w.state))
-	for compKey, v := range w.state[clientId] {
-		fieldMap := make(map[string]string)
+func (w *Mean) encode(sum float64, n int) []byte {
+	return fmt.Appendf(nil, "%f %d\n", sum, n)
+}
 
-		keys := strings.Split(compKey, SEP)
+func (w *Mean) decode(state []byte) (float64, int, error) {
+	values := strings.Split(string(bytes.TrimSpace(state)), " ")
+	if len(values) != 2 {
+		return 0, 0, fmt.Errorf("invalid amount of values, should be %d: %v", 2, values)
+	}
+
+	sum, err := strconv.ParseFloat(values[0], 64)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	n, err := strconv.Atoi(values[1])
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return sum, n, nil
+}
+
+func (w *Mean) result(clientId int, con *config.GroupbyConfig, persistor persistance.Persistor) []map[string]string {
+	persistedFiles, err := persistor.RecoverFor(clientId)
+	if err != nil {
+		return nil
+	}
+
+	fieldMaps := make([]map[string]string, 0)
+	for pf := range persistedFiles {
+		sum, n, err := w.decode(pf.State)
+		if err != nil {
+			continue
+		}
+
+		fieldMap := make(map[string]string)
+		keys := strings.Split(pf.FileName, SEP)
 		for i, key := range keys {
 			fieldMap[con.GroupKeys[i]] = key
 		}
 
-		fieldMap[con.Storage] = strconv.FormatFloat(v.sum/float64(v.n), 'f', 4, 64)
+		fieldMap[con.Storage] = strconv.FormatFloat(sum/float64(n), 'f', 4, 64)
 		fieldMaps = append(fieldMaps, fieldMap)
 	}
 
 	return fieldMaps
+}
+
+func (w *Mean) store(id middleware.DelId, persistor *persistance.Persistor) error {
+	replicaId := id.ReplicaId
+	clientId := id.ClientId
+	seq := id.Seq
+
+	for k, partialTup := range w.state {
+		lastReplicaId, lastSeq, state, err := persistor.Load(clientId, k)
+		exists := err == nil
+
+		if !exists {
+			newState := w.encode(partialTup.sum, partialTup.n)
+			persistor.Store(id, k, newState)
+			continue
+		}
+
+		if seq <= lastSeq && replicaId == lastReplicaId {
+			continue
+		}
+
+		prevSum, prevCount, err := w.decode(state)
+		if err != nil {
+			continue
+		}
+
+		newState := w.encode(prevSum+partialTup.sum, prevCount+partialTup.n)
+		persistor.Store(id, k, newState)
+	}
+
+	w.state = make(map[string]tuple)
+	return nil
 }

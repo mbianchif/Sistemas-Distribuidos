@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"os"
 	"sort"
 	"strconv"
 
@@ -17,7 +16,7 @@ import (
 	"github.com/op/go-logging"
 )
 
-const PERSISTOR_FILENAME = "state"
+const PERSISTOR_FILENAME = "state.txt"
 
 type tuple struct {
 	value    float64
@@ -28,7 +27,6 @@ type Top struct {
 	*workers.Worker
 	Con       *config.TopConfig
 	persistor persistance.Persistor
-	count     int
 
 	// Persisted
 	tops map[int][]tuple
@@ -135,8 +133,6 @@ func (w *Top) Decode(clientId int, state []byte) error {
 }
 
 func (w *Top) Batch(qId int, del middleware.Delivery) {
-	w.count++
-
 	body := del.Body
 	batch, err := comms.DecodeBatch(body)
 	if err != nil {
@@ -163,20 +159,10 @@ func (w *Top) Batch(qId int, del middleware.Delivery) {
 }
 
 func (w *Top) Eof(qId int, del middleware.Delivery) {
-	w.count++
-	if w.count == 2 {
-		os.Exit(1)
-	}
-
 	clientId := del.Headers.ClientId
 	responseFieldMaps := make([]map[string]string, 0, w.Con.Amount)
 	for _, tup := range w.tops[clientId] {
 		responseFieldMaps = append(responseFieldMaps, tup.fieldMap)
-	}
-
-	// Check for duplicated deliveries
-	if w.persistor.IsDup(del) {
-		return
 	}
 
 	if len(responseFieldMaps) > 0 {
@@ -192,10 +178,6 @@ func (w *Top) Eof(qId int, del middleware.Delivery) {
 	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
-
-	// Persist once the entire delivery is processed
-	state := w.Encode(clientId)
-	w.persistor.Store(del.Id(), PERSISTOR_FILENAME, state)
 }
 
 func (w *Top) Flush(qId int, del middleware.Delivery) {

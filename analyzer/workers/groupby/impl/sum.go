@@ -1,30 +1,29 @@
 package impl
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"analyzer/comms/middleware"
+	"analyzer/comms/persistance"
 	"analyzer/workers/groupby/config"
 )
 
 type Sum struct {
-	*Groupby
-	state map[int]map[string]int
+	*GroupBy
+	state map[string]int
 }
 
-func NewSum(w *Groupby) GroupbyHandler {
+func NewSum(w *GroupBy) GroupByHandler {
 	return &Sum{
-		Groupby: w,
-		state:   make(map[int]map[string]int),
+		GroupBy: w,
+		state:   make(map[string]int),
 	}
 }
 
-func (w *Sum) clean(clientId int) {
-	delete(w.state, clientId)
-}
-
-func (w *Sum) Add(clientId int, fieldMap map[string]string, con *config.GroupbyConfig) error {
+func (w *Sum) add(fieldMap map[string]string, con *config.GroupbyConfig) error {
 	sumValueStr, ok := fieldMap[con.AggKey]
 	if !ok {
 		return fmt.Errorf("value %v was not found", con.AggKey)
@@ -45,27 +44,77 @@ func (w *Sum) Add(clientId int, fieldMap map[string]string, con *config.GroupbyC
 	}
 
 	compKey := strings.Join(keys, SEP)
-	if _, ok := w.state[clientId]; !ok {
-		w.state[clientId] = make(map[string]int)
-	}
-
-	w.state[clientId][compKey] += sumValue
+	w.state[compKey] += sumValue
 	return nil
 }
 
-func (w *Sum) Result(clientId int, con *config.GroupbyConfig) []map[string]string {
-	fieldMaps := make([]map[string]string, 0, len(w.state))
-	for compKey, v := range w.state[clientId] {
-		fieldMap := make(map[string]string)
+func (w *Sum) result(clientId int, con *config.GroupbyConfig, persistor persistance.Persistor) []map[string]string {
+	persistedFiles, err := persistor.RecoverFor(clientId)
+	if err != nil {
+		return nil
+	}
 
-		keys := strings.Split(compKey, SEP)
+	fieldMaps := make([]map[string]string, 0)
+	for pf := range persistedFiles {
+		sum, err := w.decode(pf.State)
+		if err != nil {
+			continue
+		}
+
+		fieldMap := make(map[string]string)
+		keys := strings.Split(pf.FileName, SEP)
 		for i, key := range keys {
 			fieldMap[con.GroupKeys[i]] = key
 		}
 
-		fieldMap[con.Storage] = strconv.Itoa(v)
+		fieldMap[con.Storage] = strconv.Itoa(sum)
 		fieldMaps = append(fieldMaps, fieldMap)
 	}
 
 	return fieldMaps
+}
+
+func (w *Sum) encode(sum int) []byte {
+	return fmt.Appendf(nil, "%d\n", sum)
+}
+
+func (w *Sum) decode(state []byte) (int, error) {
+	stateStr := string(bytes.TrimSpace(state))
+	sum, err := strconv.Atoi(stateStr)
+	if err != nil {
+		return 0, err
+	}
+	return sum, nil
+}
+
+func (w *Sum) store(id middleware.DelId, persistor *persistance.Persistor) error {
+	replicaId := id.ReplicaId
+	clientId := id.ClientId
+	seq := id.Seq
+
+	for k, partialSum := range w.state {
+		lastReplicaId, lastSeq, state, err := persistor.Load(clientId, k)
+		exists := err == nil
+
+		if !exists {
+			newState := w.encode(partialSum)
+			persistor.Store(id, k, newState)
+			continue
+		}
+
+		if seq <= lastSeq && replicaId == lastReplicaId {
+			continue
+		}
+
+		prevSum, err := w.decode(state)
+		if err != nil {
+			continue
+		}
+
+		newState := w.encode(prevSum + partialSum)
+		persistor.Store(id, k, newState)
+	}
+
+	w.state = make(map[string]int)
+	return nil
 }

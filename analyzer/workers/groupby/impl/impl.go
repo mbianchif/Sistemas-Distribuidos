@@ -3,6 +3,7 @@ package impl
 import (
 	"analyzer/comms"
 	"analyzer/comms/middleware"
+	"analyzer/comms/persistance"
 	"analyzer/workers"
 	"analyzer/workers/groupby/config"
 
@@ -11,66 +12,76 @@ import (
 
 const SEP = "<|>"
 
-type Groupby struct {
+type GroupBy struct {
 	*workers.Worker
-	Con     *config.GroupbyConfig
-	Handler GroupbyHandler
+	con       *config.GroupbyConfig
+	handler   GroupByHandler
+	persistor persistance.Persistor
 }
 
-type GroupbyHandler interface {
-	Add(int, map[string]string, *config.GroupbyConfig) error
-	Result(int, *config.GroupbyConfig) []map[string]string
-	clean(int)
+type GroupByHandler interface {
+	add(map[string]string, *config.GroupbyConfig) error
+	result(int, *config.GroupbyConfig, persistance.Persistor) []map[string]string
+	store(middleware.DelId, *persistance.Persistor) error
 }
 
-func New(con *config.GroupbyConfig, log *logging.Logger) (*Groupby, error) {
+func New(con *config.GroupbyConfig, log *logging.Logger) (*GroupBy, error) {
 	base, err := workers.New(con.Config, log)
 	if err != nil {
 		return nil, err
 	}
 
-	handler := map[string]func(*Groupby) GroupbyHandler{
+	handler := map[string]func(*GroupBy) GroupByHandler{
 		"count": NewCount,
 		"sum":   NewSum,
 		"mean":  NewMean,
 	}[con.Aggregator]
 
-	w := &Groupby{base, con, nil}
-	w.Handler = handler(w)
+	w := &GroupBy{
+		Worker:    base,
+		con:       con,
+		handler:   nil,
+		persistor: persistance.New(log),
+	}
+	w.handler = handler(w)
+
 	return w, nil
 }
 
-func (w *Groupby) Run() error {
+func (w *GroupBy) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Groupby) clean(clientId int) {
-	w.Handler.clean(clientId)
-}
+func (w *GroupBy) clean(clientId int) {}
 
-func (w *Groupby) Batch(qId int, del middleware.Delivery) {
-	clientId := del.Headers.ClientId
+func (w *GroupBy) Batch(qId int, del middleware.Delivery) {
 	body := del.Body
-
 	batch, err := comms.DecodeBatch(body)
 	if err != nil {
 		w.Log.Fatalf("failed to decode batch: %v", err)
 	}
 
+	// Check for duplicated deliveries
+	if w.persistor.IsDup(del) {
+		return
+	}
+
 	for _, fieldMap := range batch.FieldMaps {
-		err := w.Handler.Add(clientId, fieldMap, w.Con)
+		err := w.handler.add(fieldMap, w.con)
 		if err != nil {
 			w.Log.Errorf("failed to handle message: %v", err)
 			continue
 		}
 	}
+
+	// Persist once the entire delivery is processed
+	w.handler.store(del.Id(), &w.persistor)
 }
 
-func (w *Groupby) Eof(qId int, del middleware.Delivery) {
+func (w *GroupBy) Eof(qId int, del middleware.Delivery) {
 	clientId := del.Headers.ClientId
-	body := del.Body
+	responseFieldMaps := w.handler.result(clientId, w.con, w.persistor)
 
-	responseFieldMaps := w.Handler.Result(clientId, w.Con)
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 		batch := comms.NewBatch(responseFieldMaps)
@@ -79,15 +90,14 @@ func (w *Groupby) Eof(qId int, del middleware.Delivery) {
 		}
 	}
 
+	body := del.Body
 	eof := comms.DecodeEof(body)
 	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
-
-	w.clean(clientId)
 }
 
-func (w *Groupby) Flush(qId int, del middleware.Delivery) {
+func (w *GroupBy) Flush(qId int, del middleware.Delivery) {
 	clientId := del.Headers.ClientId
 	body := del.Body
 

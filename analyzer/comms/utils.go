@@ -61,6 +61,6 @@ func AtomicWrite(dirPath, fileName string, data []byte) error {
 		return fmt.Errorf("Couldn't write to temp file for path %s/%s: %v", dirPath, fileName, err)
 	}
 
-	newFileName := fmt.Sprintf("%s/%s.txt", dirPath, fileName)
+	newFileName := fmt.Sprintf("%s/%s", dirPath, fileName)
 	return os.Rename(tmpFileName, newFileName)
 }

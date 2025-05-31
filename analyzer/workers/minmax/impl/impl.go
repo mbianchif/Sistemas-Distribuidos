@@ -14,7 +14,7 @@ import (
 	"github.com/op/go-logging"
 )
 
-const PERSISTOR_FILENAME = "state"
+const PERSISTOR_FILENAME = "state.txt"
 
 type tuple struct {
 	fieldMap map[string]string
@@ -185,11 +185,6 @@ func (w *MinMax) Eof(qId int, del middleware.Delivery) {
 		w.maxs[clientId].fieldMap,
 	}
 
-	// Check for duplicated deliveries
-	if w.persistor.IsDup(del) {
-		return
-	}
-
 	w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
 	batch := comms.NewBatch(responseFieldMaps)
 	if err := w.Mailer.PublishBatch(batch, clientId); err != nil {
@@ -201,10 +196,6 @@ func (w *MinMax) Eof(qId int, del middleware.Delivery) {
 	if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
-
-	// Persist once the entire delivery is processed
-	state := w.Encode(clientId)
-	w.persistor.Store(del.Id(), PERSISTOR_FILENAME, state)
 }
 
 func (w *MinMax) Flush(qId int, del middleware.Delivery) {

@@ -19,9 +19,11 @@ const (
 )
 
 type PersistedFile struct {
-	ClientId int
-	FileName string
-	State    []byte
+	ReplicaId int
+	Seq       int
+	ClientId  int
+	FileName  string
+	State     []byte
 }
 
 type Persistor struct {
@@ -88,6 +90,51 @@ func (p Persistor) Load(clientId int, fileName string) (int, int, []byte, error)
 	return replicaId, seq, fields[1], nil
 }
 
+func (p Persistor) RecoverFor(clientId int) (iter.Seq[PersistedFile], error) {
+	return func(yield func(PersistedFile) bool) {
+		files, err := os.ReadDir(fmt.Sprintf("%s/%d", PERSISTOR_DIRNAME, clientId))
+		if err != nil {
+			p.log.Errorf("failed to read files in directory %d: %v", clientId, err)
+			return
+		}
+
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
+
+			name := file.Name()
+			if strings.HasSuffix(name, ".tmp") {
+				continue
+			}
+
+			replicaId, seq, state, err := p.Load(clientId, name)
+			if err != nil {
+				p.log.Errorf("failed to load file %s for client %d: %v", file.Name(), clientId, err)
+				continue
+			}
+
+			p.lastDeliveries[clientId] = middleware.DelId{
+				ReplicaId: replicaId,
+				Seq:       seq,
+				ClientId:  clientId,
+			}
+
+			pf := PersistedFile{
+				ReplicaId: replicaId,
+				ClientId:  clientId,
+				Seq:       seq,
+				FileName:  name,
+				State:     state,
+			}
+
+			if !yield(pf) {
+				return
+			}
+		}
+	}, nil
+}
+
 func (p Persistor) Recover() (iter.Seq[PersistedFile], error) {
 	files, err := os.ReadDir(PERSISTOR_DIRNAME)
 	if err != nil {
@@ -106,41 +153,9 @@ func (p Persistor) Recover() (iter.Seq[PersistedFile], error) {
 				continue
 			}
 
-			files, err := os.ReadDir(fmt.Sprintf("%s/%s", PERSISTOR_DIRNAME, clientDir.Name()))
-			if err != nil {
-				p.log.Errorf("failed to read files in directory %s: %v", clientDir.Name(), err)
-				continue
-			}
-
-			for _, file := range files {
-				if file.IsDir() {
-					continue
-				}
-
-				name := file.Name()
-				if strings.HasSuffix(name, ".tmp") {
-					continue
-				}
-
-				replicaId, seq, state, err := p.Load(clientId, name)
-				if err != nil {
-					p.log.Errorf("failed to load file %s for client %d: %v", file.Name(), clientId, err)
-					continue
-				}
-
-				p.lastDeliveries[clientId] = middleware.DelId{
-					ReplicaId: replicaId,
-					Seq:       seq,
-					ClientId:  clientId,
-				}
-
-				pf := PersistedFile{
-					ClientId: clientId,
-					FileName: name,
-					State:    state,
-				}
-
-				if !yield(pf) {
+			files, err := p.RecoverFor(clientId)
+			for file := range files {
+				if !yield(file) {
 					return
 				}
 			}
