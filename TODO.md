@@ -1,5 +1,10 @@
 # TODO
 
+## Fault-Tolerance
+- Hacer tolerante al Join
+- Hacer los Health-Checkers
+- Depende, hacer el Gateway
+
 ## Requisitos para la proxima entrega
 - Agregar en el gateway el FLUSH cuando el cliente termina de enviar todos los archivos
 - chequear que todos los recursos se cierren correctamente
