@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"analyzer/comms"
 
@@ -15,10 +16,10 @@ type SenderShard struct {
 	broker       *Broker
 	log          *logging.Logger
 	outputCopies int
+	key          string
+	fmt          string
 
 	// Persisted
-	fmt string
-	key string
 	seq []map[int]int
 }
 
@@ -90,7 +91,7 @@ func (s *SenderShard) Broadcast(body []byte, headers amqp.Table) error {
 	return nil
 }
 
-// Example: "shard <fmt> <key> <seq> ... <seq>"
+// Example: "shard <seq> ... <seq>"
 func (s *SenderShard) Encode(clientId int) []byte {
 	init := fmt.Appendf(nil, "shard %s %s", s.fmt, s.key)
 	builder := bytes.NewBuffer(init)
@@ -102,4 +103,38 @@ func (s *SenderShard) Encode(clientId int) []byte {
 	}
 
 	return builder.Bytes()
+}
+
+// Example: "shard <seq> ... <seq>"
+func DecodeLineShard(line string) ([]int, error) {
+	line, _ = strings.CutPrefix(line, "shard ")
+
+	parts := strings.Split(line, " ")
+	if len(parts) < 1 {
+		return nil, fmt.Errorf("the amount of parts is not enough: %s", line)
+	}
+
+	// Read sequence numbers
+	seqs := make([]int, 0, len(parts))
+	for _, seqStr := range parts {
+		seq, err := strconv.Atoi(seqStr)
+		if err != nil {
+			return nil, fmt.Errorf("seq number is not a number: %s", line)
+		}
+		seqs = append(seqs, seq)
+	}
+
+	return seqs, nil
+}
+
+func (s *SenderShard) SetState(clientId int, seqs []int) error {
+	if len(seqs) != s.outputCopies {
+		return fmt.Errorf("expected %d seqs, got %d", s.outputCopies, len(seqs))
+	}
+
+	for i, seq := range seqs {
+		s.seq[i][clientId] = seq
+	}
+
+	return nil
 }

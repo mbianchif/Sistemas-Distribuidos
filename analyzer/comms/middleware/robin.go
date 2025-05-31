@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"analyzer/comms"
 
@@ -13,9 +14,9 @@ import (
 type SenderRobin struct {
 	broker       *Broker
 	outputCopies int
+	fmt          string
 
 	// Persisted
-	fmt string
 	cur map[int]int
 	seq []map[int]int
 }
@@ -88,4 +89,47 @@ func (s *SenderRobin) Encode(clientId int) []byte {
 	}
 
 	return builder.Bytes()
+}
+
+// Example: "robin <cur> <seq>  ... <seq>"
+func DecodeLineRobin(line string) (int, []int, error) {
+	line, _ = strings.CutPrefix(line, "robin ")
+
+	parts := strings.Split(line, " ")
+	if len(parts) < 2 {
+		return 0, nil, fmt.Errorf("the amount of parts is not enough: %s", line)
+	}
+
+	// Read current index
+	cur, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, nil, fmt.Errorf("cur is not a number: %s", line)
+	}
+
+	// Read sequence numbers
+	seqs := make([]int, 0, len(parts)-1)
+	for _, seqStr := range parts[1:] {
+		seq, err := strconv.Atoi(seqStr)
+		if err != nil {
+			return 0, nil, fmt.Errorf("seq number is not a number: %s", line)
+		}
+		seqs = append(seqs, seq)
+	}
+
+	return cur, seqs, nil
+}
+
+func (s *SenderRobin) SetState(clientId int, cur int, seqs []int) error {
+	if len(seqs) != s.outputCopies {
+		return fmt.Errorf("expected %d seqs, got %d", s.outputCopies, len(seqs))
+	}
+
+	s.cur[clientId] = cur
+	s.seq = make([]map[int]int, s.outputCopies)
+
+	for i := range s.seq {
+		s.seq[i][clientId] = seqs[i]
+	}
+
+	return nil
 }

@@ -63,7 +63,7 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 			kind := int(del.Headers["kind"].(int32))
 
 			if _, ok := r.expecting[replica][clientId]; !ok {
-				r.expecting[replica][clientId] = 0
+				r.expecting[replica][clientId] = seq
 			}
 
 			if kind == comms.FLUSH {
@@ -123,14 +123,11 @@ func (r *Receiver) Encode(clientId int) []byte {
 
 // Example: "recv <qName> <eofs> <seq> ... <seq>"
 func DecodeLineRecv(line string) (string, int, []int, error) {
-	line, found := strings.CutPrefix(line, "recv ")
-	if !found {
-		return "", 0, nil, fmt.Errorf("Invalid recv line: %s", line)
-	}
+	line, _ = strings.CutPrefix(line, "recv ")
 
 	parts := strings.Split(line, " ")
 	if len(parts) < 3 {
-		return "", 0, nil, fmt.Errorf("The amount of parts is not enough: %s", line)
+		return "", 0, nil, fmt.Errorf("the amount of parts is not enough: %s", line)
 	}
 
 	// Read queue name
@@ -147,10 +144,24 @@ func DecodeLineRecv(line string) (string, int, []int, error) {
 	for _, seqStr := range parts[2:] {
 		seq, err := strconv.Atoi(seqStr)
 		if err != nil {
-			return "", 0, nil, fmt.Errorf("Seq number is not a number: %s", line)
+			return "", 0, nil, fmt.Errorf("seq number is not a number: %s", line)
 		}
 		seqs = append(seqs, seq)
 	}
 
 	return qName, eofs, seqs, nil
+}
+
+func (r *Receiver) SetState(clientId int, eofs int, seqs []int) error {
+	if len(seqs) != r.copies {
+		return fmt.Errorf("expected %d sequence numbers, got %d for client %d in receiver %s", r.copies, len(seqs), clientId, r.qName)
+	}
+
+	r.eofs[clientId] = eofs
+
+	for replicaId, seq := range seqs {
+		r.expecting[replicaId][clientId] = seq
+	}
+
+	return nil
 }
