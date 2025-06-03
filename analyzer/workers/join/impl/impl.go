@@ -10,6 +10,7 @@ import (
 
 	"analyzer/comms"
 	"analyzer/comms/middleware"
+	"analyzer/comms/persistance"
 	"analyzer/workers"
 	"analyzer/workers/join/config"
 
@@ -48,6 +49,7 @@ type Join struct {
 	Con          *config.JoinConfig
 	readingRight map[int]struct{}
 	persistors   map[int]PersistChannels
+	persistor    persistance.Persistor
 	outOfOrders  map[int]OutOfOrderChannels
 }
 
@@ -62,6 +64,7 @@ func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
 		Con:          con,
 		readingRight: make(map[int]struct{}),
 		persistors:   make(map[int]PersistChannels),
+		persistor:    persistance.New(log),
 		outOfOrders:  make(map[int]OutOfOrderChannels),
 	}
 
@@ -240,20 +243,46 @@ func spawnOutOfOrderPersistor(w *Join, recv <-chan []map[string]string, send cha
 	return nil
 }
 
-func handleLeft(w *Join, clientId int, data []byte) error {
+func keyHash(str string, _ int) string {
+	return str
+}
+
+func (w *Join) encode(fieldMaps []map[string]string) []byte {
+	return comms.NewBatch(fieldMaps).EncodeForPersistance()
+}
+
+func handleLeft(w *Join, id middleware.DelId, data []byte) error {
 	batch, err := comms.DecodeBatch(data)
 	if err != nil {
 		w.Log.Criticalf("failed to decode batch: %v", err)
 		return err
 	}
 
-	shards, err := comms.Shard(batch.FieldMaps, w.Con.LeftKey, w.Con.NShards)
+	shards, err := comms.Shard(batch.FieldMaps, w.Con.LeftKey, w.Con.NShards, keyHash)
 	if err != nil {
 		return err
 	}
 
-	for i, shard := range shards {
-		w.persistors[clientId].sends[i] <- PersistMessage{STORE, shard}
+	replicaId := id.ReplicaId
+	clientId := id.ClientId
+	seq := id.Seq
+
+	for k, partialShard := range shards {
+		lastReplicaId, lastSeq, state, err := w.persistor.Load(clientId, k)
+		partialEncoded := w.encode(partialShard)
+
+		exists := err == nil
+		if !exists {
+			w.persistor.Store(id, k, partialEncoded)
+			continue
+		}
+
+		if seq <= lastSeq && replicaId == lastReplicaId {
+			continue
+		}
+
+		newState := append(state, partialEncoded...)
+		w.persistor.Store(id, k, newState)
 	}
 
 	return nil
@@ -264,7 +293,7 @@ func handleRight(w *Join, clientId int, data []byte) error {
 	if err != nil {
 		w.Log.Fatalf("failed to decode batch: %v", err)
 	}
-	shards, err := comms.Shard(batch.FieldMaps, w.Con.RightKey, w.Con.NShards)
+	shards, err := comms.Shard(batch.FieldMaps, w.Con.RightKey, w.Con.NShards, keyHash)
 	if err != nil {
 		return err
 	}
@@ -308,15 +337,16 @@ func (w *Join) Run() error {
 
 func (w *Join) Batch(qId int, del middleware.Delivery) {
 	clientId := del.Headers.ClientId
-	body := del.Body
 
 	if _, ok := w.persistors[clientId]; !ok {
 		w.setupPersistors(clientId)
 	}
 
+	id := del.Id()
+	body := del.Body
 	if _, ok := w.readingRight[clientId]; !ok && qId == LEFT {
 		// Reading left and given data is from LEFT queue
-		if err := handleLeft(w, clientId, body); err != nil {
+		if err := handleLeft(w, id, body); err != nil {
 			w.Log.Errorf("error while handling batch in left side: %v", err)
 		}
 
