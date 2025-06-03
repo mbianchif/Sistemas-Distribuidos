@@ -1,17 +1,17 @@
 # TODO
 
 ## Fault-Tolerance
-- Agregar Publisher Confirms
-- Hacer el explotador aleatorio
-- Hacer tolerante al Join
-- Hacer tolerante el Gateway
-- Hacer los Health-Checkers
-- Agregar el mensaje de Cleanse (borra el estado de todos los clientes), se envia apenas se levanta el gateway
+- (Pesado) Hacer tolerante al Join
+- (Facil)  Hacer el explotador aleatorio
+- (Facil)  Agregar Publisher Confirms
+- (Pesado) Hacer tolerante el Gateway
+- (Pesado) Hacer los Health-Checkers
+- (Facil)  Agregar el mensaje de Cleanse (borra el estado de todos los clientes), se envia apenas se levanta el gateway
 
 ## Requisitos para la proxima entrega
-- Agregar el Clean a los nodos stateful para el persistor
-- Fijarse de ponerle una cota a los mensajes de bache de rabbit, no pedir todos, sino hasta cierto tope
-- Agregar en el gateway el FLUSH cuando el cliente termina de enviar todos los archivos
+- (Mediano) Agregar el Clean a los nodos stateful para el persistor
+- (Facil)   Fijarse de ponerle una cota a los mensajes de bache de rabbit, no pedir todos, sino hasta cierto tope
+- (Facil)   Agregar en el gateway el FLUSH cuando el cliente termina de enviar todos los archivos
 - chequear que todos los recursos se cierren correctamente
 - agregar la documentacion necesaria al informe/diagramas
 
