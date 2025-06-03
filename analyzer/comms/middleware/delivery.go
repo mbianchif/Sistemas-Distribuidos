@@ -26,10 +26,10 @@ type Delivery struct {
 	Headers Headers
 	Body    []byte
 	del     amqp.Delivery
-	wg      *sync.WaitGroup
+	mu      *sync.Mutex
 }
 
-func NewDelivery(del amqp.Delivery, wg *sync.WaitGroup) Delivery {
+func NewDelivery(del amqp.Delivery, mu *sync.Mutex) Delivery {
 	headers := Headers{
 		ReplicaId: int(del.Headers["replica-id"].(int32)),
 		ClientId:  int(del.Headers["client-id"].(int32)),
@@ -47,7 +47,7 @@ func NewDelivery(del amqp.Delivery, wg *sync.WaitGroup) Delivery {
 		Headers: headers,
 		Body:    del.Body,
 		del:     del,
-		wg:      wg,
+		mu:      mu,
 	}
 }
 
@@ -61,6 +61,6 @@ func (d Delivery) Id() DelId {
 
 func (d Delivery) Ack(multiple bool) error {
 	// aca hay que asegurarse de que el ack le llega a rabbit, despues correr d.acker.Done()
-	d.wg.Done()
+	d.mu.Unlock()
 	return d.del.Ack(multiple)
 }

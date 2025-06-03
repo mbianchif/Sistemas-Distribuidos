@@ -6,6 +6,7 @@ import (
 	"analyzer/gateway/config"
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/op/go-logging"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -53,9 +54,10 @@ func (s *SanitizeMailer) initSenders(outputQFmts []string) []*middleware.SenderR
 
 func (s *SanitizeMailer) initReceivers(inputQs []amqp.Queue, inputCopies []int) []*middleware.Receiver {
 	receivers := make([]*middleware.Receiver, 0, len(inputQs))
+	mu := new(sync.Mutex)
 
 	for i := range inputQs {
-		recv := middleware.NewReceiver(s.broker, inputQs[i], inputCopies[i], nil)
+		recv := middleware.NewReceiver(s.broker, inputQs[i], inputCopies[i], nil, mu)
 		receivers = append(receivers, recv)
 	}
 

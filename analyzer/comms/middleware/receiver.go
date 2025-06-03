@@ -14,6 +14,7 @@ import (
 type Receiver struct {
 	broker *Broker
 	mailer Dumpable
+	mu     *sync.Mutex
 
 	// Persisted
 	qName     string
@@ -22,7 +23,7 @@ type Receiver struct {
 	eofs      map[int]int
 }
 
-func NewReceiver(broker *Broker, q amqp.Queue, copies int, mailer Dumpable) *Receiver {
+func NewReceiver(broker *Broker, q amqp.Queue, copies int, mailer Dumpable, mu *sync.Mutex) *Receiver {
 	expecting := make([]map[int]int, copies)
 	for i := range expecting {
 		expecting[i] = make(map[int]int)
@@ -31,9 +32,10 @@ func NewReceiver(broker *Broker, q amqp.Queue, copies int, mailer Dumpable) *Rec
 	eofs := make(map[int]int)
 	return &Receiver{
 		broker:    broker,
-		qName:     q.Name,
 		copies:    copies,
 		mailer:    mailer,
+		mu:        mu,
+		qName:     q.Name,
 		expecting: expecting,
 		eofs:      eofs,
 	}
@@ -48,16 +50,14 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 	ordered := make(chan Delivery)
 	go func() {
 		defer close(ordered)
-		wg := new(sync.WaitGroup)
 
 		for rabbitDel := range recv {
 			// Stop here until worker has Ack'd it's last delivery
 			// so not to change `expecting` table before it got the
 			// chance to persist it's state.
-			wg.Wait()
-			wg.Add(1)
+			r.mu.Lock()
 
-			del := NewDelivery(rabbitDel, wg)
+			del := NewDelivery(rabbitDel, r.mu)
 			replicaId := del.Headers.ReplicaId
 			clientId := del.Headers.ClientId
 			seq := del.Headers.Seq

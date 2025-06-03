@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"analyzer/comms"
 	"analyzer/comms/middleware"
@@ -56,10 +57,10 @@ func (m *Mailer) tryRecover(inputQs []amqp.Queue, outputQFmts []string) (map[str
 			continue
 		}
 
-		statePath := fmt.Sprintf("%s/%d/%s.txt", PERSISTANCE_DIR, clientId, PERSISTANCE_FILENAME)
+		statePath := fmt.Sprintf("%s/%d/%s", PERSISTANCE_DIR, clientId, PERSISTANCE_FILENAME)
 		fp, err := os.Open(statePath)
 		if err != nil {
-			m.Log.Errorf("Failed to recover client %s mailer's state:", err)
+			m.Log.Errorf("Failed to recover client %s mailer's state: %v", clientId, err)
 			continue
 		}
 
@@ -144,9 +145,10 @@ func (m *Mailer) initSenders(outputQFmts []string) []middleware.Sender {
 
 func (m *Mailer) initReceivers(inputQs []amqp.Queue, inputCopies []int) map[string]*middleware.Receiver {
 	receivers := make(map[string]*middleware.Receiver, len(inputQs))
+	mu := new(sync.Mutex)
 
 	for i := range inputQs {
-		recv := middleware.NewReceiver(m.broker, inputQs[i], inputCopies[i], m)
+		recv := middleware.NewReceiver(m.broker, inputQs[i], inputCopies[i], m, mu)
 		receivers[inputQs[i].Name] = recv
 	}
 
