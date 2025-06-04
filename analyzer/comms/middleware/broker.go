@@ -29,6 +29,9 @@ func NewBroker(url string) (*Broker, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := conCh.Qos(4096, 0, false); err != nil {
+		return nil, err
+	}
 
 	pubCh, err := pubConn.Channel()
 	if err != nil {

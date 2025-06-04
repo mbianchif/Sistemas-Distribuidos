@@ -10,7 +10,6 @@
 
 ## Requisitos para la proxima entrega
 - (Mediano) Agregar el Clean a los nodos stateful para el persistor
-- (Facil)   Fijarse de ponerle una cota a los mensajes de bache de rabbit, no pedir todos, sino hasta cierto tope
 - (Facil)   Agregar en el gateway el FLUSH cuando el cliente termina de enviar todos los archivos
 - chequear que todos los recursos se cierren correctamente
 - agregar la documentacion necesaria al informe/diagramas
