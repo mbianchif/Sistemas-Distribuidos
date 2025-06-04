@@ -10,16 +10,17 @@ import (
 )
 
 type Config struct {
-	Id                  int
-	Url                 string
-	InputExchangeNames  []string
-	InputQueueNames     []string
-	InputCopies         []int
-	OutputExchangeName  string
-	OutputQueueNames    []string
-	OutputCopies        []int
-	OutputDeliveryTypes []string
-	Select              map[string]struct{}
+	Id                    int
+	Url                   string
+	InputExchangeNames    []string
+	InputQueueNames       []string
+	InputCopies           []int
+	OutputExchangeName    string
+	OutputQueueNames      []string
+	OutputCopies          []int
+	OutputDeliveryTypes   []string
+	RussianRouletteChance int
+	Select                map[string]struct{}
 }
 
 func configLog(logLevel logging.Level) {
@@ -126,6 +127,15 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the length of output queue names and output copies per queue don't match (names: %v, copies: %v)", len(outputQueueNames), len(outputCopiesPerQueueSlice))
 	}
 
+	// RUSSIAN ROULETTE CHANCE
+	russianRouletteChance, err := strconv.Atoi(os.Getenv("RUSSIAN_ROULETTE_CHANCE"))
+	if err != nil {
+		return nil, fmt.Errorf("the given russian roulette chance is invalid: %v", err)
+	}
+	if !(0 <= russianRouletteChance || russianRouletteChance <= 100) {
+		return nil, fmt.Errorf("russian roulette chance must be between 0 and 100: %d", russianRouletteChance)
+	}
+
 	// SELECT
 	selectString := os.Getenv("SELECT")
 	if len(selectString) == 0 {
@@ -145,15 +155,16 @@ func Create() (*Config, error) {
 	configLog(logLevel)
 
 	return &Config{
-		Id:                  id,
-		Url:                 url,
-		InputExchangeNames:  inputExchangeNames,
-		InputQueueNames:     inputQueueNames,
-		InputCopies:         inputCopies,
-		OutputExchangeName:  outputExchangeName,
-		OutputQueueNames:    outputQueueNames,
-		OutputCopies:        outputCopies,
-		OutputDeliveryTypes: outputDeliveryTypes,
-		Select:              selectMap,
+		Id:                    id,
+		Url:                   url,
+		InputExchangeNames:    inputExchangeNames,
+		InputQueueNames:       inputQueueNames,
+		InputCopies:           inputCopies,
+		OutputExchangeName:    outputExchangeName,
+		OutputQueueNames:      outputQueueNames,
+		OutputCopies:          outputCopies,
+		OutputDeliveryTypes:   outputDeliveryTypes,
+		RussianRouletteChance: russianRouletteChance,
+		Select:                selectMap,
 	}, nil
 }

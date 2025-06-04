@@ -2,8 +2,8 @@
 
 ## Fault-Tolerance
 - (Pesado) Hacer tolerante al Join
-- (Facil)  Hacer el explotador aleatorio
 - (Facil)  Agregar Publisher Confirms
+- (Pesado) Cambiar el mailer del Gateway por una entidad mejor
 - (Pesado) Hacer tolerante el Gateway
 - (Pesado) Hacer los Health-Checkers
 - (Facil)  Agregar el mensaje de Cleanse (borra el estado de todos los clientes), se envia apenas se levanta el gateway

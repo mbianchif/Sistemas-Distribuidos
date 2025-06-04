@@ -2,6 +2,7 @@ package workers
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"reflect"
@@ -79,6 +80,7 @@ func (base *Worker) Run(w IWorker) error {
 			return nil
 		}
 
+		base.RussianRoulette("[Recv, Process + Send]")
 		del := value.Interface().(middleware.Delivery)
 		kind := del.Headers.Kind
 
@@ -95,13 +97,29 @@ func (base *Worker) Run(w IWorker) error {
 		}
 
 		// Dump
+		base.RussianRoulette("[Process + Send, Dump]")
 		clientId := del.Headers.ClientId
 		base.Mailer.Dump(clientId)
 
 		// Ack
+		base.RussianRoulette("[Dump, Ack]")
 		if err := del.Ack(false); err != nil {
 			base.Log.Errorf("error while acknowledging message: %v", err)
 		}
+	}
+}
+
+func (w *Worker) RussianRoulette(format string, args ...any) {
+	threshold := w.con.RussianRouletteChance
+	if threshold == 0 {
+		return
+	}
+
+	r := int(rand.Uint32()) % 100
+	if r < threshold {
+		msg := fmt.Sprintf(format, args...)
+		w.Log.Info("Terminated by chance: %s", msg)
+		os.Exit(1)
 	}
 }
 
