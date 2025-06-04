@@ -123,11 +123,8 @@ func (w *Worker) ack(del middleware.Delivery) error {
 
 func (w *Worker) RussianRoulette(format string, args ...any) {
 	threshold := w.con.RussianRouletteChance
-	if threshold == 0 {
-		return
-	}
+	r := rand.Float64()
 
-	r := int(rand.Uint32()) % 100
 	if r < threshold {
 		msg := fmt.Sprintf(format, args...)
 		w.Log.Info("Terminated by chance: %s", msg)

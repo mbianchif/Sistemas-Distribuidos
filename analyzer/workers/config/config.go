@@ -19,7 +19,7 @@ type Config struct {
 	OutputQueueNames      []string
 	OutputCopies          []int
 	OutputDeliveryTypes   []string
-	RussianRouletteChance int
+	RussianRouletteChance float64
 	Select                map[string]struct{}
 }
 
@@ -128,7 +128,7 @@ func Create() (*Config, error) {
 	}
 
 	// RUSSIAN ROULETTE CHANCE
-	russianRouletteChance, err := strconv.Atoi(os.Getenv("RUSSIAN_ROULETTE_CHANCE"))
+	russianRouletteChance, err := strconv.ParseFloat(os.Getenv("RUSSIAN_ROULETTE_CHANCE"), 32)
 	if err != nil {
 		return nil, fmt.Errorf("the given russian roulette chance is invalid: %v", err)
 	}
