@@ -8,7 +8,8 @@
 - (Facil)  Agregar el mensaje de Cleanse (borra el estado de todos los clientes), se envia apenas se levanta el gateway
 
 ## Requisitos para la proxima entrega
-- (Mediano) Agregar el Clean a los nodos stateful para el persistor
+- (Facil)   Agregar Close a todos los nodos
+- (Mediano) Agregar el clean a los nodos stateful para el persistor
 - chequear que todos los recursos se cierren correctamente
 - agregar la documentacion necesaria al informe/diagramas
 
