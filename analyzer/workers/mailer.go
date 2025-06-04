@@ -45,7 +45,6 @@ func (m *Mailer) tryRecover(inputQs []amqp.Queue, outputQFmts []string) (map[str
 
 	mailerDir, err := os.ReadDir(PERSISTANCE_DIR)
 	if err != nil {
-		m.Log.Infof("Failed to recover mailer didn't find recovery directory")
 		return receivers, senders
 	}
 
@@ -103,6 +102,7 @@ func (m *Mailer) tryRecover(inputQs []amqp.Queue, outputQFmts []string) (map[str
 		}
 	}
 
+	m.Log.Infof("Mailer recovered successfully")
 	return receivers, senders
 }
 
