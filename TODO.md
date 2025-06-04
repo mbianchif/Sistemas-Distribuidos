@@ -2,7 +2,6 @@
 
 ## Fault-Tolerance
 - (Pesado) Hacer tolerante al Join
-- (Facil)  Agregar Publisher Confirms
 - (Pesado) Cambiar el mailer del Gateway por una entidad mejor
 - (Pesado) Hacer tolerante el Gateway
 - (Pesado) Hacer los Health-Checkers
@@ -17,4 +16,3 @@
 ## Cosas que estarian bien
 - sacar el failed to recover
 - hacer que los mensajes de los workers esten acotados por tamaño
-- hacer que cada clientHandler en gateway tenga su propio mailer, asi no hay que sincronizar nada, deberia ser mas rapido

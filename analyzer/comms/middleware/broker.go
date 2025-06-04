@@ -7,46 +7,51 @@ import (
 )
 
 type Broker struct {
-	conConn            *amqp.Connection
-	pubConn            *amqp.Connection
-	conCh              *amqp.Channel
-	pubCh              *amqp.Channel
+	rxConn             *amqp.Connection
+	txConn             *amqp.Connection
+	rxCh               *amqp.Channel
+	txCh               *amqp.Channel
 	outputExchangeName string
 }
 
+// Creates a `Broker` and sets the connections to it
 func NewBroker(url string) (*Broker, error) {
-	conConn, err := amqp.Dial(url)
+	rxConn, err := amqp.Dial(url)
 	if err != nil {
 		return nil, err
 	}
 
-	pubConn, err := amqp.Dial(url)
+	txConn, err := amqp.Dial(url)
 	if err != nil {
 		return nil, err
 	}
 
-	conCh, err := conConn.Channel()
+	rxCh, err := rxConn.Channel()
 	if err != nil {
 		return nil, err
 	}
-	if err := conCh.Qos(4096, 0, false); err != nil {
+	if err := rxCh.Qos(4096, 0, false); err != nil {
 		return nil, err
 	}
 
-	pubCh, err := pubConn.Channel()
+	txCh, err := txConn.Channel()
 	if err != nil {
+		return nil, err
+	}
+	if err := txCh.Confirm(false); err != nil {
 		return nil, err
 	}
 
 	return &Broker{
-		conConn:            conConn,
-		pubConn:            pubConn,
-		conCh:              conCh,
-		pubCh:              pubCh,
+		rxConn:             rxConn,
+		txConn:             txConn,
+		rxCh:               rxCh,
+		txCh:               txCh,
 		outputExchangeName: "",
 	}, nil
 }
 
+// Creates all the broker's infrastructure the node needs to communicate with the broker
 func (b *Broker) Init(id int, inExchNames []string, inQNames []string, outExchName string, outQNames []string, outCopies []int) ([]amqp.Queue, []string, error) {
 	inputQs, err := b.initInput(id, inExchNames, inQNames)
 	if err != nil {
@@ -62,22 +67,24 @@ func (b *Broker) Init(id int, inExchNames []string, inQNames []string, outExchNa
 	return inputQs, outputQFmts, nil
 }
 
+// Releases the used external resources
 func (b *Broker) DeInit() {
-	if !b.conConn.IsClosed() {
-		b.conConn.Close()
+	if !b.rxCh.IsClosed() {
+		b.rxCh.Close()
 	}
-	if !b.pubConn.IsClosed() {
-		b.pubConn.Close()
+	if !b.txCh.IsClosed() {
+		b.txCh.Close()
 	}
 
-	if !b.conCh.IsClosed() {
-		b.conCh.Close()
+	if !b.rxConn.IsClosed() {
+		b.rxConn.Close()
 	}
-	if !b.pubCh.IsClosed() {
-		b.pubCh.Close()
+	if !b.txConn.IsClosed() {
+		b.txConn.Close()
 	}
 }
 
+// Creates the broker's infrastructure for the input of this particular node
 func (b *Broker) initInput(id int, exchangeNames []string, qNames []string) ([]amqp.Queue, error) {
 	qs := make([]amqp.Queue, 0, len(qNames))
 	for i := range exchangeNames {
@@ -104,7 +111,7 @@ func (b *Broker) initInput(id int, exchangeNames []string, qNames []string) ([]a
 	return qs, nil
 }
 
-// Returns the format of output queue names
+// Creates the broker's infrastructure for the input of this particular node and returns the names of the output queues
 func (b *Broker) initOutput(exchangeName string, qNames []string, qCopies []int) ([]string, error) {
 	if err := b.exchangeDeclare(exchangeName, "direct"); err != nil {
 		return nil, err
@@ -132,8 +139,9 @@ func (b *Broker) initOutput(exchangeName string, qNames []string, qCopies []int)
 	return fmtQNames, nil
 }
 
+// Declares an exchange with the given name and kind
 func (b *Broker) exchangeDeclare(name string, kind string) error {
-	return b.pubCh.ExchangeDeclare(
+	return b.txCh.ExchangeDeclare(
 		name,
 		kind,
 		true,  // durable
@@ -144,8 +152,9 @@ func (b *Broker) exchangeDeclare(name string, kind string) error {
 	)
 }
 
+// Declares a queue ith the given name and returns it
 func (b *Broker) queueDeclare(name string) (amqp.Queue, error) {
-	return b.pubCh.QueueDeclare(
+	return b.txCh.QueueDeclare(
 		name,
 		false, // durable
 		false, // delete when unused
@@ -155,8 +164,9 @@ func (b *Broker) queueDeclare(name string) (amqp.Queue, error) {
 	)
 }
 
+// Declares a queue binding from the given queue to the given exchange using `key`
 func (b *Broker) queueBind(q amqp.Queue, key string, exchangeName string) error {
-	return b.pubCh.QueueBind(
+	return b.txCh.QueueBind(
 		q.Name,
 		key,
 		exchangeName,
@@ -165,8 +175,9 @@ func (b *Broker) queueBind(q amqp.Queue, key string, exchangeName string) error 
 	)
 }
 
+// Returns a channel used to consume deliveries sent by the broker server
 func (b *Broker) Consume(qName, consumer string) (<-chan amqp.Delivery, error) {
-	return b.conCh.Consume(
+	return b.rxCh.Consume(
 		qName,
 		consumer,
 		false, // auto-ack
@@ -177,8 +188,9 @@ func (b *Broker) Consume(qName, consumer string) (<-chan amqp.Delivery, error) {
 	)
 }
 
+// Publishes a message to the broker server using the given key, will wait for server confirmation
 func (b *Broker) Publish(key string, body []byte, headers amqp.Table) error {
-	return b.pubCh.Publish(
+	waiter, err := b.txCh.PublishWithDeferredConfirm(
 		b.outputExchangeName,
 		key,
 		false, // mandatory
@@ -188,4 +200,14 @@ func (b *Broker) Publish(key string, body []byte, headers amqp.Table) error {
 			Body:        body,
 			Headers:     headers,
 		})
+
+	if err != nil {
+		return err
+	}
+
+	if !waiter.Wait() {
+		return fmt.Errorf("failed to wait on publishment")
+	}
+
+	return nil
 }

@@ -8,12 +8,14 @@ import (
 
 type Table = amqp.Table
 
+// Id to unequivocally identify a delivery
 type DelId struct {
 	ReplicaId int
 	Seq       int
 	ClientId  int
 }
 
+// The headers of all deliveries
 type Headers struct {
 	ReplicaId int
 	ClientId  int
@@ -22,6 +24,7 @@ type Headers struct {
 	Kind      int
 }
 
+// Middleware delivery imlpementation
 type Delivery struct {
 	Headers Headers
 	Body    []byte
@@ -29,6 +32,7 @@ type Delivery struct {
 	mu      *sync.Mutex
 }
 
+// Creates a new delivery, the mutex will be unlocked when the delivery is acked
 func NewDelivery(del amqp.Delivery, mu *sync.Mutex) Delivery {
 	headers := Headers{
 		ReplicaId: int(del.Headers["replica-id"].(int32)),
@@ -51,6 +55,7 @@ func NewDelivery(del amqp.Delivery, mu *sync.Mutex) Delivery {
 	}
 }
 
+// Returns the id that corresponds with this delivery
 func (d Delivery) Id() DelId {
 	return DelId{
 		ReplicaId: d.Headers.ReplicaId,
@@ -59,8 +64,12 @@ func (d Delivery) Id() DelId {
 	}
 }
 
+// Sends an ack to the delivery's sender, waits till confirmation
 func (d Delivery) Ack(multiple bool) error {
-	// aca hay que asegurarse de que el ack le llega a rabbit, despues correr d.acker.Done()
+	if err := d.del.Ack(multiple); err != nil {
+		return err
+	}
+
 	d.mu.Unlock()
-	return d.del.Ack(multiple)
+	return nil
 }

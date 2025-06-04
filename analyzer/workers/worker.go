@@ -15,6 +15,8 @@ import (
 	"github.com/op/go-logging"
 )
 
+const ACK_RETRIES = 10
+
 type IWorker interface {
 	Batch(int, middleware.Delivery)
 	Eof(int, middleware.Delivery)
@@ -93,7 +95,7 @@ func (base *Worker) Run(w IWorker) error {
 		case comms.FLUSH:
 			w.Flush(qId, del)
 		default:
-			base.Log.Errorf("received an unknown message type %v", kind)
+			base.Log.Errorf("received an unknown message kind %v", kind)
 		}
 
 		// Dump
@@ -103,10 +105,20 @@ func (base *Worker) Run(w IWorker) error {
 
 		// Ack
 		base.RussianRoulette("[Dump, Ack]")
-		if err := del.Ack(false); err != nil {
-			base.Log.Errorf("error while acknowledging message: %v", err)
+		if err := base.ack(del); err != nil {
+			return fmt.Errorf("couldn't acknowledge delivery: %v", err)
 		}
 	}
+}
+
+func (w *Worker) ack(del middleware.Delivery) error {
+	err := del.Ack(false)
+
+	for i := 0; err != nil && i < ACK_RETRIES; i++ {
+		err = del.Ack(false)
+	}
+
+	return err
 }
 
 func (w *Worker) RussianRoulette(format string, args ...any) {
