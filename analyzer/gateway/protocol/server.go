@@ -72,7 +72,7 @@ func (s *Server) clientHandler(conn *CsvTransferStream, clientId int) error {
 	for range 3 {
 		fileName, err := conn.Resource()
 		if err != nil {
-			s.sendFlush(clientId)
+			s.mailer.PublishFlush(clientId, []byte{})
 			s.log.Criticalf("an error ocurred while receiving resource for client %d, exiting...", clientId)
 			return err
 		}
@@ -81,44 +81,32 @@ func (s *Server) clientHandler(conn *CsvTransferStream, clientId int) error {
 		for {
 			msg, err := conn.Recv()
 			if err != nil {
-				s.sendFlush(clientId)
+				s.mailer.PublishFlush(clientId, []byte{})
 				s.log.Criticalf("an error ocurred while handling client %d, exiting...", clientId)
 				return err
 			}
 
 			if msg.Kind == MSG_EOF {
 				s.log.Infof("%s was successfully received by client %d", fileName, clientId)
-				s.sendEof(fileName, clientId)
+				s.mailer.PublishEof(fileName, clientId, []byte{})
 				break
 
 			} else if msg.Kind == MSG_BATCH {
-				s.sendBatch(fileName, clientId, msg.Data)
+				s.mailer.PublishBatch(fileName, clientId, msg.Data)
 
 			} else if msg.Kind == MSG_ERR {
 				s.log.Criticalf("an error was received from the client %d, exiting...", clientId)
-				s.sendFlush(clientId)
+				s.mailer.PublishFlush(clientId, []byte{})
 				return nil
 
 			} else {
-				s.sendFlush(clientId)
+				s.mailer.PublishFlush(clientId, []byte{})
 				return fmt.Errorf("an unknown msg kind was received by client %d: %d", clientId, msg.Kind)
 			}
 		}
 	}
 
 	return nil
-}
-
-func (s *Server) sendBatch(fileName string, clientId int, body []byte) {
-	s.mailer.PublishBatch(fileName, clientId, body)
-}
-
-func (s *Server) sendEof(fileName string, clientId int) {
-	s.mailer.PublishEof(fileName, clientId, []byte{})
-}
-
-func (s *Server) sendFlush(clientId int) {
-	s.mailer.PublishFlush(clientId, []byte{})
 }
 
 func (s *Server) hasToTerminate() bool {
