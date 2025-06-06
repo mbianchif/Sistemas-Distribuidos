@@ -14,6 +14,7 @@ import (
 	"github.com/op/go-logging"
 )
 
+const PERSISTOR_DIRNAME = "persistor"
 const PERSISTOR_FILENAME = "state.txt"
 
 type tuple struct {
@@ -58,7 +59,7 @@ func New(con *config.MinMaxConfig, log *logging.Logger) (*MinMax, error) {
 	w := MinMax{
 		Worker:    base,
 		Con:       con,
-		persistor: persistance.New(log),
+		persistor: persistance.New(PERSISTOR_DIRNAME, log),
 		mins:      make(map[int]tuple),
 		maxs:      make(map[int]tuple),
 	}

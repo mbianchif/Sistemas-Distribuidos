@@ -11,6 +11,7 @@ import (
 )
 
 const SEP = "<|>"
+const PERSISTOR_DIRNAME = "persistor"
 
 type GroupBy struct {
 	*workers.Worker
@@ -41,7 +42,7 @@ func New(con *config.GroupbyConfig, log *logging.Logger) (*GroupBy, error) {
 		Worker:    base,
 		con:       con,
 		handler:   nil,
-		persistor: persistance.New(log),
+		persistor: persistance.New(PERSISTOR_DIRNAME, log),
 	}
 	w.handler = handler(w)
 

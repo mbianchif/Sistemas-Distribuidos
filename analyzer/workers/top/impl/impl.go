@@ -16,6 +16,7 @@ import (
 	"github.com/op/go-logging"
 )
 
+const PERSISTOR_DIRNAME = "persistor"
 const PERSISTOR_FILENAME = "state.txt"
 
 type tuple struct {
@@ -59,7 +60,7 @@ func New(con *config.TopConfig, log *logging.Logger) (*Top, error) {
 	w := Top{
 		Worker:    base,
 		Con:       con,
-		persistor: persistance.New(log),
+		persistor: persistance.New(PERSISTOR_DIRNAME, log),
 		tops:      make(map[int][]tuple),
 	}
 

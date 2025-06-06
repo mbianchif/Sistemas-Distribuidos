@@ -14,10 +14,6 @@ import (
 	"github.com/op/go-logging"
 )
 
-const (
-	PERSISTOR_DIRNAME = "persistors"
-)
-
 type PersistedFile struct {
 	ReplicaId int
 	Seq       int
@@ -27,13 +23,15 @@ type PersistedFile struct {
 }
 
 type Persistor struct {
-	lastDeliveries map[int]middleware.DelId // maps clientId to last delivery id
+	lastDeliveries map[int]middleware.DelId
+	dirName        string
 	log            *logging.Logger
 }
 
-func New(log *logging.Logger) Persistor {
+func New(dirName string, log *logging.Logger) Persistor {
 	return Persistor{
 		lastDeliveries: make(map[int]middleware.DelId),
+		dirName:        dirName,
 		log:            log,
 	}
 }
@@ -44,7 +42,7 @@ func buildHeader(replicaId, seq int) []byte {
 
 func (p Persistor) Store(id middleware.DelId, fileName string, data []byte) error {
 	header := buildHeader(id.ReplicaId, id.Seq)
-	dirPath := fmt.Sprintf("%s/%d", PERSISTOR_DIRNAME, id.ClientId)
+	dirPath := fmt.Sprintf("%s/%d", p.dirName, id.ClientId)
 	p.lastDeliveries[id.ClientId] = id
 	return comms.AtomicWrite(dirPath, fileName, append(header, data...))
 }
@@ -69,7 +67,7 @@ func parseHeader(header []byte) (int, int, error) {
 }
 
 func (p Persistor) Load(clientId int, fileName string) (int, int, []byte, error) {
-	dirPath := fmt.Sprintf("%s/%d", PERSISTOR_DIRNAME, clientId)
+	dirPath := fmt.Sprintf("%s/%d", p.dirName, clientId)
 	path := fmt.Sprintf("%s/%s", dirPath, fileName)
 
 	data, err := os.ReadFile(path)
@@ -92,7 +90,7 @@ func (p Persistor) Load(clientId int, fileName string) (int, int, []byte, error)
 
 func (p Persistor) RecoverFor(clientId int) (iter.Seq[PersistedFile], error) {
 	return func(yield func(PersistedFile) bool) {
-		files, err := os.ReadDir(fmt.Sprintf("%s/%d", PERSISTOR_DIRNAME, clientId))
+		files, err := os.ReadDir(fmt.Sprintf("%s/%d", p.dirName, clientId))
 		if err != nil {
 			p.log.Errorf("failed to read files in directory %d: %v", clientId, err)
 			return
@@ -136,7 +134,7 @@ func (p Persistor) RecoverFor(clientId int) (iter.Seq[PersistedFile], error) {
 }
 
 func (p Persistor) Recover() (iter.Seq[PersistedFile], error) {
-	files, err := os.ReadDir(PERSISTOR_DIRNAME)
+	files, err := os.ReadDir(p.dirName)
 	if err != nil {
 		return slices.Values([]PersistedFile{}), nil
 	}
