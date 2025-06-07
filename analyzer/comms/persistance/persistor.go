@@ -1,8 +1,7 @@
 package persistance
 
 import (
-	"analyzer/comms"
-	"analyzer/comms/middleware"
+	"bufio"
 	"bytes"
 	"fmt"
 	"iter"
@@ -11,81 +10,151 @@ import (
 	"strconv"
 	"strings"
 
+	"analyzer/comms"
+	"analyzer/comms/middleware"
+
 	"github.com/op/go-logging"
 )
 
+type PersistedHeader struct {
+	Seqs []int
+}
+
 type PersistedFile struct {
-	ReplicaId int
-	Seq       int
-	ClientId  int
-	FileName  string
-	State     []byte
+	ClientId int
+	FileName string
+	Header   PersistedHeader
+	State    []byte
 }
 
 type Persistor struct {
-	lastDeliveries map[int]middleware.DelId
-	dirName        string
-	log            *logging.Logger
+	dirName  string
+	replicas int
+	log      *logging.Logger
 }
 
-func New(dirName string, log *logging.Logger) Persistor {
+func New(dirName string, replicas int, log *logging.Logger) Persistor {
 	return Persistor{
-		lastDeliveries: make(map[int]middleware.DelId),
-		dirName:        dirName,
-		log:            log,
+		dirName:  dirName,
+		replicas: replicas,
+		log:      log,
 	}
 }
 
-func buildHeader(replicaId, seq int) []byte {
-	return fmt.Appendf(nil, "%d %d\n", replicaId, seq)
-}
-
-func (p Persistor) Store(id middleware.DelId, fileName string, data []byte) error {
-	header := buildHeader(id.ReplicaId, id.Seq)
-	dirPath := fmt.Sprintf("%s/%d", p.dirName, id.ClientId)
-	p.lastDeliveries[id.ClientId] = id
-	return comms.AtomicWrite(dirPath, fileName, append(header, data...))
-}
-
-func parseHeader(header []byte) (int, int, error) {
-	fields := bytes.Split(header, []byte(" "))
-	if len(fields) != 2 {
-		return 0, 0, fmt.Errorf("invalid header format, has size %d, should have size 2", len(fields))
+func (p Persistor) LoadHeader(clientId int, fileName string) (PersistedHeader, error) {
+	empty := PersistedHeader{
+		Seqs: make([]int, p.replicas),
 	}
 
-	replicaId, err := strconv.Atoi(string(fields[0]))
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to parse replicaId from header: %w", err)
-	}
-
-	seq, err := strconv.Atoi(string(fields[1]))
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to parse seq from header: %w", err)
-	}
-
-	return replicaId, seq, nil
-}
-
-func (p Persistor) Load(clientId int, fileName string) (int, int, []byte, error) {
-	dirPath := fmt.Sprintf("%s/%d", p.dirName, clientId)
+	dirPath := fmt.Sprintf("/%s/%d", p.dirName, clientId)
 	path := fmt.Sprintf("%s/%s", dirPath, fileName)
+	fp, err := os.Open(path)
+	if err != nil {
+		return empty, fmt.Errorf("couldn't read header of %s for client %d: %v", fileName, clientId, err)
+	}
+
+	seqs := make([]int, 0, p.replicas)
+	reader := bufio.NewReader(fp)
+	for replicaId := range p.replicas {
+		line, err := reader.ReadBytes('\n')
+		if err != nil {
+			return empty, fmt.Errorf("couldn't read lines of header of %s for clinet %d: %v", fileName, clientId, err)
+		}
+
+		seq, err := p.parseHeaderLine(line)
+		if err != nil {
+			return empty, fmt.Errorf("couldn't parse seq number of header for replica %d client %d in file %s: %v", replicaId, clientId, fileName, err)
+		}
+
+		seqs = append(seqs, seq)
+	}
+
+	return PersistedHeader{seqs}, nil
+}
+
+func (p Persistor) parseHeaderLine(header []byte) (int, error) {
+	header = bytes.TrimSpace(header)
+	seq, err := strconv.Atoi(string(header))
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse seq number from header: %v", err)
+	}
+
+	return seq, nil
+}
+
+func (p Persistor) parseHeader(header [][]byte) (PersistedHeader, error) {
+	empty := PersistedHeader{}
+
+	seqs := make([]int, 0, p.replicas)
+	for _, line := range header {
+		seq, err := p.parseHeaderLine(line)
+		if err != nil {
+			return empty, err
+		}
+
+		seqs = append(seqs, seq)
+	}
+
+	return PersistedHeader{seqs}, nil
+}
+
+func (p Persistor) encodeHeader(header PersistedHeader) []byte {
+	buf := bytes.NewBuffer(nil)
+
+	for _, seq := range header.Seqs {
+		str := fmt.Sprintf("%d\n", seq)
+		buf.WriteString(str)
+	}
+
+	return buf.Bytes()
+}
+
+func (p Persistor) Store(id middleware.DelId, fileName string, data []byte, headers ...PersistedHeader) error {
+	replicaId := id.ReplicaId
+	clientId := id.ClientId
+	seq := id.Seq
+
+	header := PersistedHeader{}
+	if len(headers) > 1 {
+		return fmt.Errorf("invalid argument count in persistor.Store")
+	} else if len(headers) == 1 && len(headers[0].Seqs) == p.replicas {
+		header = headers[0]
+	} else {
+		header, _ = p.LoadHeader(clientId, fileName)
+	}
+
+	header.Seqs[replicaId] = seq
+	encodedHeader := p.encodeHeader(header)
+
+	dirPath := fmt.Sprintf("/%s/%d", p.dirName, id.ClientId)
+	return comms.AtomicWrite(dirPath, fileName, append(encodedHeader, data...))
+}
+
+func (p Persistor) Load(clientId int, fileName string) (PersistedFile, error) {
+	dirPath := fmt.Sprintf("/%s/%d", p.dirName, clientId)
+	path := fmt.Sprintf("%s/%s", dirPath, fileName)
+	empty := PersistedFile{}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return 0, 0, nil, fmt.Errorf("failed to read persistor file %s for client %d: %w", path, clientId, err)
+		return empty, fmt.Errorf("failed to read persistor file %s for client %d: %v", fileName, clientId, err)
 	}
 
-	fields := bytes.SplitN(data, []byte("\n"), 2)
-	if len(fields) < 2 {
-		return 0, 0, nil, fmt.Errorf("invalid persistor file format: %s", path)
-	}
+	fields := bytes.SplitN(data, []byte("\n"), p.replicas+1)
 
-	replicaId, seq, err := parseHeader(fields[0])
+	header, err := p.parseHeader(fields[:p.replicas])
 	if err != nil {
-		return 0, 0, nil, fmt.Errorf("failed to parse header in persistor file %s for client %d: %w", path, clientId, err)
+		return empty, fmt.Errorf("failed to parse header at file %s for client %d: %v", fileName, clientId, err)
 	}
 
-	return replicaId, seq, fields[1], nil
+	state := fields[len(fields)-1]
+
+	return PersistedFile{
+		ClientId: clientId,
+		FileName: fileName,
+		Header:   header,
+		State:    state,
+	}, nil
 }
 
 func (p Persistor) RecoverFor(clientId int) (iter.Seq[PersistedFile], error) {
@@ -106,24 +175,10 @@ func (p Persistor) RecoverFor(clientId int) (iter.Seq[PersistedFile], error) {
 				continue
 			}
 
-			replicaId, seq, state, err := p.Load(clientId, name)
+			pf, err := p.Load(clientId, name)
 			if err != nil {
 				p.log.Errorf("failed to load file %s for client %d: %v", file.Name(), clientId, err)
 				continue
-			}
-
-			p.lastDeliveries[clientId] = middleware.DelId{
-				ReplicaId: replicaId,
-				Seq:       seq,
-				ClientId:  clientId,
-			}
-
-			pf := PersistedFile{
-				ReplicaId: replicaId,
-				ClientId:  clientId,
-				Seq:       seq,
-				FileName:  name,
-				State:     state,
 			}
 
 			if !yield(pf) {
@@ -161,17 +216,8 @@ func (p Persistor) Recover() (iter.Seq[PersistedFile], error) {
 	}, nil
 }
 
-func (p *Persistor) IsDup(del middleware.Delivery) bool {
-	clientId := del.Headers.ClientId
-	replicaId := del.Headers.ReplicaId
-	seq := del.Headers.Seq
-
-	if lastDelId, ok := p.lastDeliveries[clientId]; ok {
-		if seq <= lastDelId.Seq && replicaId == lastDelId.ReplicaId {
-			p.log.Debugf("client %v: delivery is already processed, skipping", clientId)
-			return true
-		}
-	}
-
-	return false
+func (h PersistedHeader) IsDup(id middleware.DelId) bool {
+	replicaId := id.ReplicaId
+	seq := id.Seq
+	return seq <= h.Seqs[replicaId]
 }

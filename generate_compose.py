@@ -623,16 +623,12 @@ services:"""
     build:
       dockerfile: build/client.Dockerfile
     volumes:
-      - client_data:/data
+      - .data:/data
     networks:
       - my-network
     env_file: configs/client/.env
 """
     docker_compose += """
-volumes:
-  client_data:
-    name: client_dataset
-
 networks:
   my-network:
     name: moviesanalyzer_net

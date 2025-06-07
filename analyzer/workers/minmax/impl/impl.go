@@ -14,8 +14,8 @@ import (
 	"github.com/op/go-logging"
 )
 
-const PERSISTOR_DIRNAME = "persistor"
-const PERSISTOR_FILENAME = "state.txt"
+const STATE_DIRNAME = "persistor"
+const STATE_FILENAME = "state"
 
 type tuple struct {
 	fieldMap map[string]string
@@ -59,7 +59,7 @@ func New(con *config.MinMaxConfig, log *logging.Logger) (*MinMax, error) {
 	w := MinMax{
 		Worker:    base,
 		Con:       con,
-		persistor: persistance.New(PERSISTOR_DIRNAME, log),
+		persistor: persistance.New(STATE_DIRNAME, con.InputCopies[0], log),
 		mins:      make(map[int]tuple),
 		maxs:      make(map[int]tuple),
 	}
@@ -154,18 +154,21 @@ func (w *MinMax) Decode(clientId int, state []byte) error {
 }
 
 func (w *MinMax) Batch(qId int, del middleware.Delivery) {
+	id := del.Id()
 	body := del.Body
+	clientId := id.ClientId
+
 	batch, err := comms.DecodeBatch(body)
 	if err != nil {
 		w.Log.Fatal("failed to decode batch: %v", err)
 	}
 
 	// Check for duplicated deliveries
-	if w.persistor.IsDup(del) {
+	header, err := w.persistor.LoadHeader(clientId, STATE_FILENAME)
+	if err == nil && header.IsDup(del.Id()) {
 		return
 	}
 
-	clientId := del.Headers.ClientId
 	for _, fieldMap := range batch.FieldMaps {
 		err := handleMinMax(w, clientId, fieldMap)
 		if err != nil {
@@ -176,7 +179,7 @@ func (w *MinMax) Batch(qId int, del middleware.Delivery) {
 
 	// Persist once the entire delivery is processed
 	state := w.Encode(clientId)
-	w.persistor.Store(del.Id(), PERSISTOR_FILENAME, state)
+	w.persistor.Store(id, STATE_FILENAME, state, header)
 }
 
 func (w *MinMax) Eof(qId int, del middleware.Delivery) {

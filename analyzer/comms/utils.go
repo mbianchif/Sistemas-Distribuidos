@@ -1,6 +1,7 @@
 package comms
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -53,4 +54,18 @@ func AtomicWrite(dirPath, fileName string, data []byte) error {
 
 	newFileName := fmt.Sprintf("%s/%s", dirPath, fileName)
 	return os.Rename(tmpFileName, newFileName)
+}
+
+func IndexN(s []byte, sep rune, n int) int {
+	found := 0
+	f := func(r rune) bool {
+		if r == sep {
+			found++
+			if found == n {
+				return true
+			}
+		}
+		return false
+	}
+	return bytes.IndexFunc(s, f)
 }

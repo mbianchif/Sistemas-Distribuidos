@@ -133,7 +133,7 @@ func Create() (*Config, error) {
 		return nil, fmt.Errorf("the given russian roulette chance is invalid: %v", err)
 	}
 	if !(0 <= russianRouletteChance || russianRouletteChance <= 100) {
-		return nil, fmt.Errorf("russian roulette chance must be between 0 and 100: %d", russianRouletteChance)
+		return nil, fmt.Errorf("russian roulette chance must be between 0 and 100: %f", russianRouletteChance)
 	}
 
 	// SELECT

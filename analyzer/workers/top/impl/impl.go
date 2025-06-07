@@ -16,8 +16,8 @@ import (
 	"github.com/op/go-logging"
 )
 
-const PERSISTOR_DIRNAME = "persistor"
-const PERSISTOR_FILENAME = "state.txt"
+const STATE_DIRNAME = "persistor"
+const STATE_FILENAME = "state"
 
 type tuple struct {
 	value    float64
@@ -43,7 +43,7 @@ func (w *Top) tryRecover() error {
 		clientId := pf.ClientId
 		state := pf.State
 
-		if err := w.Decode(clientId, state); err != nil {
+		if err := w.decode(clientId, state); err != nil {
 			return err
 		}
 	}
@@ -60,7 +60,7 @@ func New(con *config.TopConfig, log *logging.Logger) (*Top, error) {
 	w := Top{
 		Worker:    base,
 		Con:       con,
-		persistor: persistance.New(PERSISTOR_DIRNAME, log),
+		persistor: persistance.New(STATE_DIRNAME, con.InputCopies[0], log),
 		tops:      make(map[int][]tuple),
 	}
 
@@ -113,7 +113,7 @@ func (w *Top) Encode(clientId int) []byte {
 	return buf.Bytes()
 }
 
-func (w *Top) Decode(clientId int, state []byte) error {
+func (w *Top) decode(clientId int, state []byte) error {
 	reader := bufio.NewReader(bytes.NewReader(state))
 	for {
 		line, err := reader.ReadBytes('\n')
@@ -134,18 +134,21 @@ func (w *Top) Decode(clientId int, state []byte) error {
 }
 
 func (w *Top) Batch(qId int, del middleware.Delivery) {
+	id := del.Id()
 	body := del.Body
+	clientId := id.ClientId
+
 	batch, err := comms.DecodeBatch(body)
 	if err != nil {
 		w.Log.Fatal("failed to decode batch: %v", err)
 	}
 
 	// Check for duplicated deliveries
-	if w.persistor.IsDup(del) {
+	header, err := w.persistor.LoadHeader(clientId, STATE_FILENAME)
+	if err == nil && header.IsDup(del.Id()) {
 		return
 	}
 
-	clientId := del.Headers.ClientId
 	for _, fieldMap := range batch.FieldMaps {
 		err := handleTop(w, clientId, fieldMap)
 		if err != nil {
@@ -156,7 +159,7 @@ func (w *Top) Batch(qId int, del middleware.Delivery) {
 
 	// Persist once the entire delivery is processed
 	state := w.Encode(clientId)
-	w.persistor.Store(del.Id(), PERSISTOR_FILENAME, state)
+	w.persistor.Store(id, STATE_FILENAME, state, header)
 }
 
 func (w *Top) Eof(qId int, del middleware.Delivery) {

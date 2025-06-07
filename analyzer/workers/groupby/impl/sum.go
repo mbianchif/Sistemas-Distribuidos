@@ -93,20 +93,20 @@ func (w *Sum) store(id middleware.DelId, persistor *persistance.Persistor) error
 	seq := id.Seq
 
 	for k, partialSum := range w.state {
-		lastReplicaId, lastSeq, state, err := persistor.Load(clientId, k)
+		pf, err := persistor.Load(clientId, k)
 		exists := err == nil
-
 		if !exists {
 			newState := w.encode(partialSum)
 			persistor.Store(id, k, newState)
 			continue
 		}
 
-		if seq <= lastSeq && replicaId == lastReplicaId {
+		h := pf.Header
+		if seq <= h.Seqs[replicaId] {
 			continue
 		}
 
-		prevSum, err := w.decode(state)
+		prevSum, err := w.decode(pf.State)
 		if err != nil {
 			continue
 		}

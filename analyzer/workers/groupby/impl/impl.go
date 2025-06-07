@@ -11,7 +11,7 @@ import (
 )
 
 const SEP = "<|>"
-const PERSISTOR_DIRNAME = "persistor"
+const STATE_DIRNAME = "persistor"
 
 type GroupBy struct {
 	*workers.Worker
@@ -42,7 +42,7 @@ func New(con *config.GroupbyConfig, log *logging.Logger) (*GroupBy, error) {
 		Worker:    base,
 		con:       con,
 		handler:   nil,
-		persistor: persistance.New(PERSISTOR_DIRNAME, log),
+		persistor: persistance.New(STATE_DIRNAME, con.InputCopies[0], log),
 	}
 	w.handler = handler(w)
 
@@ -57,14 +57,10 @@ func (w *GroupBy) clean(clientId int) {}
 
 func (w *GroupBy) Batch(qId int, del middleware.Delivery) {
 	body := del.Body
+
 	batch, err := comms.DecodeBatch(body)
 	if err != nil {
 		w.Log.Fatalf("failed to decode batch: %v", err)
-	}
-
-	// Check for duplicated deliveries
-	if w.persistor.IsDup(del) {
-		return
 	}
 
 	for _, fieldMap := range batch.FieldMaps {

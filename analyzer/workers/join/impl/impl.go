@@ -43,8 +43,8 @@ func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
 		Worker:         base,
 		Con:            con,
 		readingRight:   make(map[int]struct{}),
-		leftPersistor:  persistance.New(LEFT_PERSISTOR_DIRNAME, log),
-		rightPersistor: persistance.New(RIGHT_PERSISTOR_DIRNAME, log),
+		leftPersistor:  persistance.New(LEFT_PERSISTOR_DIRNAME, con.InputCopies[0], log),
+		rightPersistor: persistance.New(RIGHT_PERSISTOR_DIRNAME, con.InputCopies[1], log),
 	}
 
 	return w, nil
@@ -102,9 +102,8 @@ func handleLeft(w *Join, id middleware.DelId, data []byte) error {
 	seq := id.Seq
 
 	for k, partialShard := range shards {
-		lastReplicaId, lastSeq, state, err := w.leftPersistor.Load(clientId, k)
 		partialEncoded := w.encode(partialShard)
-
+		pf, err := w.leftPersistor.Load(clientId, k)
 		exists := err == nil
 		if !exists {
 			if err := w.leftPersistor.Store(id, k, partialEncoded); err != nil {
@@ -113,11 +112,13 @@ func handleLeft(w *Join, id middleware.DelId, data []byte) error {
 			continue
 		}
 
-		if seq <= lastSeq && replicaId == lastReplicaId {
+		header := pf.Header
+
+		if seq <= header.Seqs[replicaId] {
 			continue
 		}
 
-		newState := append(state, partialEncoded...)
+		newState := append(pf.State, partialEncoded...)
 		if err := w.leftPersistor.Store(id, k, newState); err != nil {
 			return err
 		}
@@ -140,14 +141,13 @@ func handleRight(w *Join, id middleware.DelId, data []byte) error {
 	responseFieldMaps := make([]map[string]string, 0)
 
 	for k, shard := range shards {
-		_, _, state, err := w.leftPersistor.Load(clientId, k)
-
+		pf, err := w.leftPersistor.Load(clientId, k)
 		exists := err == nil
 		if !exists {
 			continue
 		}
 
-		decodedLefts, err := w.decode(state)
+		decodedLefts, err := w.decode(pf.State)
 		if err != nil {
 			continue
 		}
@@ -183,7 +183,7 @@ func handleOutOfOrder(w *Join, id middleware.DelId, data []byte) error {
 	seq := id.Seq
 
 	encoded := w.encode(batch.FieldMaps)
-	lastReplicaId, lastSeq, state, err := w.rightPersistor.Load(clientId, OUT_OF_ORDER_FILENAME)
+	pf, err := w.rightPersistor.Load(clientId, OUT_OF_ORDER_FILENAME)
 
 	exists := err == nil
 	if !exists {
@@ -191,11 +191,12 @@ func handleOutOfOrder(w *Join, id middleware.DelId, data []byte) error {
 		return nil
 	}
 
-	if seq <= lastSeq && replicaId == lastReplicaId {
+	header := pf.Header
+	if seq <= header.Seqs[replicaId] {
 		return nil
 	}
 
-	newState := append(state, encoded...)
+	newState := append(pf.State, encoded...)
 	return w.rightPersistor.Store(id, OUT_OF_ORDER_FILENAME, newState)
 }
 
@@ -237,19 +238,22 @@ func (w *Join) Eof(qId int, del middleware.Delivery) {
 	clientId := id.ClientId
 	body := del.Body
 
+	_, err := w.rightPersistor.LoadHeader(clientId, READING_RIGHT_FILENAME)
+	exists := err == nil
+
 	if _, ok := w.readingRight[clientId]; !ok {
 		w.readingRight[clientId] = struct{}{}
 
-		_, _, state, err := w.rightPersistor.Load(clientId, OUT_OF_ORDER_FILENAME)
+		pf, err := w.rightPersistor.Load(clientId, OUT_OF_ORDER_FILENAME)
 		exists := err == nil
 		if exists {
-			del.Body = state
+			del.Body = pf.State
 			del.Headers.Kind = comms.BATCH
 			w.Batch(RIGHT, del)
 		}
 
 		w.rightPersistor.Store(id, READING_RIGHT_FILENAME, []byte{})
-	} else if !w.rightPersistor.IsDup(del) {
+	} else if exists {
 		eof := comms.DecodeEof(body)
 		if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
