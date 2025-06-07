@@ -1,12 +1,13 @@
 package middleware
 
 import (
-	"analyzer/comms"
 	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
+
+	"analyzer/comms"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -50,25 +51,20 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 	ordered := make(chan Delivery)
 	go func() {
 		defer close(ordered)
+		copies := r.copies
 
-		for rabbitDel := range recv {
-			// Stop here until worker has Ack'd it's last delivery
-			// so not to change `expecting` table before it got the
-			// chance to persist it's state.
-			r.mu.Lock()
+		bufs := make([]map[int]map[int]amqp.Delivery, copies)
+		for i := range bufs {
+			bufs[i] = make(map[int]map[int]amqp.Delivery)
+		}
 
-			del := NewDelivery(rabbitDel, r.mu)
-			replicaId := del.Headers.ReplicaId
-			clientId := del.Headers.ClientId
-			seq := del.Headers.Seq
-			kind := del.Headers.Kind
+		for del := range recv {
+			replicaId := int(del.Headers["replica-id"].(int32))
+			clientId := int(del.Headers["client-id"].(int32))
+			seq := int(del.Headers["seq"].(int32))
 
-			if _, ok := r.expecting[replicaId][clientId]; !ok {
-				r.expecting[replicaId][clientId] = seq
-			}
-
-			if kind == comms.FLUSH {
-				delete(r.expecting[replicaId], clientId)
+			if _, ok := bufs[replicaId][clientId]; !ok {
+				bufs[replicaId][clientId] = make(map[int]amqp.Delivery)
 			}
 
 			if seq < r.expecting[replicaId][clientId] {
@@ -76,8 +72,28 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 				continue
 			}
 
-			r.expecting[replicaId][clientId] = seq + 1
-			ordered <- del
+			bufs[replicaId][clientId][seq] = del
+			for {
+				expected := r.expecting[replicaId][clientId]
+				next, ok := bufs[replicaId][clientId][expected]
+				if !ok {
+					break
+				}
+
+				delete(bufs[replicaId][clientId], expected)
+
+				// Stop here until worker has Ack'd it's last delivery
+				// so not to change `expecting` table before it got the
+				// chance to persist it's state.
+				r.mu.Lock()
+				r.expecting[replicaId][clientId]++
+				ordered <- NewDelivery(next, r.mu)
+
+				kind := int(next.Headers["kind"].(int32))
+				if kind == comms.FLUSH {
+					delete(r.expecting[replicaId], clientId)
+				}
+			}
 		}
 	}()
 

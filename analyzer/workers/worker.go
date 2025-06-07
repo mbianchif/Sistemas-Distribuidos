@@ -105,20 +105,10 @@ func (base *Worker) Run(w IWorker) error {
 
 		// Ack
 		base.RussianRoulette("[Dump, Ack]")
-		if err := base.ack(del); err != nil {
+		if err := del.Ack(false); err != nil {
 			return fmt.Errorf("couldn't acknowledge delivery: %v", err)
 		}
 	}
-}
-
-func (w *Worker) ack(del middleware.Delivery) error {
-	err := del.Ack(false)
-
-	for i := 0; err != nil && i < ACK_RETRIES; i++ {
-		err = del.Ack(false)
-	}
-
-	return err
 }
 
 func (w *Worker) RussianRoulette(format string, args ...any) {
@@ -127,7 +117,7 @@ func (w *Worker) RussianRoulette(format string, args ...any) {
 
 	if r < threshold {
 		msg := fmt.Sprintf(format, args...)
-		w.Log.Info("Terminated by chance: %s", msg)
+		w.Log.Info("Terminated by chance:", msg)
 		os.Exit(1)
 	}
 }

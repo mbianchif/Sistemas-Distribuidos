@@ -33,6 +33,22 @@ type Join struct {
 	readingRight map[int]struct{}
 }
 
+func (w *Join) tryRecover() error {
+	persistedFiles, err := w.rightPersistor.Recover()
+	if err != nil {
+		return err
+	}
+
+	for pf := range persistedFiles {
+		clientId := pf.ClientId
+		if pf.FileName == READING_RIGHT_FILENAME {
+			w.readingRight[clientId] = struct{}{}
+		}
+	}
+
+	return nil
+}
+
 func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
 	base, err := workers.New(con.Config, log)
 	if err != nil {
@@ -45,6 +61,10 @@ func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
 		readingRight:   make(map[int]struct{}),
 		leftPersistor:  persistance.New(LEFT_PERSISTOR_DIRNAME, con.InputCopies[0], log),
 		rightPersistor: persistance.New(RIGHT_PERSISTOR_DIRNAME, con.InputCopies[1], log),
+	}
+
+	if err := w.tryRecover(); err != nil {
+		return nil, err
 	}
 
 	return w, nil
@@ -238,9 +258,6 @@ func (w *Join) Eof(qId int, del middleware.Delivery) {
 	clientId := id.ClientId
 	body := del.Body
 
-	_, err := w.rightPersistor.LoadHeader(clientId, READING_RIGHT_FILENAME)
-	exists := err == nil
-
 	if _, ok := w.readingRight[clientId]; !ok {
 		w.readingRight[clientId] = struct{}{}
 
@@ -253,7 +270,13 @@ func (w *Join) Eof(qId int, del middleware.Delivery) {
 		}
 
 		w.rightPersistor.Store(id, READING_RIGHT_FILENAME, []byte{})
-	} else if exists {
+		return
+	}
+
+	_, err := w.rightPersistor.LoadHeader(clientId, READING_RIGHT_FILENAME)
+	exists := err == nil
+
+	if exists {
 		eof := comms.DecodeEof(body)
 		if err := w.Mailer.PublishEof(eof, clientId); err != nil {
 			w.Log.Errorf("failed to publish message: %v", err)
