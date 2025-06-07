@@ -207,8 +207,7 @@ func handleOutOfOrder(w *Join, id middleware.DelId, data []byte) error {
 
 	exists := err == nil
 	if !exists {
-		w.rightPersistor.Store(id, OUT_OF_ORDER_FILENAME, encoded)
-		return nil
+		return w.rightPersistor.Store(id, OUT_OF_ORDER_FILENAME, encoded)
 	}
 
 	header := pf.Header
