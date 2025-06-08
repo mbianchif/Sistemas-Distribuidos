@@ -82,7 +82,7 @@ func joinFieldMaps(left map[string]string, right map[string]string) map[string]s
 	return joined
 }
 
-func keyHash(str string, _ int) string {
+func keyHash(str string) string {
 	return str
 }
 
@@ -112,7 +112,7 @@ func handleLeft(w *Join, id middleware.DelId, data []byte) error {
 		return err
 	}
 
-	shards, err := comms.Shard(batch.FieldMaps, w.Con.LeftKey, w.Con.NShards, keyHash)
+	shards, err := comms.Shard(batch.FieldMaps, w.Con.LeftKey, keyHash)
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func handleRight(w *Join, id middleware.DelId, data []byte) error {
 	if err != nil {
 		w.Log.Fatalf("failed to decode batch: %v", err)
 	}
-	shards, err := comms.Shard(batch.FieldMaps, w.Con.RightKey, w.Con.NShards, keyHash)
+	shards, err := comms.Shard(batch.FieldMaps, w.Con.RightKey, keyHash)
 	if err != nil {
 		return err
 	}

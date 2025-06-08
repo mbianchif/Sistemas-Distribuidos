@@ -46,21 +46,24 @@ func (s *SenderShard) nextKeySeq(i int, clientId int) (string, int) {
 	return key, seq
 }
 
-func keyHash(str string, mod int) int {
+func keyHash(str string) int {
 	var hash uint64 = 5381
 
 	for _, c := range str {
 		hash = ((hash << 5) + hash) + uint64(c) // hash * 33 + c
 	}
 
-	return int(hash % uint64(mod))
+	return int(hash)
 }
 
 func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}, headers Table) error {
-	shards, err := comms.Shard(batch.FieldMaps, s.key, s.outputCopies, keyHash)
+	shards, err := comms.Shard(batch.FieldMaps, s.key, func(str string) int {
+		return keyHash(str) % s.outputCopies
+	})
 	if err != nil {
 		return err
 	}
+
 	clientId := int(headers["client-id"].(int32))
 
 	for i, shard := range shards {

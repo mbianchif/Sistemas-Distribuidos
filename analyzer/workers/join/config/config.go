@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"strconv"
 
 	"analyzer/workers/config"
 )
@@ -12,7 +11,6 @@ type JoinConfig struct {
 	*config.Config
 	LeftKey  string
 	RightKey string
-	NShards  int
 }
 
 func Create() (*JoinConfig, error) {
@@ -31,10 +29,5 @@ func Create() (*JoinConfig, error) {
 		return nil, fmt.Errorf("no right key was provided")
 	}
 
-	shards, err := strconv.Atoi(os.Getenv("SHARDS"))
-	if err != nil {
-		return nil, fmt.Errorf("invalid shard value was given")
-	}
-
-	return &JoinConfig{con, leftKey, rightKey, shards}, nil
+	return &JoinConfig{con, leftKey, rightKey}, nil
 }
