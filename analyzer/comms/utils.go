@@ -7,8 +7,8 @@ import (
 	"os"
 )
 
-func Shard[T comparable](fieldMaps []map[string]string, key string, r int, hash func(str string, mod int) T) (map[T][]map[string]string, error) {
-	shards := make(map[T][]map[string]string, r)
+func Shard[T comparable](fieldMaps []map[string]string, key string, hash func(str string) T) (map[T][]map[string]string, error) {
+	shards := make(map[T][]map[string]string)
 
 	for _, fieldMap := range fieldMaps {
 		key, ok := fieldMap[key]
@@ -16,7 +16,7 @@ func Shard[T comparable](fieldMaps []map[string]string, key string, r int, hash 
 			return nil, fmt.Errorf("key %v was not found in field map while sharding", key)
 		}
 
-		shardKey := hash(key, r)
+		shardKey := hash(key)
 		shards[shardKey] = append(shards[shardKey], fieldMap)
 	}
 

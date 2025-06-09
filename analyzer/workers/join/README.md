@@ -17,7 +17,6 @@ La estructura de configuración (`JoinConfig`) debe definir:
 
 - `LEFT_KEY`: Clave por la cual se agrupa un registro de la primer tabla.
 - `RIGHT_KEY`: Clave por la cual se agrupa registro de la segunda tabla.
-- `SHARDS`: Cantidad de workers y archivos de shardeo creados.
 
 ## 🧠 Lógica de unión
 

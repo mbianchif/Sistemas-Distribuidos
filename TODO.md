@@ -11,6 +11,5 @@
 - (Pesado)      Cambiar el mailer del Gateway por una entidad mejor
 
 ## Cosas que estarian bien
-- (Super Facil) Sacar SHARDS de los join
 - (Mediano)     Cambiar la imlementación del dump y recover del mailer a que use Persistor
 - (Pesado)      Hacer que los mensajes de los workers esten acotados por tamaño
