@@ -81,18 +81,20 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 				}
 
 				delete(bufs[replicaId][clientId], expected)
+				kind := int(next.Headers["kind"].(int32))
 
 				// Stop here until worker has Ack'd it's last delivery
 				// so not to change `expecting` table before it got the
 				// chance to persist it's state.
 				r.mu.Lock()
-				r.expecting[replicaId][clientId]++
-				ordered <- NewDelivery(next, r.mu)
 
-				kind := int(next.Headers["kind"].(int32))
 				if kind == comms.FLUSH {
 					delete(r.expecting[replicaId], clientId)
+				} else {
+					r.expecting[replicaId][clientId]++
 				}
+
+				ordered <- NewDelivery(next, r.mu)
 			}
 		}
 	}()
