@@ -73,12 +73,12 @@ func (m *Mailer) tryRecover(inputQs []amqp.Queue, outputQFmts []string) (map[str
 			line := strings.TrimSpace(string(lineBytes))
 
 			if strings.HasPrefix(line, "recv") {
-				qName, eofs, seqs, err := middleware.DecodeLineRecv(line)
+				qName, eofs, flushes, seqs, err := middleware.DecodeLineRecv(line)
 				if err != nil {
 					m.Log.Errorf("Failed to decode line for client-%d's receiver: %v", clientId, err)
 					continue
 				}
-				receivers[qName].SetState(clientId, eofs, seqs)
+				receivers[qName].SetState(clientId, eofs, flushes, seqs)
 			} else if strings.HasPrefix(line, "robin") {
 				cur, seqs, err := middleware.DecodeLineRobin(line)
 				if err != nil {
@@ -227,7 +227,28 @@ func (m *Mailer) PublishFlush(flush comms.Flush, clientId int, headers ...middle
 	return nil
 }
 
+func (m *Mailer) PublishPurge(purge comms.Purge, headers ...middleware.Table) error {
+	baseHeaders := middleware.Table{
+		"kind":       comms.PURGE,
+		"replica-id": m.con.Id,
+		"client-id":  int32(-1),
+	}
+	merged := mergeHeaders(baseHeaders, headers)
+
+	for _, sender := range m.senders {
+		if err := sender.Purge(purge, merged); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (m *Mailer) Dump(clientId int) error {
+	if clientId < 0 {
+		return nil
+	}
+
 	buf := bytes.NewBuffer(nil)
 
 	// 1. Write receivers' data

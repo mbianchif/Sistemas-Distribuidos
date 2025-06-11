@@ -75,10 +75,6 @@ func (w *Top) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *Top) clean(clientId int) {
-	delete(w.tops, clientId)
-}
-
 func handleTop(w *Top, clientId int, fieldMap map[string]string) error {
 	value, err := strconv.ParseFloat(fieldMap[w.Con.Key], 64)
 	if err != nil {
@@ -184,13 +180,37 @@ func (w *Top) Eof(qId int, del middleware.Delivery) {
 	}
 }
 
+func (w *Top) flush(clientId int) {
+	delete(w.tops, clientId)
+	if err := w.persistor.Flush(clientId); err != nil {
+		w.Log.Errorf("failed to flush inner state for client %d: %v", clientId, err)
+	}
+}
+
 func (w *Top) Flush(qId int, del middleware.Delivery) {
 	clientId := del.Headers.ClientId
 	body := del.Body
 
-	w.clean(clientId)
+	w.flush(clientId)
 	flush := comms.DecodeFlush(body)
 	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+}
+
+func (w *Top) purge() {
+	w.tops = make(map[int][]tuple)
+	if err := w.persistor.Purge(); err != nil {
+		w.Log.Errorf("failed to purge inner state: %v", err)
+	}
+}
+
+func (w *Top) Purge(qId int, del middleware.Delivery) {
+	body := del.Body
+
+	w.purge()
+	purge := comms.DecodePurge(body)
+	if err := w.Mailer.PublishPurge(purge); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }

@@ -1,15 +1,16 @@
 # TODO
 
 ## Fault-Tolerance
-- (Mediano) Agregar el mensaje de Purge (borra el estado de todos los clientes), se envia apenas se levanta el gateway
+- (Mediano) Terminar de probar el Purge
 - (Pesado)  Hacer los Health-Checkers
 
 ## Requisitos para la proxima entrega
-- (IMPORTANTE)  Agregar la documentacion necesaria al informe/diagramas
-- (Mediano)     Agregar Close a todos los nodos
-- (Mediano)     Agregar el clean a los nodos stateful para el persistor
-- (Pesado)      Cambiar el mailer del Gateway por una entidad mejor
+- (IMPORTANTE) Agregar la documentacion necesaria al informe/diagramas
+- (Mediano)    Agregar Close a todos los nodos
+- (Mediano)    Agregar el clean a los nodos stateful para el persistor
+- (Pesado)     Cambiar el mailer del Gateway por una entidad mejor
 
 ## Cosas que estarian bien
-- (Mediano)     Cambiar la imlementación del dump y recover del mailer a que use Persistor
-- (Pesado)      Hacer que los mensajes de los workers esten acotados por tamaño
+- (Mediano) Cambiar la imlementación del dump y recover del mailer a que use Persistor
+- (Mediano) shardear los archivos del join para tener menos archivos, deberia ser mucho mas rapida la parte de izquierda
+- (Pesado)  Hacer que los mensajes de los workers esten acotados por tamaño

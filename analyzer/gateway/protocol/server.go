@@ -106,6 +106,7 @@ func (s *Server) clientHandler(conn *CsvTransferStream, clientId int) error {
 		}
 	}
 
+	s.mailer.PublishFlush(clientId, []byte{})
 	return nil
 }
 
@@ -123,12 +124,18 @@ func (s *Server) hasToTerminate() bool {
 
 func (s *Server) recvResults() error {
 	eofsRecv := make(map[int]int)
+	skipped := map[int]struct{}{comms.FLUSH: {}, comms.PURGE: {}}
 
 	for del := range s.recvChan {
 		kind := del.Headers.Kind
 		query := del.Headers.Query
 		clientId := del.Headers.ClientId
 		body := del.Body
+
+		if _, ok := skipped[kind]; ok {
+			del.Ack(false)
+			continue
+		}
 
 		connInt, ok := s.conns.Load(clientId)
 		if !ok {
@@ -162,7 +169,7 @@ func (s *Server) recvResults() error {
 				delete(eofsRecv, clientId)
 			}
 
-		} else if kind != comms.FLUSH {
+		} else {
 			s.log.Errorf("Received an unknown data kind %d", kind)
 			conn.Close()
 			s.conns.Delete(clientId)
@@ -182,6 +189,9 @@ func (s *Server) recvResults() error {
 
 func (s *Server) Run() {
 	defer s.mailer.DeInit()
+
+	// Clean the pipeline
+	s.mailer.PublishPurge([]byte{})
 
 	go func() {
 		sigs := make(chan os.Signal, 1)

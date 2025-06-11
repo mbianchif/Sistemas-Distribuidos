@@ -86,7 +86,26 @@ func (s *SenderShard) Eof(eof comms.Eof, headers Table) error {
 
 func (s *SenderShard) Flush(flush comms.Flush, headers Table) error {
 	body := flush.Encode()
-	return s.Broadcast(body, headers)
+	err := s.Broadcast(body, headers)
+
+	clientId := int(headers["client-id"].(int32))
+	for replicaId := range s.outputCopies {
+		delete(s.seq[replicaId], clientId)
+	}
+
+	return err
+}
+
+func (s *SenderShard) Purge(purge comms.Purge, headers Table) error {
+	body := purge.Encode()
+	err := s.Broadcast(body, headers)
+
+	s.seq = make([]map[int]int, s.outputCopies)
+	for i := range s.seq {
+		s.seq[i] = make(map[int]int)
+	}
+
+	return err
 }
 
 func (s *SenderShard) Broadcast(body []byte, headers Table) error {

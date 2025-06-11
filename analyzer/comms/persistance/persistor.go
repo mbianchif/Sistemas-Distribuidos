@@ -20,6 +20,12 @@ type PersistedHeader struct {
 	Seqs []int
 }
 
+func (h PersistedHeader) IsDup(id middleware.DelId) bool {
+	replicaId := id.ReplicaId
+	seq := id.Seq
+	return seq <= h.Seqs[replicaId]
+}
+
 type PersistedFile struct {
 	ClientId int
 	FileName string
@@ -216,8 +222,12 @@ func (p Persistor) Recover() (iter.Seq[PersistedFile], error) {
 	}, nil
 }
 
-func (h PersistedHeader) IsDup(id middleware.DelId) bool {
-	replicaId := id.ReplicaId
-	seq := id.Seq
-	return seq <= h.Seqs[replicaId]
+func (p Persistor) Flush(clientId int) error {
+	dirPath := fmt.Sprintf("/%s/%d", p.dirName, clientId)
+	return os.RemoveAll(dirPath)
+}
+
+func (p Persistor) Purge() error {
+	dirPath := fmt.Sprintf("/%s", p.dirName)
+	return os.RemoveAll(dirPath)
 }

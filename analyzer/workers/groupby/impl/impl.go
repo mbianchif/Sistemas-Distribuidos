@@ -94,13 +94,36 @@ func (w *GroupBy) Eof(qId int, del middleware.Delivery) {
 	}
 }
 
+func (w *GroupBy) flush(clientId int) {
+	if err := w.persistor.Flush(clientId); err != nil {
+		w.Log.Errorf("failed to flush inner state for client %d: %v", clientId, err)
+	}
+}
+
 func (w *GroupBy) Flush(qId int, del middleware.Delivery) {
 	clientId := del.Headers.ClientId
 	body := del.Body
 
-	w.clean(clientId)
+	w.flush(clientId)
 	flush := comms.DecodeFlush(body)
 	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+}
+
+func (w *GroupBy) purge() {
+	if err := w.persistor.Purge(); err != nil {
+		w.Log.Errorf("failed to purge inner state: %v", err)
+	}
+
+}
+
+func (w *GroupBy) Purge(qId int, del middleware.Delivery) {
+	body := del.Body
+
+	w.purge()
+	purge := comms.DecodePurge(body)
+	if err := w.Mailer.PublishPurge(purge); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }

@@ -47,6 +47,11 @@ func (s *SyncMailer) Init() error {
 				if err := s.mailer.PublishFlush(tup.clientId, tup.body); err != nil {
 					s.log.Errorf("Error publishing flush: %v", err)
 				}
+			case comms.PURGE:
+				if err := s.mailer.PublishPurge(tup.body); err != nil {
+					s.log.Errorf("Error publishing purge: %v", err)
+				}
+
 			default:
 				s.log.Errorf("got an unexpected message kind in sync mailer: %d", tup.kind)
 			}
@@ -70,6 +75,10 @@ func (s *SyncMailer) PublishEof(fileName string, clientId int, body []byte) {
 
 func (s *SyncMailer) PublishFlush(clientId int, body []byte) {
 	s.ch <- tuple{"", clientId, body, comms.FLUSH}
+}
+
+func (s *SyncMailer) PublishPurge(body []byte) {
+	s.ch <- tuple{"", -1, body, comms.PURGE}
 }
 
 func (s *SyncMailer) DeInit() {

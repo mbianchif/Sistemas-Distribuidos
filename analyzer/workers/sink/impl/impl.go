@@ -62,8 +62,16 @@ func (w *Sink) Flush(qId int, del middleware.Delivery) {
 	body := del.Body
 
 	flush := comms.DecodeFlush(body)
-	headers := middleware.Table{"query": w.Con.Query}
-	if err := w.Mailer.PublishFlush(flush, clientId, headers); err != nil {
+	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+}
+
+func (w *Sink) Purge(qId int, del middleware.Delivery) {
+	body := del.Body
+
+	purge := comms.DecodePurge(body)
+	if err := w.Mailer.PublishPurge(purge); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }

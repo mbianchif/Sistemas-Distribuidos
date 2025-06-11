@@ -126,7 +126,13 @@ func writeAll(w io.Writer, data []byte) error {
 	return nil
 }
 
-func spawnFileHandler(query int, ch <-chan []byte, storage string) error {
+type tuple struct {
+	kind int
+	data []byte
+	ok   bool
+}
+
+func spawnFileHandler(query int, ch <-chan tuple, storage string) error {
 	dirPath := fmt.Sprintf("/%s", storage)
 	if err := os.MkdirAll(dirPath, 0755); err != nil {
 		return err
@@ -140,20 +146,28 @@ func spawnFileHandler(query int, ch <-chan []byte, storage string) error {
 	defer fp.Close()
 
 	writer := bufio.NewWriter(fp)
-	for data := range ch {
-		writeAll(writer, append(data, []byte("\n")...))
+	for tup := range ch {
+		if !tup.ok {
+			return os.Remove(path)
+		}
+
+		if tup.kind == MSG_BATCH {
+			writeAll(writer, append(tup.data, []byte("\n")...))
+		} else if tup.kind == MSG_EOF {
+			break
+		}
 	}
 
 	return writer.Flush()
 }
 
 func (s *CsvTransferStream) RecvQueryResult(storage string, queryCount int) {
-	wg := &sync.WaitGroup{}
+	wg := new(sync.WaitGroup)
 	wg.Add(queryCount)
 
-	chans := make(map[int]chan<- []byte, queryCount)
+	chans := make(map[int]chan<- tuple, queryCount)
 	for i := 1; i <= queryCount; i++ {
-		ch := make(chan []byte)
+		ch := make(chan tuple)
 		chans[i] = ch
 		go func(i int) {
 			defer wg.Done()
@@ -165,35 +179,40 @@ func (s *CsvTransferStream) RecvQueryResult(storage string, queryCount int) {
 
 	headerSize := 6
 	header := make([]byte, headerSize)
+
 	for doneQueries := 0; doneQueries < queryCount; {
 		n, err := io.ReadFull(s.conn, header)
 		if err != nil || n < headerSize {
 			s.log.Error("failed to recv message from gateway")
+			for _, ch := range chans {
+				ch <- tuple{ok: false}
+			}
 			break
 		}
 
 		dataLength := binary.BigEndian.Uint32(header)
 		kind := int(header[4])
 		query := int(header[5])
+		tup := tuple{
+			ok:   true,
+			kind: kind,
+		}
+
 		switch kind {
 		case MSG_BATCH:
-			data := make([]byte, dataLength)
-			n, err = io.ReadFull(s.conn, data)
-			if err != nil || n < int(dataLength) {
-				continue
+			tup.data = make([]byte, dataLength)
+			n, err = io.ReadFull(s.conn, tup.data)
+			if err == nil && n == int(dataLength) {
+				chans[query] <- tup
 			}
-			chans[query] <- data
-			continue
 
 		case MSG_EOF:
 			s.log.Infof("Query %v is ready!", query)
-
-		case MSG_ERR:
-			s.log.Errorf("an error occurred with query %v", query)
+			chans[query] <- tup
+			close(chans[query])
+			delete(chans, query)
+			doneQueries++
 		}
-
-		doneQueries++
-		close(chans[query])
 	}
 
 	wg.Wait()

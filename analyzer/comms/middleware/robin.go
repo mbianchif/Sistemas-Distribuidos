@@ -46,7 +46,28 @@ func (s *SenderRobin) Eof(eof comms.Eof, headers Table) error {
 
 func (s *SenderRobin) Flush(flush comms.Flush, headers Table) error {
 	body := flush.Encode()
-	return s.Broadcast(body, headers)
+	err := s.Broadcast(body, headers)
+
+	clientId := int(headers["client-id"].(int32))
+	for replicaId := range s.outputCopies {
+		delete(s.seq[replicaId], clientId)
+	}
+
+	delete(s.cur, clientId)
+	return err
+}
+
+func (s *SenderRobin) Purge(purge comms.Purge, headers Table) error {
+	body := purge.Encode()
+	err := s.Broadcast(body, headers)
+
+	s.seq = make([]map[int]int, s.outputCopies)
+	for i := range s.seq {
+		s.seq[i] = make(map[int]int)
+	}
+
+	s.cur = make(map[int]int)
+	return err
 }
 
 func (s *SenderRobin) nextKeySeq(clientId int) (string, int) {

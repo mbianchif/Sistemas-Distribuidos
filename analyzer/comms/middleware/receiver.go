@@ -22,6 +22,7 @@ type Receiver struct {
 	copies    int
 	expecting []map[int]int
 	eofs      map[int]int
+	flushes   map[int]int
 }
 
 func NewReceiver(broker *Broker, q amqp.Queue, copies int, mailer Dumpable, mu *sync.Mutex) *Receiver {
@@ -30,7 +31,6 @@ func NewReceiver(broker *Broker, q amqp.Queue, copies int, mailer Dumpable, mu *
 		expecting[i] = make(map[int]int)
 	}
 
-	eofs := make(map[int]int)
 	return &Receiver{
 		broker:    broker,
 		copies:    copies,
@@ -38,7 +38,8 @@ func NewReceiver(broker *Broker, q amqp.Queue, copies int, mailer Dumpable, mu *
 		mu:        mu,
 		qName:     q.Name,
 		expecting: expecting,
-		eofs:      eofs,
+		eofs:      make(map[int]int),
+		flushes:   make(map[int]int),
 	}
 }
 
@@ -90,6 +91,10 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 
 				if kind == comms.FLUSH {
 					delete(r.expecting[replicaId], clientId)
+				} else if kind == comms.PURGE {
+					for i := range r.expecting {
+						r.expecting[i] = make(map[int]int)
+					}
 				} else {
 					r.expecting[replicaId][clientId]++
 				}
@@ -99,9 +104,9 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 		}
 	}()
 
-	eofsCounted := make(chan Delivery)
+	counted := make(chan Delivery)
 	go func() {
-		defer close(eofsCounted)
+		defer close(counted)
 		copies := r.copies
 
 		for del := range ordered {
@@ -116,19 +121,26 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 					continue
 				}
 			} else if kind == comms.FLUSH {
+				r.flushes[clientId]++
+				if r.flushes[clientId] < copies {
+					r.mailer.Dump(clientId)
+					del.Ack(false)
+					continue
+				}
 				delete(r.eofs, clientId)
+				delete(r.flushes, clientId)
 			}
 
-			eofsCounted <- del
+			counted <- del
 		}
 	}()
 
-	return eofsCounted, nil
+	return counted, nil
 }
 
-// Example: "recv <qName> <eofs> <seq> ... <seq>"
+// Example: "recv <qName> <eofs> <flushes> <seq> ... <seq>"
 func (r *Receiver) Encode(clientId int) []byte {
-	init := fmt.Appendf(nil, "recv %s %d", r.qName, r.eofs[clientId])
+	init := fmt.Appendf(nil, "recv %s %d %d", r.qName, r.eofs[clientId], r.flushes[clientId])
 	builder := bytes.NewBuffer(init)
 
 	for replicaId := range r.expecting {
@@ -140,13 +152,13 @@ func (r *Receiver) Encode(clientId int) []byte {
 	return builder.Bytes()
 }
 
-// Example: "recv <qName> <eofs> <seq> ... <seq>"
-func DecodeLineRecv(line string) (string, int, []int, error) {
+// Example: "recv <qName> <eofs> <flushes> <seq> ... <seq>"
+func DecodeLineRecv(line string) (string, int, int, []int, error) {
 	line, _ = strings.CutPrefix(line, "recv ")
 
 	parts := strings.Split(line, " ")
-	if len(parts) < 3 {
-		return "", 0, nil, fmt.Errorf("the amount of parts is not enough: %s", line)
+	if len(parts) < 5 {
+		return "", 0, 0, nil, fmt.Errorf("the amount of parts is not enough: %s", line)
 	}
 
 	// Read queue name
@@ -155,28 +167,35 @@ func DecodeLineRecv(line string) (string, int, []int, error) {
 	// Read eof count
 	eofs, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return "", 0, nil, fmt.Errorf("Eof count is not a number: %s", line)
+		return "", 0, 0, nil, fmt.Errorf("Eof count is not a number: %s", line)
+	}
+
+	// Read flush count
+	flushes, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return "", 0, 0, nil, fmt.Errorf("Flush count is not a number: %s", line)
 	}
 
 	// Read sequence numbers
-	seqs := make([]int, 0, len(parts)-2)
-	for _, seqStr := range parts[2:] {
+	seqs := make([]int, 0, len(parts)-3)
+	for _, seqStr := range parts[3:] {
 		seq, err := strconv.Atoi(seqStr)
 		if err != nil {
-			return "", 0, nil, fmt.Errorf("seq number is not a number: %s", line)
+			return "", 0, 0, nil, fmt.Errorf("seq number is not a number: %s", line)
 		}
 		seqs = append(seqs, seq)
 	}
 
-	return qName, eofs, seqs, nil
+	return qName, eofs, flushes, seqs, nil
 }
 
-func (r *Receiver) SetState(clientId int, eofs int, seqs []int) error {
+func (r *Receiver) SetState(clientId, eofs, flushes int, seqs []int) error {
 	if len(seqs) != r.copies {
 		return fmt.Errorf("expected %d sequence numbers, got %d for client %d in receiver %s", r.copies, len(seqs), clientId, r.qName)
 	}
 
 	r.eofs[clientId] = eofs
+	r.flushes[clientId] = flushes
 
 	for replicaId, seq := range seqs {
 		r.expecting[replicaId][clientId] = seq

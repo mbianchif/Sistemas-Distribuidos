@@ -283,13 +283,51 @@ func (w *Join) Eof(qId int, del middleware.Delivery) {
 	}
 }
 
+func (w *Join) flush(clientId int) {
+	delete(w.readingRight, clientId)
+	if err := w.leftPersistor.Flush(clientId); err != nil {
+		w.Log.Errorf("failed to flush left inner state for client %d: %v", clientId, err)
+	}
+	if err := w.rightPersistor.Flush(clientId); err != nil {
+		w.Log.Errorf("failed to flush right inner state for client %d: %v", clientId, err)
+	}
+}
+
 func (w *Join) Flush(qId int, del middleware.Delivery) {
+	if qId != RIGHT {
+		return
+	}
+
 	clientId := del.Headers.ClientId
 	body := del.Body
 
-	w.clean(clientId)
+	w.flush(clientId)
 	flush := comms.DecodeFlush(body)
 	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+}
+
+func (w *Join) purge() {
+	w.readingRight = make(map[int]struct{})
+	if err := w.leftPersistor.Purge(); err != nil {
+		w.Log.Errorf("failed to purge left inner state: %v", err)
+	}
+	if err := w.rightPersistor.Purge(); err != nil {
+		w.Log.Errorf("failed ot purge right inner state: %v", err)
+	}
+}
+
+func (w *Join) Purge(qId int, del middleware.Delivery) {
+	if qId != RIGHT {
+		return
+	}
+
+	body := del.Body
+
+	w.purge()
+	purge := comms.DecodePurge(body)
+	if err := w.Mailer.PublishPurge(purge); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }

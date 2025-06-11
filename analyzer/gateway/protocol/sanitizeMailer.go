@@ -151,6 +151,22 @@ func (s *SanitizeMailer) PublishFlush(clientId int, body []byte) error {
 	return nil
 }
 
+func (s *SanitizeMailer) PublishPurge(body []byte) error {
+	baseHeaders := middleware.Table{
+		"kind":       comms.PURGE,
+		"replica-id": s.con.Id,
+		"client-id":  int32(-1),
+	}
+
+	for _, sender := range s.senders {
+		if err := sender.Broadcast(body, baseHeaders); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (s *SanitizeMailer) DeInit() {
 	s.broker.DeInit()
 }

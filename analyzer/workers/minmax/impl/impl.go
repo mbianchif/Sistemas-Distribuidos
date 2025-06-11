@@ -75,11 +75,6 @@ func (w *MinMax) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *MinMax) clean(clientId int) {
-	delete(w.mins, clientId)
-	delete(w.maxs, clientId)
-}
-
 func handleMinMax(w *MinMax, clientId int, fieldMap map[string]string) error {
 	if _, ok := fieldMap[w.Con.Key]; !ok {
 		return fmt.Errorf("key %v was not found in the field map", w.Con.Key)
@@ -202,13 +197,39 @@ func (w *MinMax) Eof(qId int, del middleware.Delivery) {
 	}
 }
 
+func (w *MinMax) flush(clientId int) {
+	delete(w.mins, clientId)
+	delete(w.maxs, clientId)
+	if err := w.persistor.Flush(clientId); err != nil {
+		w.Log.Errorf("failed to flush inner state for client %d: %v", clientId, err)
+	}
+}
+
 func (w *MinMax) Flush(qId int, del middleware.Delivery) {
 	clientId := del.Headers.ClientId
 	body := del.Body
 
-	w.clean(clientId)
+	w.flush(clientId)
 	flush := comms.DecodeFlush(body)
 	if err := w.Mailer.PublishFlush(flush, clientId); err != nil {
+		w.Log.Errorf("failed to publish message: %v", err)
+	}
+}
+
+func (w *MinMax) purge() {
+	w.mins = make(map[int]tuple)
+	w.maxs = make(map[int]tuple)
+	if err := w.persistor.Purge(); err != nil {
+		w.Log.Errorf("failed to purge inner state: %v", err)
+	}
+}
+
+func (w *MinMax) Purge(qId int, del middleware.Delivery) {
+	body := del.Body
+
+	w.purge()
+	purge := comms.DecodePurge(body)
+	if err := w.Mailer.PublishPurge(purge); err != nil {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }

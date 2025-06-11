@@ -15,12 +15,11 @@ import (
 	"github.com/op/go-logging"
 )
 
-const ACK_RETRIES = 10
-
 type IWorker interface {
 	Batch(int, middleware.Delivery)
 	Eof(int, middleware.Delivery)
 	Flush(int, middleware.Delivery)
+	Purge(int, middleware.Delivery)
 }
 
 type Worker struct {
@@ -94,6 +93,8 @@ func (base *Worker) Run(w IWorker) error {
 			w.Eof(qId, del)
 		case comms.FLUSH:
 			w.Flush(qId, del)
+		case comms.PURGE:
+			w.Purge(qId, del)
 		default:
 			base.Log.Errorf("received an unknown message kind %v", kind)
 		}

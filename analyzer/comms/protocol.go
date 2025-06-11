@@ -68,6 +68,7 @@ const (
 	BATCH = iota
 	EOF
 	FLUSH
+	PURGE
 )
 
 type Batch struct {
@@ -248,5 +249,15 @@ func DecodeFlush([]byte) Flush {
 }
 
 func (m Flush) Encode() []byte {
+	return []byte{}
+}
+
+type Purge struct{}
+
+func DecodePurge([]byte) Purge {
+	return Purge{}
+}
+
+func (m Purge) Encode() []byte {
 	return []byte{}
 }
