@@ -30,9 +30,9 @@ func NewBroker(url string) (*Broker, error) {
 	if err != nil {
 		return nil, err
 	}
-	// if err := rxCh.Qos(4096, 0, false); err != nil {
-	// 	return nil, err
-	// }
+	if err := rxCh.Qos(4096, 0, false); err != nil {
+		return nil, err
+	}
 
 	txCh, err := txConn.Channel()
 	if err != nil {
