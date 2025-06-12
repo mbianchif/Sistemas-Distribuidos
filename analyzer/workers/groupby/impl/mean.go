@@ -100,16 +100,18 @@ func (w *Mean) result(clientId int, con config.GroupByConfig, persistor persista
 }
 
 func (w *Mean) store(id middleware.DelId, persistor *persistance.Persistor) error {
+	defer func() { w.state = make(map[string]tuple) }()
+
 	replicaId := id.ReplicaId
 	clientId := id.ClientId
 	seq := id.Seq
 
-	for k, partialTup := range w.state {
-		pf, err := persistor.Load(clientId, k)
+	for compKey, partialTup := range w.state {
+		pf, err := persistor.Load(clientId, compKey)
 		exists := err == nil
 		if !exists {
 			newState := w.encode(partialTup.sum, partialTup.n)
-			persistor.Store(id, k, newState)
+			persistor.Store(id, compKey, newState)
 			continue
 		}
 
@@ -126,9 +128,8 @@ func (w *Mean) store(id middleware.DelId, persistor *persistance.Persistor) erro
 		}
 
 		newState := w.encode(prevSum+partialTup.sum, prevCount+partialTup.n)
-		persistor.Store(id, k, newState)
+		persistor.Store(id, compKey, newState, h)
 	}
 
-	w.state = make(map[string]tuple)
 	return nil
 }

@@ -47,9 +47,17 @@ func New(dirName string, replicas int, log *logging.Logger) Persistor {
 	}
 }
 
+func emptySeqs(n int) []int {
+	seqs := make([]int, n)
+	for i := range n {
+		seqs[i] = -1
+	}
+	return seqs
+}
+
 func (p Persistor) LoadHeader(clientId int, fileName string) (PersistedHeader, error) {
 	empty := PersistedHeader{
-		Seqs: make([]int, p.replicas),
+		Seqs: emptySeqs(p.replicas),
 	}
 
 	dirPath := fmt.Sprintf("/%s/%d", p.dirName, clientId)
@@ -164,7 +172,8 @@ func (p Persistor) Load(clientId int, fileName string) (PersistedFile, error) {
 }
 
 func (p Persistor) RecoverFor(clientId int) (iter.Seq[PersistedFile], error) {
-	files, err := os.ReadDir(fmt.Sprintf("%s/%d", p.dirName, clientId))
+	dirPath := fmt.Sprintf("/%s/%d", p.dirName, clientId)
+	files, err := os.ReadDir(dirPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read files in directory %d: %v", clientId, err)
 	}
@@ -194,7 +203,8 @@ func (p Persistor) RecoverFor(clientId int) (iter.Seq[PersistedFile], error) {
 }
 
 func (p Persistor) Recover() (iter.Seq[PersistedFile], error) {
-	files, err := os.ReadDir(p.dirName)
+	dirPath := fmt.Sprintf("/%s", p.dirName)
+	files, err := os.ReadDir(dirPath)
 	if err != nil {
 		return slices.Values([]PersistedFile{}), nil
 	}

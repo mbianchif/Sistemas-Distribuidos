@@ -72,22 +72,23 @@ func (w *Count) decode(state []byte) (int, error) {
 }
 
 func (w *Count) store(id middleware.DelId, persistor *persistance.Persistor) error {
+	defer func() { w.state = make(map[string]int) }()
+
 	replicaId := id.ReplicaId
 	clientId := id.ClientId
 	seq := id.Seq
 
-	for k, partialCount := range w.state {
-		pf, err := persistor.Load(clientId, k)
+	for compKey, partialCount := range w.state {
+		pf, err := persistor.Load(clientId, compKey)
 		exists := err == nil
 		if !exists {
 			newState := w.encode(partialCount)
-			persistor.Store(id, k, newState)
+			persistor.Store(id, compKey, newState)
 			continue
 		}
 
 		h := pf.Header
 		if seq <= h.Seqs[replicaId] {
-			w.Log.Infof("duplicado")
 			continue
 		}
 
@@ -98,9 +99,8 @@ func (w *Count) store(id middleware.DelId, persistor *persistance.Persistor) err
 		}
 
 		newState := w.encode(prevCount + partialCount)
-		persistor.Store(id, k, newState)
+		persistor.Store(id, compKey, newState, h)
 	}
 
-	w.state = make(map[string]int)
 	return nil
 }

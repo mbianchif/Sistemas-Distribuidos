@@ -84,16 +84,18 @@ func (w *Sum) decode(state []byte) (int, error) {
 }
 
 func (w *Sum) store(id middleware.DelId, persistor *persistance.Persistor) error {
+	defer func() { w.state = make(map[string]int) }()
+
 	replicaId := id.ReplicaId
 	clientId := id.ClientId
 	seq := id.Seq
 
-	for k, partialSum := range w.state {
-		pf, err := persistor.Load(clientId, k)
+	for compKey, partialSum := range w.state {
+		pf, err := persistor.Load(clientId, compKey)
 		exists := err == nil
 		if !exists {
 			newState := w.encode(partialSum)
-			persistor.Store(id, k, newState)
+			persistor.Store(id, compKey, newState)
 			continue
 		}
 
@@ -110,9 +112,8 @@ func (w *Sum) store(id middleware.DelId, persistor *persistance.Persistor) error
 		}
 
 		newState := w.encode(prevSum + partialSum)
-		persistor.Store(id, k, newState)
+		persistor.Store(id, compKey, newState, h)
 	}
 
-	w.state = make(map[string]int)
 	return nil
 }

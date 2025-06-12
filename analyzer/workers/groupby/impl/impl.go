@@ -78,11 +78,7 @@ func (w *GroupBy) Batch(qId int, del middleware.Delivery) {
 
 func (w *GroupBy) Eof(qId int, del middleware.Delivery) {
 	clientId := del.Headers.ClientId
-	responseFieldMaps, err := w.handler.result(clientId, *w.con, w.persistor)
-	if err != nil {
-		w.Log.Errorf("failed to get result: %v", err)
-		return
-	}
+	responseFieldMaps, _ := w.handler.result(clientId, *w.con, w.persistor)
 
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)
