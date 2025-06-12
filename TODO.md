@@ -1,14 +1,11 @@
 # TODO
 
 ## Fault-Tolerance
-- (Mediano) Terminar de probar el Purge
 - (Pesado)  Hacer los Health-Checkers
 
 ## Requisitos para la proxima entrega
 - (IMPORTANTE) Agregar la documentacion necesaria al informe/diagramas
 - (Mediano)    Agregar Close a todos los nodos
-- (Mediano)    Agregar el clean a los nodos stateful para el persistor
-- (Pesado)     Cambiar el mailer del Gateway por una entidad mejor
 
 ## Cosas que estarian bien
 - (Mediano) Cambiar la imlementación del dump y recover del mailer a que use Persistor

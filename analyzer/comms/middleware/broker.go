@@ -52,19 +52,17 @@ func NewBroker(url string) (*Broker, error) {
 }
 
 // Creates all the broker's infrastructure the node needs to communicate with the broker
-func (b *Broker) Init(id int, inExchNames []string, inQNames []string, outExchName string, outQNames []string, outCopies []int) ([]amqp.Queue, []string, error) {
-	inputQs, err := b.initInput(id, inExchNames, inQNames)
+func (b *Broker) Init(id int, inExchNames []string, inQNames []string, outExchName string, outQNames []string, outCopies []int) ([]Queue, error) {
+	inputQs, err := b.InitInput(id, inExchNames, inQNames)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	outputQFmts, err := b.initOutput(outExchName, outQNames, outCopies)
-	if err != nil {
-		return inputQs, nil, err
+	if err := b.InitOutput(outExchName, outQNames, outCopies); err != nil {
+		return nil, err
 	}
 
-	b.outputExchangeName = outExchName
-	return inputQs, outputQFmts, nil
+	return inputQs, nil
 }
 
 // Releases the used external resources
@@ -85,58 +83,53 @@ func (b *Broker) DeInit() {
 }
 
 // Creates the broker's infrastructure for the input of this particular node
-func (b *Broker) initInput(id int, exchangeNames []string, qNames []string) ([]amqp.Queue, error) {
-	qs := make([]amqp.Queue, 0, len(qNames))
+func (b *Broker) InitInput(id int, exchangeNames []string, qNames []string) ([]Queue, error) {
+	qs := make([]Queue, 0)
 	for i := range exchangeNames {
 		if err := b.exchangeDeclare(exchangeNames[i], "direct"); err != nil {
 			return nil, err
 		}
 
-		// Build queue name
-		nameFmt := qNames[i] + "-%d"
-		qName := fmt.Sprintf(nameFmt, id)
-
+		qName := fmt.Sprintf("%s-%d", qNames[i], id)
 		q, err := b.queueDeclare(qName)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := b.queueBind(q, q.Name, exchangeNames[i]); err != nil {
+		qs = append(qs, q)
+		if err := b.queueBind(q.Name, q.Name, exchangeNames[i]); err != nil {
 			return nil, err
 		}
-
-		qs = append(qs, q)
 	}
 
 	return qs, nil
 }
 
-// Creates the broker's infrastructure for the input of this particular node and returns the names of the output queues
-func (b *Broker) initOutput(exchangeName string, qNames []string, qCopies []int) ([]string, error) {
+// Creates the broker's infrastructure for the input of this particular node
+func (b *Broker) InitOutput(exchangeName string, qNames []string, qCopies []int) error {
 	if err := b.exchangeDeclare(exchangeName, "direct"); err != nil {
-		return nil, err
+		return err
 	}
 
-	fmtQNames := make([]string, 0, len(qNames)*len(qCopies))
 	for i := range qNames {
 		nameFmt := qNames[i] + "-%d"
-		fmtQNames = append(fmtQNames, nameFmt)
 
 		for id := range qCopies[i] {
 			qName := fmt.Sprintf(nameFmt, id)
 
 			q, err := b.queueDeclare(qName)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
-			if err := b.queueBind(q, q.Name, exchangeName); err != nil {
-				return nil, err
+			if err := b.queueBind(q.Name, q.Name, exchangeName); err != nil {
+				return err
 			}
 		}
 	}
 
-	return fmtQNames, nil
+	b.outputExchangeName = exchangeName
+	return nil
 }
 
 // Declares an exchange with the given name and kind
@@ -153,8 +146,8 @@ func (b *Broker) exchangeDeclare(name string, kind string) error {
 }
 
 // Declares a queue ith the given name and returns it
-func (b *Broker) queueDeclare(name string) (amqp.Queue, error) {
-	return b.txCh.QueueDeclare(
+func (b *Broker) queueDeclare(name string) (Queue, error) {
+	_, err := b.txCh.QueueDeclare(
 		name,
 		false, // durable
 		false, // delete when unused
@@ -162,12 +155,18 @@ func (b *Broker) queueDeclare(name string) (amqp.Queue, error) {
 		false, // no-wait
 		nil,   // arguments
 	)
+
+	if err != nil {
+		return Queue{}, err
+	}
+
+	return NewQueue(name), nil
 }
 
 // Declares a queue binding from the given queue to the given exchange using `key`
-func (b *Broker) queueBind(q amqp.Queue, key string, exchangeName string) error {
+func (b *Broker) queueBind(qName, key, exchangeName string) error {
 	return b.txCh.QueueBind(
-		q.Name,
+		qName,
 		key,
 		exchangeName,
 		false, // no-wait
@@ -176,9 +175,9 @@ func (b *Broker) queueBind(q amqp.Queue, key string, exchangeName string) error 
 }
 
 // Returns a channel used to consume deliveries sent by the broker server
-func (b *Broker) Consume(qName, consumer string) (<-chan amqp.Delivery, error) {
+func (b *Broker) Consume(q Queue, consumer string) (<-chan amqp.Delivery, error) {
 	return b.rxCh.Consume(
-		qName,
+		q.Name,
 		consumer,
 		false, // auto-ack
 		false, // exclusive
@@ -210,4 +209,10 @@ func (b *Broker) Publish(key string, body []byte, headers amqp.Table) error {
 	}
 
 	return nil
+}
+
+// Clears the messages of a given queue
+func (b *Broker) Purge(q Queue) error {
+	_, err := b.rxCh.QueuePurge(q.Name, false)
+	return err
 }

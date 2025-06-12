@@ -18,7 +18,7 @@ import (
 type Server struct {
 	lis      *CsvTransferListener
 	con      *config.Config
-	mailer   *SyncMailer
+	rxMailer *RxMailer
 	log      *logging.Logger
 	conns    sync.Map
 	end      atomic.Bool
@@ -26,7 +26,7 @@ type Server struct {
 }
 
 func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {
-	mailer, err := NewSyncMailer(config, log)
+	mailer, err := NewRxMailer(config, log)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {
 	return &Server{
 		lis:      lis,
 		con:      config,
-		mailer:   mailer,
+		rxMailer: mailer,
 		log:      log,
 		conns:    sync.Map{},
 		end:      atomic.Bool{},
@@ -69,10 +69,19 @@ func (s *Server) acceptNewConn() *CsvTransferStream {
 }
 
 func (s *Server) clientHandler(conn *CsvTransferStream, clientId int) error {
+	mailer, err := NewTxMailer(s.con, s.log)
+	if err != nil {
+		return err
+	}
+
+	if err := mailer.Init(); err != nil {
+		return err
+	}
+
 	for range 3 {
 		fileName, err := conn.Resource()
 		if err != nil {
-			s.mailer.PublishFlush(clientId, []byte{})
+			mailer.PublishFlush(clientId, []byte{})
 			s.log.Criticalf("an error ocurred while receiving resource for client %d, exiting...", clientId)
 			return err
 		}
@@ -81,32 +90,32 @@ func (s *Server) clientHandler(conn *CsvTransferStream, clientId int) error {
 		for {
 			msg, err := conn.Recv()
 			if err != nil {
-				s.mailer.PublishFlush(clientId, []byte{})
+				mailer.PublishFlush(clientId, []byte{})
 				s.log.Criticalf("an error ocurred while handling client %d, exiting...", clientId)
 				return err
 			}
 
 			if msg.Kind == MSG_EOF {
 				s.log.Infof("%s was successfully received by client %d", fileName, clientId)
-				s.mailer.PublishEof(fileName, clientId, []byte{})
+				mailer.PublishEof(fileName, clientId, []byte{})
 				break
 
 			} else if msg.Kind == MSG_BATCH {
-				s.mailer.PublishBatch(fileName, clientId, msg.Data)
+				mailer.PublishBatch(fileName, clientId, msg.Data)
 
 			} else if msg.Kind == MSG_ERR {
 				s.log.Criticalf("an error was received from the client %d, exiting...", clientId)
-				s.mailer.PublishFlush(clientId, []byte{})
+				mailer.PublishFlush(clientId, []byte{})
 				return nil
 
 			} else {
-				s.mailer.PublishFlush(clientId, []byte{})
+				mailer.PublishFlush(clientId, []byte{})
 				return fmt.Errorf("an unknown msg kind was received by client %d: %d", clientId, msg.Kind)
 			}
 		}
 	}
 
-	s.mailer.PublishFlush(clientId, []byte{})
+	mailer.PublishFlush(clientId, []byte{})
 	return nil
 }
 
@@ -139,9 +148,10 @@ func (s *Server) recvResults() error {
 
 		connInt, ok := s.conns.Load(clientId)
 		if !ok {
-			s.log.Errorf("tried to load %d's conn but failed, not present in conn map", clientId)
+			del.Ack(false)
 			continue
 		}
+
 		conn := connInt.(*CsvTransferStream)
 		if _, ok := eofsRecv[clientId]; !ok {
 			eofsRecv[clientId] = 0
@@ -150,6 +160,7 @@ func (s *Server) recvResults() error {
 		if kind == comms.BATCH {
 			batch, err := comms.DecodeBatch(body)
 			if err != nil {
+				del.Ack(false)
 				return fmt.Errorf("[%d]: failed to decode batch from query %d", clientId, query)
 			}
 			result := batch.ToResult(query)
@@ -187,11 +198,44 @@ func (s *Server) recvResults() error {
 	return nil
 }
 
-func (s *Server) Run() {
-	defer s.mailer.DeInit()
+func (s *Server) cleanPipeline() error {
+	mailer, err := NewTxMailer(s.con, s.log)
+	if err != nil {
+		return err
+	}
 
-	// Clean the pipeline
-	s.mailer.PublishPurge([]byte{})
+	if err := mailer.Init(); err != nil {
+		return err
+	}
+
+	if err := mailer.PublishPurge([]byte{}); err != nil {
+		return err
+	}
+
+	queryPurges := make(map[int]struct{})
+	for del := range s.recvChan {
+		kind := del.Headers.Kind
+		if kind == comms.PURGE {
+			query := del.Headers.Query
+			queryPurges[query] = struct{}{}
+		}
+
+		del.Ack(false)
+		if len(queryPurges) == 5 {
+			break
+		}
+	}
+
+	return s.rxMailer.Purge()
+}
+
+func (s *Server) Run() {
+	defer s.rxMailer.DeInit()
+
+	if err := s.cleanPipeline(); err != nil {
+		s.log.Criticalf("failed to clean pipeline: %v", err)
+		return
+	}
 
 	go func() {
 		sigs := make(chan os.Signal, 1)

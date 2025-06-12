@@ -99,13 +99,22 @@ func (base *Worker) Run(w IWorker) error {
 			base.Log.Errorf("received an unknown message kind %v", kind)
 		}
 
-		// Dump
 		base.RussianRoulette("[Process + Send, Dump]")
 		clientId := del.Headers.ClientId
-		base.Mailer.Dump(clientId)
+
+		// Dump
+		switch kind {
+		case comms.BATCH | comms.EOF:
+			base.Mailer.Dump(clientId)
+		case comms.FLUSH:
+			base.Mailer.Flush(clientId)
+		case comms.PURGE:
+			base.Mailer.Purge()
+		}
+
+		base.RussianRoulette("[Dump, Ack]")
 
 		// Ack
-		base.RussianRoulette("[Dump, Ack]")
 		if err := del.Ack(false); err != nil {
 			return fmt.Errorf("couldn't acknowledge delivery: %v", err)
 		}

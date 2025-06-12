@@ -15,20 +15,22 @@ import (
 	"analyzer/workers/config"
 
 	"github.com/op/go-logging"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 const (
-	PERSISTANCE_DIR      = "/mailer"
+	PERSISTANCE_DIRNAME  = "mailer"
 	PERSISTANCE_FILENAME = "state"
 )
 
 type Mailer struct {
+	con *config.Config
+	log *logging.Logger
+
+	// Need Init
+	broker    *middleware.Broker
 	senders   []middleware.Sender
 	receivers map[string]*middleware.Receiver
-	broker    *middleware.Broker
-	con       *config.Config
-	Log       *logging.Logger
+	inputQs   []middleware.Queue
 }
 
 func NewMailer(con *config.Config, log *logging.Logger) (*Mailer, error) {
@@ -36,14 +38,24 @@ func NewMailer(con *config.Config, log *logging.Logger) (*Mailer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Mailer{nil, nil, broker, con, log}, nil
+
+	return &Mailer{
+		broker:    broker,
+		con:       con,
+		log:       log,
+		senders:   nil,
+		receivers: nil,
+		inputQs:   nil,
+	}, nil
 }
 
-func (m *Mailer) tryRecover(inputQs []amqp.Queue, outputQFmts []string) (map[string]*middleware.Receiver, []middleware.Sender) {
+func (m *Mailer) tryRecover(inputQs []middleware.Queue) (map[string]*middleware.Receiver, []middleware.Sender) {
+	m.inputQs = inputQs
 	receivers := m.initReceivers(inputQs, m.con.InputCopies)
-	senders := m.initSenders(outputQFmts)
+	senders := m.initSenders()
 
-	mailerDir, err := os.ReadDir(PERSISTANCE_DIR)
+	dirPath := fmt.Sprintf("/%s", PERSISTANCE_DIRNAME)
+	mailerDir, err := os.ReadDir(dirPath)
 	if err != nil {
 		return receivers, senders
 	}
@@ -52,14 +64,15 @@ func (m *Mailer) tryRecover(inputQs []amqp.Queue, outputQFmts []string) (map[str
 		clientIdStr := clientDir.Name()
 		clientId, err := strconv.Atoi(clientIdStr)
 		if err != nil {
-			m.Log.Errorf("Failed to parse clientId for client %s: ", clientIdStr, err)
+			m.log.Errorf("Failed to parse clientId for client %s: ", clientIdStr, err)
 			continue
 		}
 
-		statePath := fmt.Sprintf("%s/%d/%s", PERSISTANCE_DIR, clientId, PERSISTANCE_FILENAME)
+		dirPath := fmt.Sprintf("/%s/%d", PERSISTANCE_DIRNAME, clientId)
+		statePath := fmt.Sprintf("%s/%s", dirPath, PERSISTANCE_FILENAME)
 		fp, err := os.Open(statePath)
 		if err != nil {
-			m.Log.Errorf("Failed to recover client %s mailer's state: %v", clientId, err)
+			m.log.Errorf("Failed to recover client %s mailer's state: %v", clientId, err)
 			continue
 		}
 
@@ -75,14 +88,14 @@ func (m *Mailer) tryRecover(inputQs []amqp.Queue, outputQFmts []string) (map[str
 			if strings.HasPrefix(line, "recv") {
 				qName, eofs, flushes, seqs, err := middleware.DecodeLineRecv(line)
 				if err != nil {
-					m.Log.Errorf("Failed to decode line for client-%d's receiver: %v", clientId, err)
+					m.log.Errorf("Failed to decode line for client-%d's receiver: %v", clientId, err)
 					continue
 				}
 				receivers[qName].SetState(clientId, eofs, flushes, seqs)
 			} else if strings.HasPrefix(line, "robin") {
 				cur, seqs, err := middleware.DecodeLineRobin(line)
 				if err != nil {
-					m.Log.Errorf("failed to decode line for client-%d's robin sender: %v", clientId, err)
+					m.log.Errorf("failed to decode line for client-%d's robin sender: %v", clientId, err)
 					continue
 				}
 				senders[sendIdx].(*middleware.SenderRobin).SetState(clientId, cur, seqs)
@@ -90,51 +103,54 @@ func (m *Mailer) tryRecover(inputQs []amqp.Queue, outputQFmts []string) (map[str
 			} else if strings.HasPrefix(line, "shard") {
 				seqs, err := middleware.DecodeLineShard(line)
 				if err != nil {
-					m.Log.Errorf("failed to decode line for client-%d's shard sender: %v", clientId, err)
+					m.log.Errorf("failed to decode line for client-%d's shard sender: %v", clientId, err)
 					continue
 				}
 				senders[sendIdx].(*middleware.SenderShard).SetState(clientId, seqs)
 				sendIdx++
 			} else {
-				m.Log.Errorf("Unknown line format for client-%d's mailer state: %s", clientId, line)
+				m.log.Errorf("Unknown line format for client-%d's mailer state: %s", clientId, line)
 				continue
 			}
 		}
 	}
 
-	m.Log.Infof("Mailer recovered successfully")
+	m.log.Infof("Mailer recovered successfully")
 	return receivers, senders
 }
 
-func (m *Mailer) Init() ([]amqp.Queue, error) {
+func (m *Mailer) Init() ([]middleware.Queue, error) {
 	inExchNames := m.con.InputExchangeNames
 	inQNames := m.con.InputQueueNames
 	outExchName := m.con.OutputExchangeName
 	outQNames := m.con.OutputQueueNames
 	outCopies := m.con.OutputCopies
 
-	inputQs, outputQFmts, err := m.broker.Init(m.con.Id, inExchNames, inQNames, outExchName, outQNames, outCopies)
+	inputQs, err := m.broker.Init(m.con.Id, inExchNames, inQNames, outExchName, outQNames, outCopies)
 	if err != nil {
 		return nil, err
 	}
 
-	m.receivers, m.senders = m.tryRecover(inputQs, outputQFmts)
+	m.receivers, m.senders = m.tryRecover(inputQs)
 	return inputQs, nil
 }
 
-func (m *Mailer) initSenders(outputQFmts []string) []middleware.Sender {
+func (m *Mailer) initSenders() []middleware.Sender {
 	delTypes := m.con.OutputDeliveryTypes
+	outputQNames := m.con.OutputQueueNames
 	outputQCopies := m.con.OutputCopies
 	senders := make([]middleware.Sender, 0, len(delTypes))
 
-	for i := range outputQFmts {
+	for i, name := range outputQNames {
+		qNameFmt := name + "-%d"
+
 		var sender middleware.Sender
 		if delTypes[i] == "robin" {
-			sender = middleware.NewRobin(m.broker, outputQFmts[i], outputQCopies[i])
+			sender = middleware.NewRobin(m.broker, qNameFmt, outputQCopies[i])
 		} else {
 			parts := strings.Split(delTypes[i], ":")
 			key := parts[1]
-			sender = middleware.NewShard(m.broker, outputQFmts[i], key, outputQCopies[i], m.Log)
+			sender = middleware.NewShard(m.broker, qNameFmt, key, outputQCopies[i], m.log)
 		}
 
 		senders = append(senders, sender)
@@ -143,7 +159,7 @@ func (m *Mailer) initSenders(outputQFmts []string) []middleware.Sender {
 	return senders
 }
 
-func (m *Mailer) initReceivers(inputQs []amqp.Queue, inputCopies []int) map[string]*middleware.Receiver {
+func (m *Mailer) initReceivers(inputQs []middleware.Queue, inputCopies []int) map[string]*middleware.Receiver {
 	receivers := make(map[string]*middleware.Receiver, len(inputQs))
 	mu := new(sync.Mutex)
 
@@ -159,7 +175,7 @@ func (m *Mailer) DeInit() {
 	m.broker.DeInit()
 }
 
-func (m *Mailer) Consume(q amqp.Queue) (<-chan middleware.Delivery, error) {
+func (m *Mailer) Consume(q middleware.Queue) (<-chan middleware.Delivery, error) {
 	recv, ok := m.receivers[q.Name]
 	if !ok {
 		return nil, fmt.Errorf("no receivers matches this queue name: %s", q.Name)
@@ -245,10 +261,6 @@ func (m *Mailer) PublishPurge(purge comms.Purge, headers ...middleware.Table) er
 }
 
 func (m *Mailer) Dump(clientId int) error {
-	if clientId < 0 {
-		return nil
-	}
-
 	buf := bytes.NewBuffer(nil)
 
 	// 1. Write receivers' data
@@ -266,6 +278,23 @@ func (m *Mailer) Dump(clientId int) error {
 	}
 
 	// 3. Atomic write
-	dirPath := fmt.Sprintf("%s/%d", PERSISTANCE_DIR, clientId)
+	dirPath := fmt.Sprintf("%s/%d", PERSISTANCE_DIRNAME, clientId)
 	return comms.AtomicWrite(dirPath, PERSISTANCE_FILENAME, buf.Bytes())
+}
+
+func (m *Mailer) Flush(clientId int) error {
+	dirPath := fmt.Sprintf("/%s/%d", PERSISTANCE_DIRNAME, clientId)
+	return os.RemoveAll(dirPath)
+}
+
+func (m *Mailer) Purge() error {
+	for _, q := range m.inputQs {
+		if err := m.broker.Purge(q); err != nil {
+			return fmt.Errorf("failed to purge queue %s: %v", q.Name, err)
+		}
+
+	}
+
+	dirPath := fmt.Sprintf("/%s", PERSISTANCE_DIRNAME)
+	return os.RemoveAll(dirPath)
 }

@@ -16,16 +16,16 @@ type Receiver struct {
 	broker *Broker
 	mailer Dumpable
 	mu     *sync.Mutex
+	copies int
 
 	// Persisted
-	qName     string
-	copies    int
-	expecting []map[int]int
+	q         Queue
 	eofs      map[int]int
 	flushes   map[int]int
+	expecting []map[int]int
 }
 
-func NewReceiver(broker *Broker, q amqp.Queue, copies int, mailer Dumpable, mu *sync.Mutex) *Receiver {
+func NewReceiver(broker *Broker, q Queue, copies int, mailer Dumpable, mu *sync.Mutex) *Receiver {
 	expecting := make([]map[int]int, copies)
 	for i := range expecting {
 		expecting[i] = make(map[int]int)
@@ -36,7 +36,7 @@ func NewReceiver(broker *Broker, q amqp.Queue, copies int, mailer Dumpable, mu *
 		copies:    copies,
 		mailer:    mailer,
 		mu:        mu,
-		qName:     q.Name,
+		q:         q,
 		expecting: expecting,
 		eofs:      make(map[int]int),
 		flushes:   make(map[int]int),
@@ -44,7 +44,7 @@ func NewReceiver(broker *Broker, q amqp.Queue, copies int, mailer Dumpable, mu *
 }
 
 func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
-	recv, err := r.broker.Consume(r.qName, consumer)
+	recv, err := r.broker.Consume(r.q, consumer)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't start consuming through receiver: %v", err)
 	}
@@ -89,13 +89,14 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 				// chance to persist it's state.
 				r.mu.Lock()
 
-				if kind == comms.FLUSH {
+				switch kind {
+				case comms.FLUSH:
 					delete(r.expecting[replicaId], clientId)
-				} else if kind == comms.PURGE {
+				case comms.PURGE:
 					for i := range r.expecting {
 						r.expecting[i] = make(map[int]int)
 					}
-				} else {
+				default:
 					r.expecting[replicaId][clientId]++
 				}
 
@@ -113,20 +114,23 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 			kind := del.Headers.Kind
 			clientId := del.Headers.ClientId
 
-			if kind == comms.EOF {
+			switch kind {
+			case comms.EOF:
 				r.eofs[clientId]++
 				if r.eofs[clientId] < copies {
 					r.mailer.Dump(clientId)
 					del.Ack(false)
 					continue
 				}
-			} else if kind == comms.FLUSH {
+
+			case comms.FLUSH:
 				r.flushes[clientId]++
 				if r.flushes[clientId] < copies {
 					r.mailer.Dump(clientId)
 					del.Ack(false)
 					continue
 				}
+
 				delete(r.eofs, clientId)
 				delete(r.flushes, clientId)
 			}
@@ -140,7 +144,7 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 
 // Example: "recv <qName> <eofs> <flushes> <seq> ... <seq>"
 func (r *Receiver) Encode(clientId int) []byte {
-	init := fmt.Appendf(nil, "recv %s %d %d", r.qName, r.eofs[clientId], r.flushes[clientId])
+	init := fmt.Appendf(nil, "recv %s %d %d", r.q.Name, r.eofs[clientId], r.flushes[clientId])
 	builder := bytes.NewBuffer(init)
 
 	for replicaId := range r.expecting {
@@ -191,7 +195,7 @@ func DecodeLineRecv(line string) (string, int, int, []int, error) {
 
 func (r *Receiver) SetState(clientId, eofs, flushes int, seqs []int) error {
 	if len(seqs) != r.copies {
-		return fmt.Errorf("expected %d sequence numbers, got %d for client %d in receiver %s", r.copies, len(seqs), clientId, r.qName)
+		return fmt.Errorf("expected %d sequence numbers, got %d for client %d in receiver %s", r.copies, len(seqs), clientId, r.q.Name)
 	}
 
 	r.eofs[clientId] = eofs
