@@ -86,9 +86,7 @@ func (w *Sum) decode(state []byte) (int, error) {
 func (w *Sum) store(id middleware.DelId, persistor *persistance.Persistor) error {
 	defer func() { w.state = make(map[string]int) }()
 
-	replicaId := id.ReplicaId
 	clientId := id.ClientId
-	seq := id.Seq
 
 	for compKey, partialSum := range w.state {
 		pf, err := persistor.Load(clientId, compKey)
@@ -99,9 +97,8 @@ func (w *Sum) store(id middleware.DelId, persistor *persistance.Persistor) error
 			continue
 		}
 
-		h := pf.Header
-		if seq <= h.Seqs[replicaId] {
-			w.Log.Infof("duplicado")
+		header := pf.Header
+		if header.IsDup(id) {
 			continue
 		}
 
@@ -112,7 +109,7 @@ func (w *Sum) store(id middleware.DelId, persistor *persistance.Persistor) error
 		}
 
 		newState := w.encode(prevSum + partialSum)
-		persistor.Store(id, compKey, newState, h)
+		persistor.Store(id, compKey, newState, header)
 	}
 
 	return nil

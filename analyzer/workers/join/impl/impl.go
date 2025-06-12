@@ -113,9 +113,7 @@ func handleLeft(w *Join, id middleware.DelId, data []byte) error {
 		return err
 	}
 
-	replicaId := id.ReplicaId
 	clientId := id.ClientId
-	seq := id.Seq
 
 	for k, partialShard := range shards {
 		partialEncoded := w.encode(partialShard)
@@ -129,13 +127,12 @@ func handleLeft(w *Join, id middleware.DelId, data []byte) error {
 		}
 
 		header := pf.Header
-
-		if seq <= header.Seqs[replicaId] {
+		if header.IsDup(id) {
 			continue
 		}
 
 		newState := append(pf.State, partialEncoded...)
-		if err := w.leftPersistor.Store(id, k, newState); err != nil {
+		if err := w.leftPersistor.Store(id, k, newState, header); err != nil {
 			return err
 		}
 	}
