@@ -164,13 +164,12 @@ func (p Persistor) Load(clientId int, fileName string) (PersistedFile, error) {
 }
 
 func (p Persistor) RecoverFor(clientId int) (iter.Seq[PersistedFile], error) {
-	return func(yield func(PersistedFile) bool) {
-		files, err := os.ReadDir(fmt.Sprintf("%s/%d", p.dirName, clientId))
-		if err != nil {
-			p.log.Errorf("failed to read files in directory %d: %v", clientId, err)
-			return
-		}
+	files, err := os.ReadDir(fmt.Sprintf("%s/%d", p.dirName, clientId))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read files in directory %d: %v", clientId, err)
+	}
 
+	return func(yield func(PersistedFile) bool) {
 		for _, file := range files {
 			if file.IsDir() {
 				continue

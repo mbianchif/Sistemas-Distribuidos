@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"analyzer/comms"
 	"analyzer/comms/middleware"
 	"analyzer/comms/persistance"
 	"analyzer/workers/groupby/config"
@@ -23,25 +24,18 @@ func NewCount(w *GroupBy) GroupByHandler {
 	}
 }
 
-func (w *Count) add(fieldMap map[string]string, con *config.GroupbyConfig) error {
-	keys := make([]string, 0, len(con.GroupKeys))
-	for _, key := range con.GroupKeys {
-		field, ok := fieldMap[key]
-		if !ok {
-			return fmt.Errorf("key %v was not found", key)
-		}
-		keys = append(keys, field)
+func (w *Count) add(shards map[string][]map[string]string, con config.GroupByConfig) error {
+	for compKey, fieldMaps := range shards {
+		w.state[compKey] += len(fieldMaps)
 	}
 
-	compKey := strings.Join(keys, SEP)
-	w.state[compKey] += 1
 	return nil
 }
 
-func (w *Count) result(clientId int, con *config.GroupbyConfig, persistor persistance.Persistor) []map[string]string {
+func (w *Count) result(clientId int, con config.GroupByConfig, persistor persistance.Persistor) ([]map[string]string, error) {
 	persistedFiles, err := persistor.RecoverFor(clientId)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	fieldMaps := make([]map[string]string, 0)
@@ -52,7 +46,7 @@ func (w *Count) result(clientId int, con *config.GroupbyConfig, persistor persis
 		}
 
 		fieldMap := make(map[string]string)
-		keys := strings.Split(pf.FileName, SEP)
+		keys := strings.Split(pf.FileName, comms.SEP)
 		for i, key := range keys {
 			fieldMap[con.GroupKeys[i]] = key
 		}
@@ -61,7 +55,7 @@ func (w *Count) result(clientId int, con *config.GroupbyConfig, persistor persis
 		fieldMaps = append(fieldMaps, fieldMap)
 	}
 
-	return fieldMaps
+	return fieldMaps, nil
 }
 
 func (w *Count) encode(count int) []byte {
@@ -93,11 +87,13 @@ func (w *Count) store(id middleware.DelId, persistor *persistance.Persistor) err
 
 		h := pf.Header
 		if seq <= h.Seqs[replicaId] {
+			w.Log.Infof("duplicado")
 			continue
 		}
 
 		prevCount, err := w.decode(pf.State)
 		if err != nil {
+			w.Log.Errorf("failed to decode state: %v", err)
 			continue
 		}
 

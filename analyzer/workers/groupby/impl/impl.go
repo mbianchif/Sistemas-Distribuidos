@@ -10,23 +10,22 @@ import (
 	"github.com/op/go-logging"
 )
 
-const SEP = "<|>"
 const STATE_DIRNAME = "persistor"
 
 type GroupBy struct {
 	*workers.Worker
-	con       *config.GroupbyConfig
+	con       *config.GroupByConfig
 	handler   GroupByHandler
 	persistor persistance.Persistor
 }
 
 type GroupByHandler interface {
-	add(map[string]string, *config.GroupbyConfig) error
-	result(int, *config.GroupbyConfig, persistance.Persistor) []map[string]string
+	add(map[string][]map[string]string, config.GroupByConfig) error
+	result(int, config.GroupByConfig, persistance.Persistor) ([]map[string]string, error)
 	store(middleware.DelId, *persistance.Persistor) error
 }
 
-func New(con *config.GroupbyConfig, log *logging.Logger) (*GroupBy, error) {
+func New(con *config.GroupByConfig, log *logging.Logger) (*GroupBy, error) {
 	base, err := workers.New(con.Config, log)
 	if err != nil {
 		return nil, err
@@ -53,8 +52,6 @@ func (w *GroupBy) Run() error {
 	return w.Worker.Run(w)
 }
 
-func (w *GroupBy) clean(clientId int) {}
-
 func (w *GroupBy) Batch(qId int, del middleware.Delivery) {
 	body := del.Body
 
@@ -63,12 +60,16 @@ func (w *GroupBy) Batch(qId int, del middleware.Delivery) {
 		w.Log.Fatalf("failed to decode batch: %v", err)
 	}
 
-	for _, fieldMap := range batch.FieldMaps {
-		err := w.handler.add(fieldMap, w.con)
-		if err != nil {
-			w.Log.Errorf("failed to handle message: %v", err)
-			continue
-		}
+	shardKeys := w.con.GroupKeys
+	shards, err := comms.Shard(batch.FieldMaps, shardKeys, func(s string) string { return s })
+	if err != nil {
+		w.Log.Errorf("failed to shard batch: %v", err)
+		return
+	}
+
+	if err := w.handler.add(shards, *w.con); err != nil {
+		w.Log.Errorf("failed to handle message: %v", err)
+		return
 	}
 
 	// Persist once the entire delivery is processed
@@ -77,7 +78,11 @@ func (w *GroupBy) Batch(qId int, del middleware.Delivery) {
 
 func (w *GroupBy) Eof(qId int, del middleware.Delivery) {
 	clientId := del.Headers.ClientId
-	responseFieldMaps := w.handler.result(clientId, w.con, w.persistor)
+	responseFieldMaps, err := w.handler.result(clientId, *w.con, w.persistor)
+	if err != nil {
+		w.Log.Errorf("failed to get result: %v", err)
+		return
+	}
 
 	if len(responseFieldMaps) > 0 {
 		w.Log.Debugf("fieldMaps: %v", responseFieldMaps)

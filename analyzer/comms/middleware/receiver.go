@@ -92,9 +92,11 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 				switch kind {
 				case comms.FLUSH:
 					delete(r.expecting[replicaId], clientId)
+					delete(bufs[replicaId], clientId)
 				case comms.PURGE:
-					for i := range r.expecting {
+					for i := range copies {
 						r.expecting[i] = make(map[int]int)
+						bufs[i] = make(map[int]map[int]amqp.Delivery)
 					}
 				default:
 					r.expecting[replicaId][clientId]++

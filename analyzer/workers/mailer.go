@@ -149,8 +149,8 @@ func (m *Mailer) initSenders() []middleware.Sender {
 			sender = middleware.NewRobin(m.broker, qNameFmt, outputQCopies[i])
 		} else {
 			parts := strings.Split(delTypes[i], ":")
-			key := parts[1]
-			sender = middleware.NewShard(m.broker, qNameFmt, key, outputQCopies[i], m.log)
+			keys := strings.Split(parts[1], ";")
+			sender = middleware.NewShard(m.broker, qNameFmt, keys, outputQCopies[i], m.log)
 		}
 
 		senders = append(senders, sender)

@@ -5,18 +5,26 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
-func Shard[T comparable](fieldMaps []map[string]string, key string, hash func(str string) T) (map[T][]map[string]string, error) {
+const SEP = "<|>"
+
+func Shard[T comparable](fieldMaps []map[string]string, shardKeys []string, hash func(str string) T) (map[T][]map[string]string, error) {
 	shards := make(map[T][]map[string]string)
 
 	for _, fieldMap := range fieldMaps {
-		key, ok := fieldMap[key]
-		if !ok {
-			return nil, fmt.Errorf("key %v was not found in field map while sharding", key)
+		keys := make([]string, 0, len(shardKeys))
+		for _, key := range shardKeys {
+			field, ok := fieldMap[key]
+			if !ok {
+				return nil, fmt.Errorf("key %v was not found in field map while sharding", key)
+			}
+			keys = append(keys, field)
 		}
 
-		shardKey := hash(key)
+		compKey := strings.Join(keys, SEP)
+		shardKey := hash(compKey)
 		shards[shardKey] = append(shards[shardKey], fieldMap)
 	}
 

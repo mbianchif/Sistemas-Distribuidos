@@ -15,14 +15,14 @@ type SenderShard struct {
 	broker       *Broker
 	log          *logging.Logger
 	outputCopies int
-	key          string
+	keys         []string
 	fmt          string
 
 	// Persisted
 	seq []map[int]int
 }
 
-func NewShard(broker *Broker, fmt string, key string, outputCopies int, log *logging.Logger) *SenderShard {
+func NewShard(broker *Broker, qFmt string, keys []string, outputCopies int, log *logging.Logger) *SenderShard {
 	seq := make([]map[int]int, outputCopies)
 	for i := range seq {
 		seq[i] = make(map[int]int)
@@ -30,8 +30,8 @@ func NewShard(broker *Broker, fmt string, key string, outputCopies int, log *log
 
 	return &SenderShard{
 		broker:       broker,
-		fmt:          fmt,
-		key:          key,
+		fmt:          qFmt,
+		keys:         keys,
 		outputCopies: outputCopies,
 		log:          log,
 		seq:          seq,
@@ -46,19 +46,19 @@ func (s *SenderShard) nextKeySeq(i int, clientId int) (string, int) {
 	return key, seq
 }
 
-func keyHash(str string) int {
+func keyHash(str string) uint64 {
 	var hash uint64 = 5381
 
 	for _, c := range str {
 		hash = ((hash << 5) + hash) + uint64(c) // hash * 33 + c
 	}
 
-	return int(hash)
+	return hash
 }
 
 func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}, headers Table) error {
-	shards, err := comms.Shard(batch.FieldMaps, s.key, func(str string) int {
-		return keyHash(str) % s.outputCopies
+	shards, err := comms.Shard(batch.FieldMaps, s.keys, func(str string) int {
+		return int(keyHash(str) % uint64(s.outputCopies))
 	})
 	if err != nil {
 		return err

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"analyzer/comms"
 	"analyzer/comms/middleware"
 	"analyzer/comms/persistance"
 	"analyzer/workers/groupby/config"
@@ -28,29 +29,24 @@ func NewMean(w *GroupBy) GroupByHandler {
 	}
 }
 
-func (w *Mean) add(fieldMap map[string]string, con *config.GroupbyConfig) error {
-	sumValueStr, ok := fieldMap[con.AggKey]
-	if !ok {
-		return fmt.Errorf("value %v was not found", con.AggKey)
-	}
+func (w *Mean) add(shards map[string][]map[string]string, con config.GroupByConfig) error {
+	for compKey, fieldMaps := range shards {
+		for _, fieldMap := range fieldMaps {
+			sumValueStr, ok := fieldMap[con.AggKey]
+			if !ok {
+				return fmt.Errorf("value %v was not found", con.AggKey)
+			}
 
-	sumValue, err := strconv.ParseFloat(sumValueStr, 64)
-	if err != nil {
-		return fmt.Errorf("the sum value is not numerical %v", sumValueStr)
-	}
+			sumValue, err := strconv.ParseFloat(sumValueStr, 64)
+			if err != nil {
+				return fmt.Errorf("the sum value is not numerical %v", sumValueStr)
+			}
 
-	keys := make([]string, 0, len(con.GroupKeys))
-	for _, key := range con.GroupKeys {
-		field, ok := fieldMap[key]
-		if !ok {
-			return fmt.Errorf("key %v was not found", key)
+			tup := w.state[compKey]
+			w.state[compKey] = tuple{tup.sum + sumValue, tup.n + 1}
 		}
-		keys = append(keys, field)
 	}
 
-	compKey := strings.Join(keys, SEP)
-	tup := w.state[compKey]
-	w.state[compKey] = tuple{tup.sum + sumValue, tup.n + 1}
 	return nil
 }
 
@@ -77,10 +73,10 @@ func (w *Mean) decode(state []byte) (float64, int, error) {
 	return sum, n, nil
 }
 
-func (w *Mean) result(clientId int, con *config.GroupbyConfig, persistor persistance.Persistor) []map[string]string {
+func (w *Mean) result(clientId int, con config.GroupByConfig, persistor persistance.Persistor) ([]map[string]string, error) {
 	persistedFiles, err := persistor.RecoverFor(clientId)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	fieldMaps := make([]map[string]string, 0)
@@ -91,7 +87,7 @@ func (w *Mean) result(clientId int, con *config.GroupbyConfig, persistor persist
 		}
 
 		fieldMap := make(map[string]string)
-		keys := strings.Split(pf.FileName, SEP)
+		keys := strings.Split(pf.FileName, comms.SEP)
 		for i, key := range keys {
 			fieldMap[con.GroupKeys[i]] = key
 		}
@@ -100,7 +96,7 @@ func (w *Mean) result(clientId int, con *config.GroupbyConfig, persistor persist
 		fieldMaps = append(fieldMaps, fieldMap)
 	}
 
-	return fieldMaps
+	return fieldMaps, nil
 }
 
 func (w *Mean) store(id middleware.DelId, persistor *persistance.Persistor) error {
@@ -119,11 +115,13 @@ func (w *Mean) store(id middleware.DelId, persistor *persistance.Persistor) erro
 
 		h := pf.Header
 		if seq <= h.Seqs[replicaId] {
+			w.Log.Infof("duplicado")
 			continue
 		}
 
 		prevSum, prevCount, err := w.decode(pf.State)
 		if err != nil {
+			w.Log.Errorf("failed to decode state: %v", err)
 			continue
 		}
 

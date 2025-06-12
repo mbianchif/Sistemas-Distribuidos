@@ -207,6 +207,7 @@ func (s *Server) cleanPipeline() error {
 	if err := mailer.Init(); err != nil {
 		return err
 	}
+	defer mailer.DeInit()
 
 	if err := mailer.PublishPurge([]byte{}); err != nil {
 		return err

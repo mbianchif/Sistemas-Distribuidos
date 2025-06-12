@@ -9,7 +9,7 @@ import (
 	"analyzer/workers/config"
 )
 
-type GroupbyConfig struct {
+type GroupByConfig struct {
 	*config.Config
 	GroupKeys  []string
 	Aggregator string
@@ -17,7 +17,7 @@ type GroupbyConfig struct {
 	Storage    string
 }
 
-func Create() (*GroupbyConfig, error) {
+func Create() (*GroupByConfig, error) {
 	con, err := config.Create()
 	if err != nil {
 		return nil, err
@@ -45,5 +45,5 @@ func Create() (*GroupbyConfig, error) {
 		storage = aggregator
 	}
 
-	return &GroupbyConfig{con, groupKeys, aggregator, aggregatorKey, storage}, nil
+	return &GroupByConfig{con, groupKeys, aggregator, aggregatorKey, storage}, nil
 }

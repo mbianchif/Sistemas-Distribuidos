@@ -70,11 +70,6 @@ func New(con *config.JoinConfig, log *logging.Logger) (*Join, error) {
 	return w, nil
 }
 
-func (w *Join) clean(clientId int) {
-	delete(w.readingRight, clientId)
-	// 1. Pedirle al persistor que borre lo de este cliente
-}
-
 func joinFieldMaps(left map[string]string, right map[string]string) map[string]string {
 	joined := make(map[string]string, len(left)+len(right))
 	maps.Copy(joined, left)
@@ -112,7 +107,8 @@ func handleLeft(w *Join, id middleware.DelId, data []byte) error {
 		return err
 	}
 
-	shards, err := comms.Shard(batch.FieldMaps, w.Con.LeftKey, keyHash)
+	shardKeys := []string{w.Con.LeftKey}
+	shards, err := comms.Shard(batch.FieldMaps, shardKeys, keyHash)
 	if err != nil {
 		return err
 	}
@@ -152,7 +148,9 @@ func handleRight(w *Join, id middleware.DelId, data []byte) error {
 	if err != nil {
 		w.Log.Fatalf("failed to decode batch: %v", err)
 	}
-	shards, err := comms.Shard(batch.FieldMaps, w.Con.RightKey, keyHash)
+
+	shardKeys := []string{w.Con.RightKey}
+	shards, err := comms.Shard(batch.FieldMaps, shardKeys, keyHash)
 	if err != nil {
 		return err
 	}
