@@ -135,6 +135,10 @@ func (r *Receiver) Consume(consumer string) (<-chan Delivery, error) {
 
 				delete(r.eofs, clientId)
 				delete(r.flushes, clientId)
+
+			case comms.PURGE:
+				r.eofs = make(map[int]int)
+				r.flushes = make(map[int]int)
 			}
 
 			counted <- del

@@ -78,6 +78,7 @@ func (s *Server) clientHandler(conn *CsvTransferStream, clientId int) error {
 		return err
 	}
 	defer mailer.DeInit()
+	defer mailer.PublishFlush(clientId, []byte{})
 
 	for range 3 {
 		fileName, err := conn.Resource()
@@ -115,7 +116,7 @@ func (s *Server) clientHandler(conn *CsvTransferStream, clientId int) error {
 		}
 	}
 
-	return mailer.PublishFlush(clientId, []byte{})
+	return nil
 }
 
 func (s *Server) hasToTerminate() bool {

@@ -38,7 +38,7 @@ func (m *RxMailer) initReceivers(inputQs []middleware.Queue, inputCopies []int) 
 	mu := new(sync.Mutex)
 
 	for i := range inputQs {
-		recv := middleware.NewReceiver(m.broker, inputQs[i], inputCopies[i], nil, mu)
+		recv := middleware.NewReceiver(m.broker, inputQs[i], inputCopies[i], m, mu)
 		receivers = append(receivers, recv)
 	}
 
@@ -102,6 +102,10 @@ func (m *RxMailer) Purge() error {
 		}
 	}
 
+	return nil
+}
+
+func (m *RxMailer) Dump(_ int) error {
 	return nil
 }
 
