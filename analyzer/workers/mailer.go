@@ -292,7 +292,6 @@ func (m *Mailer) Purge() error {
 		if err := m.broker.Purge(q); err != nil {
 			return fmt.Errorf("failed to purge queue %s: %v", q.Name, err)
 		}
-
 	}
 
 	dirPath := fmt.Sprintf("/%s", PERSISTANCE_DIRNAME)

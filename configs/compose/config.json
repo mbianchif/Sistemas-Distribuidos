@@ -9,10 +9,10 @@
     "filter_release_date_upto_2010": 1,
     "explode_production_countries": 1,
     "explode_cast": 1,
-    "groupby_sentiment_mean_rate_revenue_budget": 2,
-    "groupby_country_sum_budget": 2,
-    "groupby_actor_count": 2,
-    "groupby_id_title_mean_rating": 2,
+    "groupby_sentiment_mean_rate_revenue_budget": 1,
+    "groupby_country_sum_budget": 1,
+    "groupby_actor_count": 1,
+    "groupby_id_title_mean_rating": 1,
     "divider": 1,
     "sentiment": 1,
     "join_id_movieid": 1,
@@ -22,5 +22,5 @@
     "sink_3": 1,
     "sink_4": 1,
     "sink_5": 1,
-    "client": 1
+    "client": 2
 }
