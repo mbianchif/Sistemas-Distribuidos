@@ -5,7 +5,6 @@
 
 ## Requisitos para la proxima entrega
 - (IMPORTANTE) Agregar la documentacion necesaria al informe/diagramas
-- (Mediano)    Agregar Close a todos los nodos
 
 ## Cosas que estarian bien
 - (Mediano) Cambiar la imlementación del dump y recover del mailer a que use Persistor

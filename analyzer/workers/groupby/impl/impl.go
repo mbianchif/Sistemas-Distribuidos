@@ -128,3 +128,8 @@ func (w *GroupBy) Purge(qId int, del middleware.Delivery) {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
+
+func (w *GroupBy) Close() {
+	w.purge()
+	w.Worker.Close()
+}

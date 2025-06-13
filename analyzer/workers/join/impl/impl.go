@@ -326,3 +326,8 @@ func (w *Join) Purge(qId int, del middleware.Delivery) {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
+
+func (w *Join) Close() {
+	w.purge()
+	w.Worker.Close()
+}

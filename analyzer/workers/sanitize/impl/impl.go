@@ -213,3 +213,7 @@ func (w *Sanitize) Purge(qId int, del middleware.Delivery) {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
+
+func (w *Sanitize) Close() {
+	w.Worker.Close()
+}

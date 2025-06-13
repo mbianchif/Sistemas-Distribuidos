@@ -160,3 +160,7 @@ func (w *Filter) Purge(qId int, del middleware.Delivery) {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
+
+func (w *Filter) Close() {
+	w.Worker.Close()
+}

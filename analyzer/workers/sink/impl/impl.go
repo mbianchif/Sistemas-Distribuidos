@@ -77,3 +77,7 @@ func (w *Sink) Purge(qId int, del middleware.Delivery) {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
+
+func (w *Sink) Close() {
+	w.Worker.Close()
+}

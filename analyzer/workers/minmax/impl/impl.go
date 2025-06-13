@@ -233,3 +233,8 @@ func (w *MinMax) Purge(qId int, del middleware.Delivery) {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
+
+func (w *MinMax) Close() {
+	w.purge()
+	w.Worker.Close()
+}

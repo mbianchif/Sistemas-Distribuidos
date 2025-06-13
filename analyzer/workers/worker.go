@@ -20,6 +20,7 @@ type IWorker interface {
 	Eof(int, middleware.Delivery)
 	Flush(int, middleware.Delivery)
 	Purge(int, middleware.Delivery)
+	Close()
 }
 
 type Worker struct {
@@ -49,6 +50,7 @@ func New(con *config.Config, log *logging.Logger) (*Worker, error) {
 	for i, q := range inputQueues {
 		ch, err := mailer.Consume(q)
 		if err != nil {
+			mailer.DeInit()
 			return nil, fmt.Errorf("couldn't start consuming: error with queue %d: %v", i, err)
 		}
 

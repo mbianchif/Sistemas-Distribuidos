@@ -117,3 +117,7 @@ func (w *Sentiment) Purge(qId int, del middleware.Delivery) {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
+
+func (w *Sentiment) Close() {
+	w.Worker.Close()
+}

@@ -116,3 +116,7 @@ func (w *Divider) Purge(qId int, del middleware.Delivery) {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
+
+func (w *Divider) Close() {
+	w.Worker.Close()
+}

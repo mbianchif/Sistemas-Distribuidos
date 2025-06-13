@@ -214,3 +214,8 @@ func (w *Top) Purge(qId int, del middleware.Delivery) {
 		w.Log.Errorf("failed to publish message: %v", err)
 	}
 }
+
+func (w *Top) Close() {
+	w.purge()
+	w.Worker.Close()
+}
