@@ -21,6 +21,7 @@ type Config struct {
 	OutputExchangeName string
 	OutputQueueNames   []string
 	OutputCopies       []int
+	HealthCheckPort    uint16
 	LogLevel           logging.Level
 }
 
@@ -98,6 +99,13 @@ func Create() (*Config, error) {
 		outputCopies = append(outputCopies, parsed)
 	}
 
+	// HEALTH_CHECK_PORT
+	healthCheckPort, err := strconv.ParseUint(os.Getenv("HEALTH_CHECK_PORT"), 10, 16)
+	if err != nil {
+		return nil, fmt.Errorf("the provided health check port is invalid: %v", err)
+	}
+
+	// LOG_LEVEL
 	logLevelString := strings.ToUpper(os.Getenv("LOG_LEVEL"))
 	logLevel, err := logging.LogLevel(logLevelString)
 	if err != nil {
@@ -116,6 +124,7 @@ func Create() (*Config, error) {
 		OutputExchangeName: outputExchangeName,
 		OutputQueueNames:   outputQueueNames,
 		OutputCopies:       outputCopies,
+		HealthCheckPort:    uint16(healthCheckPort),
 		LogLevel:           logLevel,
 	}, nil
 }

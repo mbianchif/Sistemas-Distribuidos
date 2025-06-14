@@ -20,6 +20,7 @@ type Config struct {
 	OutputCopies          []int
 	OutputDeliveryTypes   []string
 	RussianRouletteChance float64
+	HealthCheckPort       uint16
 	Select                map[string]struct{}
 }
 
@@ -36,7 +37,7 @@ func Create() (*Config, error) {
 	// ID
 	id, err := strconv.Atoi(os.Getenv("ID"))
 	if err != nil {
-		return nil, fmt.Errorf("the given id is invalid: %v", id)
+		return nil, fmt.Errorf("the given id is invalid: %v", err)
 	}
 
 	// RABBIT_URL
@@ -146,6 +147,12 @@ func Create() (*Config, error) {
 		selectMap[field] = struct{}{}
 	}
 
+	// HEALTH_CHECK_PORT
+	healthCheckPort, err := strconv.ParseUint(os.Getenv("HEALTH_CHECK_PORT"), 10, 16)
+	if err != nil {
+		return nil, fmt.Errorf("the provided health check port is invalid: %v", err)
+	}
+
 	// LOG_LEVEL
 	logLevelVar := strings.ToUpper(os.Getenv("LOG_LEVEL"))
 	logLevel, err := logging.LogLevel(logLevelVar)
@@ -165,6 +172,7 @@ func Create() (*Config, error) {
 		OutputCopies:          outputCopies,
 		OutputDeliveryTypes:   outputDeliveryTypes,
 		RussianRouletteChance: russianRouletteChance,
+		HealthCheckPort:       uint16(healthCheckPort),
 		Select:                selectMap,
 	}, nil
 }
