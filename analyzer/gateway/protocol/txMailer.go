@@ -9,7 +9,7 @@ import (
 )
 
 type TxMailer struct {
-	con *config.Config
+	con config.Config
 	log *logging.Logger
 
 	// Need Init
@@ -18,7 +18,7 @@ type TxMailer struct {
 	filename2Id map[string]int
 }
 
-func NewTxMailer(con *config.Config, log *logging.Logger) (*TxMailer, error) {
+func NewTxMailer(con config.Config, log *logging.Logger) (*TxMailer, error) {
 	broker, err := middleware.NewBroker(con.Url)
 	if err != nil {
 		return nil, err

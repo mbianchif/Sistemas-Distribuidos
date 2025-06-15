@@ -8,7 +8,7 @@ import (
 	"github.com/op/go-logging"
 )
 
-func SendFiles(skt *CsvTransferStream, con *config.Config, log *logging.Logger, files []string) error {
+func SendFiles(skt *CsvTransferStream, con config.Config, log *logging.Logger, files []string) error {
 	for id, filename := range files {
 		path := con.DataPath + "/" + filename
 		fp, err := os.Open(path)

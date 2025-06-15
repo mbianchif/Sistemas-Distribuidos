@@ -11,7 +11,7 @@ import (
 )
 
 type RxMailer struct {
-	con *config.Config
+	con config.Config
 	log *logging.Logger
 
 	// Need Init
@@ -20,7 +20,7 @@ type RxMailer struct {
 	inputQueues []middleware.Queue
 }
 
-func NewRxMailer(con *config.Config, log *logging.Logger) (*RxMailer, error) {
+func NewRxMailer(con config.Config, log *logging.Logger) (*RxMailer, error) {
 	broker, err := middleware.NewBroker(con.Url)
 	if err != nil {
 		return nil, err

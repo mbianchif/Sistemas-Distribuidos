@@ -10,59 +10,66 @@ import (
 )
 
 type Config struct {
+	// .env
 	Url                string
 	Host               string
 	Port               int
 	Backlog            int
-	Id                 int
 	InputExchangeNames []string
 	InputQueueNames    []string
-	InputCopies        []int
 	OutputExchangeName string
 	OutputQueueNames   []string
-	OutputCopies       []int
 	HealthCheckPort    uint16
 	LogLevel           logging.Level
+
+	// compose
+	Id           int
+	InputCopies  []int
+	OutputCopies []int
 }
 
-func Create() (*Config, error) {
+func Create() (Config, error) {
+	// ID
+	id := 0 // There's only one gateway
+
+	// RABBIT_URL
 	url := os.Getenv("RABBIT_URL")
 	if len(url) == 0 {
-		return nil, fmt.Errorf("no rabbit url was provided")
+		return Config{}, fmt.Errorf("no rabbit url was provided")
 	}
 
+	// HOST
 	host := os.Getenv("HOST")
 	if len(host) == 0 {
 		host = "0.0.0.0"
 	}
 
+	// PORT
 	port, err := strconv.Atoi(os.Getenv("PORT"))
 	if err != nil {
 		port = 9090
 	}
 
+	// BACKLOG
 	backlog, err := strconv.Atoi(os.Getenv("BACKLOG"))
 	if err != nil {
-		return nil, fmt.Errorf("no backlog was provided")
+		return Config{}, fmt.Errorf("no backlog was provided")
 	}
-
-	// ID
-	id := 0 // There's only one gateway
 
 	// INPUT_EXCHANGE_NAMES
 	inputExchangeNames := strings.Split(os.Getenv("INPUT_EXCHANGE_NAMES"), ",")
 	if len(inputExchangeNames) == 0 {
-		return nil, fmt.Errorf("the input exchange names were not provided")
+		return Config{}, fmt.Errorf("the input exchange names were not provided")
 	}
 
 	// INPUT_QUEUE_NAMES
 	inputQueueNames := strings.Split(os.Getenv("INPUT_QUEUE_NAMES"), ",")
 	if len(inputQueueNames) == 0 {
-		return nil, fmt.Errorf("the input queue names were not provided")
+		return Config{}, fmt.Errorf("the input queue names were not provided")
 	}
 
 	if len(inputExchangeNames) != len(inputQueueNames) {
-		return nil, fmt.Errorf("the length of input exchange names and input queue names don't match (exch: %d, names: %d)", len(inputExchangeNames), len(inputQueueNames))
+		return Config{}, fmt.Errorf("the length of input exchange names and input queue names don't match (exch: %d, names: %d)", len(inputExchangeNames), len(inputQueueNames))
 	}
 
 	// INPUT_COPIES
@@ -71,7 +78,7 @@ func Create() (*Config, error) {
 	for i, copies := range inputCopiesStrings {
 		parsed, err := strconv.Atoi(copies)
 		if err != nil {
-			return nil, fmt.Errorf("the %d'th input copy value is invalid: %v", i, copies)
+			return Config{}, fmt.Errorf("the %d'th input copy value is invalid: %v", i, copies)
 		}
 		inputCopies = append(inputCopies, parsed)
 	}
@@ -79,13 +86,13 @@ func Create() (*Config, error) {
 	// OUTPUT_EXCHANGE_NAME
 	outputExchangeName := os.Getenv("OUTPUT_EXCHANGE_NAME")
 	if len(outputExchangeName) == 0 {
-		return nil, fmt.Errorf("no output exchange name was provided")
+		return Config{}, fmt.Errorf("no output exchange name was provided")
 	}
 
 	// OUTPUT_QUEUE_NAMES
 	outputQueueNames := strings.Split(os.Getenv("OUTPUT_QUEUE_NAMES"), ",")
 	if len(outputQueueNames) == 0 {
-		return nil, fmt.Errorf("no output queue names were provided")
+		return Config{}, fmt.Errorf("no output queue names were provided")
 	}
 
 	// OUTPUT_COPIES
@@ -94,7 +101,7 @@ func Create() (*Config, error) {
 	for i, copies := range outputCopiesString {
 		parsed, err := strconv.Atoi(copies)
 		if err != nil {
-			return nil, fmt.Errorf("the %d'th input copy value is invalid: %v", i, copies)
+			return Config{}, fmt.Errorf("the %d'th input copy value is invalid: %v", i, copies)
 		}
 		outputCopies = append(outputCopies, parsed)
 	}
@@ -102,7 +109,7 @@ func Create() (*Config, error) {
 	// HEALTH_CHECK_PORT
 	healthCheckPort, err := strconv.ParseUint(os.Getenv("HEALTH_CHECK_PORT"), 10, 16)
 	if err != nil {
-		return nil, fmt.Errorf("the provided health check port is invalid: %v", err)
+		return Config{}, fmt.Errorf("the provided health check port is invalid: %v", err)
 	}
 
 	// LOG_LEVEL
@@ -112,7 +119,7 @@ func Create() (*Config, error) {
 		logLevel = logging.DEBUG
 	}
 
-	return &Config{
+	return Config{
 		Url:                url,
 		Host:               host,
 		Port:               port,

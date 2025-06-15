@@ -10,18 +10,21 @@ import (
 )
 
 type Config struct {
-	Id                    int
+	// .env
 	Url                   string
 	InputExchangeNames    []string
 	InputQueueNames       []string
-	InputCopies           []int
 	OutputExchangeName    string
 	OutputQueueNames      []string
-	OutputCopies          []int
 	OutputDeliveryTypes   []string
 	RussianRouletteChance float64
 	HealthCheckPort       uint16
 	Select                map[string]struct{}
+
+	// compose
+	Id           int
+	InputCopies  []int
+	OutputCopies []int
 }
 
 func configLog(logLevel logging.Level) {

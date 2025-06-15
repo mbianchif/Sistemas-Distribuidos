@@ -11,14 +11,6 @@ import (
 	"github.com/op/go-logging"
 )
 
-const DEFAULT_SLEEP_DURATION = 5
-const RESPAWN_SLEEP_DURATION = 5
-const CHECKER_COMPOSE_FILENAME = "compose.checkers.yaml"
-const RESPAWN_RETRIES = 5
-const KEEP_ALIVE_RETRIES = 5
-const FIRST_KEEP_ALIVE_WAIT = 5
-const HOST_FMT = "health-checker-%d"
-
 type PeerMonitor struct {
 	con      config.Config
 	conn     *net.UDPConn
@@ -35,8 +27,8 @@ func newPeerMonitor(con config.Config, log *logging.Logger) (PeerMonitor, error)
 	}
 
 	nextId := (con.Id + 1) % con.N
-	host := fmt.Sprintf(HOST_FMT, nextId)
-	addrStr := fmt.Sprintf("%s:%d", host, con.KeepAlivePort)
+	host := fmt.Sprintf(con.HostFmt, nextId)
+	addrStr := fmt.Sprintf("%s:%d", host, con.HealthCheckPort)
 	nextAddr, err := net.ResolveUDPAddr("udp", addrStr)
 	if err != nil {
 		return PeerMonitor{}, err
@@ -92,22 +84,19 @@ func (m *PeerMonitor) run() error {
 	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
-		defaultSleepDur := time.Duration(DEFAULT_SLEEP_DURATION) * time.Second
-		respawnSleepDur := time.Duration(RESPAWN_SLEEP_DURATION) * time.Second
 
-		for {
+		for !m.exit {
 			if err := m.sendNext(); err != nil {
 				break
 			}
 
 			retries := 0
-			waitDur := time.Duration(FIRST_KEEP_ALIVE_WAIT) * time.Second
-			for retries <= KEEP_ALIVE_RETRIES {
+			waitDur := m.con.StartingKeepAliveWaitDuration
+			for ; retries <= m.con.KeepAliveRetries; retries++ {
 				if m.waitNext(waitDur) {
 					break
 				}
 
-				retries++
 				waitDur <<= 1
 			}
 
@@ -115,10 +104,10 @@ func (m *PeerMonitor) run() error {
 				break
 			}
 
-			sleepDur := defaultSleepDur
-			if retries > KEEP_ALIVE_RETRIES {
+			sleepDur := m.con.DefaultSleepDuration
+			if retries > m.con.KeepAliveRetries {
 				m.respawnNext(string(m.nextAddr.IP))
-				sleepDur = respawnSleepDur
+				sleepDur = m.con.RespawnSleepDuration
 			}
 
 			time.Sleep(sleepDur)
@@ -132,10 +121,10 @@ func (m *PeerMonitor) respawnNext(containerName string) error {
 	cmd := exec.Command("docker", "kill", "--signal=9", containerName)
 	cmd.Run()
 
-	cmd = exec.Command("docker", "compose", "-f", CHECKER_COMPOSE_FILENAME, "up", "-d", containerName)
+	cmd = exec.Command("docker", "compose", "-f", m.con.CheckerComposeFileName, "up", "-d", containerName)
 	err := cmd.Run()
 
-	for i := 0; err != nil && i < RESPAWN_RETRIES; i++ {
+	for i := 0; err != nil && i < m.con.RespawnRetries; i++ {
 		err = cmd.Run()
 	}
 
@@ -146,7 +135,7 @@ func (m *PeerMonitor) respawnNext(containerName string) error {
 	return nil
 }
 
-func (m *PeerMonitor) Close() error {
+func (m *PeerMonitor) Stop() error {
 	m.exit = true
 	err := m.conn.Close()
 	m.wg.Wait()

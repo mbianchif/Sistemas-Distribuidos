@@ -13,7 +13,7 @@ type Acker struct {
 	wg   sync.WaitGroup
 }
 
-func NewAcker(port uint16) (Acker, error) {
+func newAcker(port uint16) (Acker, error) {
 	addrStr := fmt.Sprintf(":%d", port)
 	addr, err := net.ResolveUDPAddr("udp", addrStr)
 	if err != nil {
@@ -31,8 +31,8 @@ func NewAcker(port uint16) (Acker, error) {
 	}, nil
 }
 
-func spawnAcker(port uint16, log *logging.Logger) (*Acker, error) {
-	a, err := NewAcker(port)
+func SpawnAcker(port uint16, log *logging.Logger) (*Acker, error) {
+	a, err := newAcker(port)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (a *Acker) run() {
 	}
 }
 
-func (a *Acker) Close() error {
+func (a *Acker) Stop() error {
 	err := a.conn.Close()
 	a.wg.Wait()
 	return err

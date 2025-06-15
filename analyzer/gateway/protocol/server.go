@@ -17,7 +17,7 @@ import (
 
 type Server struct {
 	lis      *CsvTransferListener
-	con      *config.Config
+	con      config.Config
 	rxMailer *RxMailer
 	log      *logging.Logger
 	conns    sync.Map
@@ -25,7 +25,7 @@ type Server struct {
 	recvChan <-chan middleware.Delivery
 }
 
-func NewServer(config *config.Config, log *logging.Logger) (*Server, error) {
+func NewServer(config config.Config, log *logging.Logger) (*Server, error) {
 	mailer, err := NewRxMailer(config, log)
 	if err != nil {
 		return nil, err
