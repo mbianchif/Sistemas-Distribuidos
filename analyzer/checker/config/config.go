@@ -20,19 +20,18 @@ type Config struct {
 	ReviveRetries                 int
 
 	// compose
-	Id                 int
-	N                  int
-	CheckerComposePath string
-	HostFmt            string
-	WatchNodes         []string
+	Id         int
+	N          int
+	HostFmt    string
+	WatchNodes []string
 }
 
-func configLog(logLevel logging.Level, name string) {
+func configLog(logLevel logging.Level) {
 	backend := logging.NewLogBackend(os.Stderr, "", 0)
-	format := logging.MustStringFormatter(`%{time:2006-01-02 15:04:05}	%{level:.4s} [%{name}]	%{message}`)
+	format := logging.MustStringFormatter(`%{time:2006-01-02 15:04:05}	%{level:.4s}	%{message}`)
 	backendFormatter := logging.NewBackendFormatter(backend, format)
 	backendLeveled := logging.AddModuleLevel(backendFormatter)
-	backendLeveled.SetLevel(logLevel, name)
+	backendLeveled.SetLevel(logLevel, "log")
 	logging.SetBackend(backendLeveled)
 }
 
@@ -47,12 +46,6 @@ func Create() (Config, error) {
 	n, err := strconv.Atoi(os.Getenv("N"))
 	if err != nil {
 		return Config{}, fmt.Errorf("the given n is invalid: %v", err)
-	}
-
-	// CHECKER_COMPOSE_PATH
-	checkerComposePath := os.Getenv("CHECKER_COMPOSE_PATH")
-	if len(checkerComposePath) == 0 {
-		return Config{}, fmt.Errorf("the checker compose path is empty")
 	}
 
 	// HOST_FMT
@@ -88,7 +81,7 @@ func Create() (Config, error) {
 	reviveSleepDuration := time.Duration(reviveSleepDurationInt) * time.Second
 
 	// STARTING_KEEP_ALIVE_WAIT_DURATION
-	startingKeepAliveWaitDurationInt, err := strconv.Atoi(os.Getenv("STARTING_KEEP_ALIVE_DURATION"))
+	startingKeepAliveWaitDurationInt, err := strconv.Atoi(os.Getenv("STARTING_KEEP_ALIVE_WAIT_DURATION"))
 	if err != nil {
 		return Config{}, fmt.Errorf("the starting keep alive wait duration is invalid: %v", err)
 	}
@@ -128,20 +121,18 @@ func Create() (Config, error) {
 	if err != nil {
 		logLevel = logging.DEBUG
 	}
-	configLog(logLevel, "acker")
-	configLog(logLevel, "next monitor")
-	configLog(logLevel, "node monitor")
+	configLog(logLevel)
 
 	return Config{
 		Id:                            id,
 		N:                             n,
-		CheckerComposePath:            checkerComposePath,
 		HostFmt:                       hostFmt,
 		HealthCheckPort:               uint16(healthCheckPort),
 		DefaultSleepDuration:          defaultSleepDuration,
 		ReviveSleepDuration:           reviveSleepDuration,
 		StartingKeepAliveWaitDuration: startingKeepAliveWaitDuration,
 		ReviveRetries:                 reviveRetries,
+		WatchNodes:                    watchNodes,
 		KeepAliveRetries:              keepAliveRetries,
 	}, nil
 }

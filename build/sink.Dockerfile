@@ -6,8 +6,10 @@ COPY analyzer/workers/config ./config
 COPY analyzer/workers/sink   ./sink
 
 WORKDIR /analyzer
-COPY analyzer/comms ./comms
-COPY analyzer/go.*  ./
+COPY analyzer/comms                 ./comms
+COPY analyzer/go.*                  ./
+COPY analyzer/checker/impl/acker.go ./checker/impl/acker.go
+
 
 RUN go mod tidy
 RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/binary ./workers/sink/main.go

@@ -27,23 +27,20 @@ func (c Checker) Run() error {
 	signal.Notify(sigs, syscall.SIGTERM)
 	defer close(sigs)
 
-	ackerLog := logging.MustGetLogger("acker")
-	a, err := SpawnAcker(c.con.HealthCheckPort, c.con.KeepAliveRetries, ackerLog)
+	a, err := SpawnAcker(c.con.HealthCheckPort, c.con.KeepAliveRetries, c.log)
 	if err != nil {
 		return err
 	}
 	defer a.Stop()
 
-	nextLog := logging.MustGetLogger("next monitor")
 	nextName := fmt.Sprintf(c.con.HostFmt, (c.con.Id+1)%c.con.N)
-	nextMonitor, err := SpawnMonitor(c.con, nextLog, []string{nextName})
+	nextMonitor, err := SpawnMonitor(c.con, c.log, []string{nextName})
 	if err != nil {
 		return err
 	}
 	defer nextMonitor.Stop()
 
-	nodeLog := logging.MustGetLogger("node monitor")
-	nodeMonitor, err := SpawnMonitor(c.con, nodeLog, c.con.WatchNodes)
+	nodeMonitor, err := SpawnMonitor(c.con, c.log, c.con.WatchNodes)
 	if err != nil {
 		return err
 	}

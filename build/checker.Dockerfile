@@ -1,5 +1,10 @@
 FROM golang:1.24.2 AS builder
 
+# Install Docker
+RUN apt-get update && apt-get install -y \
+    curl \
+    && curl -fsSL https://get.docker.com | sh
+
 WORKDIR /analyzer/checker
 COPY analyzer/checker/. .
 

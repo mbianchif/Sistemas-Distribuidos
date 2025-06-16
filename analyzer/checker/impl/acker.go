@@ -52,7 +52,7 @@ func SpawnAcker(port uint16, keepAliveRetries int, log *logging.Logger) (*Acker,
 
 func (a *Acker) run() {
 	for {
-		a.log.Debugf("Waiting for keep-alives")
+		a.log.Debugf("Waiting for keep-alives...")
 		_, peerAddr, err := a.conn.ReadFromUDP(nil)
 		if err != nil {
 			return

@@ -653,7 +653,7 @@ def chunks(arr, r):
 
 def generate_checkers_compose(config: dict[str, int]):
     nodes = [
-        "gateway-0",
+        "gateway",
         "top-10_count-0",
         "top-5_budget-0",
         "minmax-rating-0",
@@ -686,9 +686,10 @@ services:"""
     environment:
       - ID={i}
       - N={ncheckers}
-      - CHECKER_COMPOSE_PATH={CHECKERS_COMPOSE_FILE_NAME}
       - HOST_FMT=health-checker-%d
       - WATCH_NODES={",".join(watch_nodes_chunks[i])}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 """
     docker_compose += """
 networks:

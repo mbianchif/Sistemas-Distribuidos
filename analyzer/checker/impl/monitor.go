@@ -17,19 +17,19 @@ type Monitor struct {
 	con        config.Config
 	log        *logging.Logger
 	conn       *net.UDPConn
-	watchNodes map[string]*net.UDPAddr
+	watchNodes map[*net.UDPAddr]string
 	wg         sync.WaitGroup
 }
 
-func newMonitor(con config.Config, watchNodeNames []string) (Monitor, error) {
-	watchNodes := make(map[string]*net.UDPAddr, len(watchNodeNames))
+func newMonitor(con config.Config, log *logging.Logger, watchNodeNames []string) (Monitor, error) {
+	watchNodes := make(map[*net.UDPAddr]string, len(watchNodeNames))
 	for _, nodeName := range watchNodeNames {
 		addrStr := fmt.Sprintf("%s:%d", nodeName, con.HealthCheckPort)
 		addr, err := net.ResolveUDPAddr("udp", addrStr)
 		if err != nil {
 			return Monitor{}, fmt.Errorf("failed to resolve network address for node name %s: %v", nodeName, err)
 		}
-		watchNodes[nodeName] = addr
+		watchNodes[addr] = nodeName
 	}
 
 	conn, err := net.ListenUDP("udp", nil)
@@ -39,13 +39,14 @@ func newMonitor(con config.Config, watchNodeNames []string) (Monitor, error) {
 
 	return Monitor{
 		con:        con,
+		log:        log,
 		conn:       conn,
 		watchNodes: watchNodes,
 	}, nil
 }
 
 func SpawnMonitor(con config.Config, log *logging.Logger, watchNodes []string) (*Monitor, error) {
-	m, err := newMonitor(con, watchNodes)
+	m, err := newMonitor(con, log, watchNodes)
 	if err != nil {
 		return nil, err
 	}
@@ -65,8 +66,8 @@ func (m *Monitor) direct(addr *net.UDPAddr) bool {
 	return err == nil
 }
 
-func (m *Monitor) broadcast(addrs map[string]*net.UDPAddr) bool {
-	for _, addr := range addrs {
+func (m *Monitor) broadcast(addrs map[*net.UDPAddr]string) bool {
+	for addr := range addrs {
 		if !m.direct(addr) {
 			return false
 		}
@@ -74,7 +75,7 @@ func (m *Monitor) broadcast(addrs map[string]*net.UDPAddr) bool {
 	return true
 }
 
-func (m *Monitor) wait(dur time.Duration, dead map[string]*net.UDPAddr) (bool, error) {
+func (m *Monitor) wait(dur time.Duration, dead map[*net.UDPAddr]string) (bool, error) {
 	now := time.Now()
 	deadline := now.Add(dur)
 
@@ -96,17 +97,12 @@ func (m *Monitor) wait(dur time.Duration, dead map[string]*net.UDPAddr) (bool, e
 			return false, fmt.Errorf("an error occurred while waiting for acks: %v", err)
 		}
 
-		name := peerAddr.IP.String()
-		delete(dead, name)
+		delete(dead, peerAddr)
 	}
 }
 
 func (m *Monitor) revive(containerName string) error {
-	m.log.Infof("Killing %s", containerName)
-	cmd := exec.Command("docker", "kill", "--signal=9", containerName)
-	cmd.Run()
-
-	cmd = exec.Command("docker", "compose", "-f", m.con.CheckerComposePath, "up", "-d", containerName)
+	cmd := exec.Command("docker", "restart", containerName)
 
 	m.log.Infof("Trying to revive %s", containerName)
 	var err error
@@ -125,7 +121,7 @@ func (m *Monitor) revive(containerName string) error {
 }
 
 func (m *Monitor) run() {
-	dead := make(map[string]*net.UDPAddr, len(m.watchNodes))
+	dead := make(map[*net.UDPAddr]string, len(m.watchNodes))
 
 	for {
 		maps.Copy(dead, m.watchNodes)
@@ -155,17 +151,17 @@ func (m *Monitor) run() {
 
 		sleepDur := m.con.DefaultSleepDuration
 		m.log.Infof("Detected %d dead nodes", len(dead))
-		for name := range dead {
+		for addr, name := range dead {
 			if err := m.revive(name); err != nil {
 				m.log.Error(err)
 				continue
 			}
 
-			delete(dead, name)
+			delete(dead, addr)
 			sleepDur = m.con.ReviveSleepDuration
 		}
 
-		m.log.Infof("Sleeping for %d seconds...", sleepDur)
+		m.log.Infof("Sleeping for %d seconds...", int(sleepDur.Seconds()))
 		time.Sleep(sleepDur)
 	}
 }
