@@ -34,5 +34,10 @@ func main() {
 		return
 	}
 
-	sv.Run()
+	if err := sv.Run(); err != nil {
+		log.Criticalf("failed run: %v", err)
+		return
+	}
+
+	log.Infof("Terminating...")
 }

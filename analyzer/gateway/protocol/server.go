@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"syscall"
 
+	checker "analyzer/checker/impl"
 	"analyzer/comms"
 	"analyzer/comms/middleware"
 	"analyzer/gateway/config"
@@ -230,13 +231,18 @@ func (s *Server) cleanPipeline() error {
 	return s.rxMailer.Purge()
 }
 
-func (s *Server) Run() {
+func (s *Server) Run() error {
 	defer s.rxMailer.DeInit()
 
 	if err := s.cleanPipeline(); err != nil {
-		s.log.Criticalf("failed to clean pipeline: %v", err)
-		return
+		return fmt.Errorf("failed to clean piipeline: %v", err)
 	}
+
+	acker, err := checker.SpawnAcker(s.con.HealthCheckPort, s.log)
+	if err != nil {
+		return fmt.Errorf("failed to spawn acker: %v", err)
+	}
+	defer acker.Stop()
 
 	go func() {
 		sigs := make(chan os.Signal, 1)
@@ -267,4 +273,6 @@ func (s *Server) Run() {
 			}
 		}(conn, clientId)
 	}
+
+	return nil
 }
