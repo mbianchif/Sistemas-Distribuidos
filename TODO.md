@@ -2,7 +2,6 @@
 
 ## Fault-Tolerance
 - (Pesado) Hacer los Health-Checkers
-  * Pasar las constantes al archivo de configuracion
   * Implementar el NodeMonitor
   * Pasar lo que es de docker a otro archivo, estilo broker
   * Agregar al generate_compose los healthcheckers
