@@ -8,7 +8,7 @@ import (
 )
 
 type MinMaxConfig struct {
-	*config.Config
+	config.Config
 	Key string
 }
 

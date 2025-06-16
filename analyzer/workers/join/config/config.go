@@ -8,7 +8,7 @@ import (
 )
 
 type JoinConfig struct {
-	*config.Config
+	config.Config
 	LeftKey  string
 	RightKey string
 }

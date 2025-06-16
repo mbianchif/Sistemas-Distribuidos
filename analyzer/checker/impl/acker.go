@@ -9,11 +9,13 @@ import (
 )
 
 type Acker struct {
-	conn *net.UDPConn
-	wg   sync.WaitGroup
+	conn             *net.UDPConn
+	log              *logging.Logger
+	wg               sync.WaitGroup
+	keepAliveRetries int
 }
 
-func newAcker(port uint16) (Acker, error) {
+func newAcker(port uint16, log *logging.Logger, keepAliveRetries int) (Acker, error) {
 	addrStr := fmt.Sprintf(":%d", port)
 	addr, err := net.ResolveUDPAddr("udp", addrStr)
 	if err != nil {
@@ -26,13 +28,14 @@ func newAcker(port uint16) (Acker, error) {
 	}
 
 	return Acker{
-		conn: conn,
-		wg:   sync.WaitGroup{},
+		conn:             conn,
+		log:              log,
+		keepAliveRetries: keepAliveRetries,
 	}, nil
 }
 
-func SpawnAcker(port uint16, log *logging.Logger) (*Acker, error) {
-	a, err := newAcker(port)
+func SpawnAcker(port uint16, keepAliveRetries int, log *logging.Logger) (*Acker, error) {
+	a, err := newAcker(port, log, keepAliveRetries)
 	if err != nil {
 		return nil, err
 	}
@@ -49,20 +52,30 @@ func SpawnAcker(port uint16, log *logging.Logger) (*Acker, error) {
 
 func (a *Acker) run() {
 	for {
-		_, peerAddr, err := a.conn.ReadFromUDP([]byte{})
+		a.log.Debugf("Waiting for keep-alives")
+		_, peerAddr, err := a.conn.ReadFromUDP(nil)
 		if err != nil {
 			return
 		}
 
-		_, err = a.conn.WriteToUDP([]byte{}, peerAddr)
-		for err != nil {
-			_, err = a.conn.WriteToUDP([]byte{}, peerAddr)
+		host := peerAddr.IP.String()
+		a.log.Debugf("Received a keep-alive from %s, trying to ACK", host)
+
+		for range a.keepAliveRetries {
+			_, err = a.conn.WriteToUDP(nil, peerAddr)
+			if err == nil {
+				break
+			}
 		}
 	}
 }
 
 func (a *Acker) Stop() error {
+	a.log.Debugf("Waiting for Acker to stop...")
+
 	err := a.conn.Close()
 	a.wg.Wait()
+
+	a.log.Debugf("Acker stoped")
 	return err
 }

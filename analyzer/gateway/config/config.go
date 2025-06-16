@@ -21,6 +21,7 @@ type Config struct {
 	OutputQueueNames   []string
 	HealthCheckPort    uint16
 	LogLevel           logging.Level
+	KeepAliveRetries   int
 
 	// compose
 	Id           int
@@ -112,6 +113,12 @@ func Create() (Config, error) {
 		return Config{}, fmt.Errorf("the provided health check port is invalid: %v", err)
 	}
 
+	// KEEP_ALIVE_RETRIES
+	keepAliveRetries, err := strconv.Atoi(os.Getenv("KEEP_ALIVE_RETRIES"))
+	if err != nil {
+		return Config{}, fmt.Errorf("the provided keep alive retries value is invalid: %v", err)
+	}
+
 	// LOG_LEVEL
 	logLevelString := strings.ToUpper(os.Getenv("LOG_LEVEL"))
 	logLevel, err := logging.LogLevel(logLevelString)
@@ -132,6 +139,7 @@ func Create() (Config, error) {
 		OutputQueueNames:   outputQueueNames,
 		OutputCopies:       outputCopies,
 		HealthCheckPort:    uint16(healthCheckPort),
+		KeepAliveRetries:   keepAliveRetries,
 		LogLevel:           logLevel,
 	}, nil
 }

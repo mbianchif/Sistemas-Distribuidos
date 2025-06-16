@@ -23,7 +23,7 @@ const (
 )
 
 type Mailer struct {
-	con *config.Config
+	con config.Config
 	log *logging.Logger
 
 	// Need Init
@@ -33,7 +33,7 @@ type Mailer struct {
 	inputQs   []middleware.Queue
 }
 
-func NewMailer(con *config.Config, log *logging.Logger) (*Mailer, error) {
+func NewMailer(con config.Config, log *logging.Logger) (*Mailer, error) {
 	broker, err := middleware.NewBroker(con.Url)
 	if err != nil {
 		return nil, err

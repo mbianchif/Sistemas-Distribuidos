@@ -1,13 +1,13 @@
 package config
 
 import (
+	"analyzer/workers/config"
 	"fmt"
 	"os"
-	"analyzer/workers/config"
 )
 
 type ExplodeConfig struct {
-	*config.Config
+	config.Config
 	Key    string
 	Rename string
 }

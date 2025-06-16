@@ -5,7 +5,7 @@ import (
 )
 
 type SentimentConfig struct {
-	*config.Config
+	config.Config
 }
 
 func Create() (*SentimentConfig, error) {

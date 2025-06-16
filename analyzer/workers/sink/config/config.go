@@ -9,7 +9,7 @@ import (
 )
 
 type SinkConfig struct {
-	*config.Config
+	config.Config
 	Query int
 }
 

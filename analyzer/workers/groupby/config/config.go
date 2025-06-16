@@ -10,7 +10,7 @@ import (
 )
 
 type GroupByConfig struct {
-	*config.Config
+	config.Config
 	GroupKeys  []string
 	Aggregator string
 	AggKey     string

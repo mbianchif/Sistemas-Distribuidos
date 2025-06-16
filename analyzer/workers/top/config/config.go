@@ -9,7 +9,7 @@ import (
 )
 
 type TopConfig struct {
-	*config.Config
+	config.Config
 	Key    string
 	Amount int
 }

@@ -20,6 +20,7 @@ type Config struct {
 	RussianRouletteChance float64
 	HealthCheckPort       uint16
 	Select                map[string]struct{}
+	KeepAliveRetries      int
 
 	// compose
 	Id           int
@@ -36,35 +37,35 @@ func configLog(logLevel logging.Level) {
 	logging.SetBackend(backendLeveled)
 }
 
-func Create() (*Config, error) {
+func Create() (Config, error) {
 	// ID
 	id, err := strconv.Atoi(os.Getenv("ID"))
 	if err != nil {
-		return nil, fmt.Errorf("the given id is invalid: %v", err)
+		return Config{}, fmt.Errorf("the given id is invalid: %v", err)
 	}
 
 	// RABBIT_URL
 	url := os.Getenv("RABBIT_URL")
 	if len(url) == 0 {
-		return nil, fmt.Errorf("the rabbitmq url was not provided")
+		return Config{}, fmt.Errorf("the rabbitmq url was not provided")
 	}
 
 	// INPUT_EXCHANGE_NAMES
 	inputExchangeNamesString := os.Getenv("INPUT_EXCHANGE_NAMES")
 	inputExchangeNames := strings.Split(inputExchangeNamesString, ",")
 	if len(inputExchangeNames) == 0 {
-		return nil, fmt.Errorf("the input exchange names were not provided")
+		return Config{}, fmt.Errorf("the input exchange names were not provided")
 	}
 
 	// INPUT_QUEUE_NAMES
 	inputQueueNamesString := os.Getenv("INPUT_QUEUE_NAMES")
 	inputQueueNames := strings.Split(inputQueueNamesString, ",")
 	if len(inputQueueNames) == 0 {
-		return nil, fmt.Errorf("the input queue names were not provided")
+		return Config{}, fmt.Errorf("the input queue names were not provided")
 	}
 
 	if len(inputExchangeNames) != len(inputQueueNames) {
-		return nil, fmt.Errorf("the length of input exchange names and input queue names don't match (exchange: %v, queues: %v)", len(inputExchangeNames), len(inputQueueNames))
+		return Config{}, fmt.Errorf("the length of input exchange names and input queue names don't match (exchange: %v, queues: %v)", len(inputExchangeNames), len(inputQueueNames))
 	}
 
 	// INPUT_COPIES
@@ -74,25 +75,25 @@ func Create() (*Config, error) {
 	for i, copies := range inputCopiesPerQueueSlice {
 		n, err := strconv.Atoi(copies)
 		if err != nil {
-			return nil, fmt.Errorf("%v'nth copy quantity is not a number: %v", i, copies)
+			return Config{}, fmt.Errorf("%v'nth copy quantity is not a number: %v", i, copies)
 		}
 		inputCopies = append(inputCopies, n)
 	}
 
 	if len(inputCopies) != len(inputQueueNames) {
-		return nil, fmt.Errorf("the length of input queue names and input copies per queue don't match (names: %v, copies: %v)", len(inputQueueNames), len(inputCopiesPerQueueSlice))
+		return Config{}, fmt.Errorf("the length of input queue names and input copies per queue don't match (names: %v, copies: %v)", len(inputQueueNames), len(inputCopiesPerQueueSlice))
 	}
 
 	// OUTPUT_EXCHANGE_NAME
 	outputExchangeName := os.Getenv("OUTPUT_EXCHANGE_NAME")
 	if len(outputExchangeName) == 0 {
-		return nil, fmt.Errorf("the output exchange name was not provided")
+		return Config{}, fmt.Errorf("the output exchange name was not provided")
 	}
 
 	// OUTPUT_QUEUE_NAMES
 	outputQueueNamesString := os.Getenv("OUTPUT_QUEUE_NAMES")
 	if len(outputQueueNamesString) == 0 {
-		return nil, fmt.Errorf("the output queues were not provided")
+		return Config{}, fmt.Errorf("the output queues were not provided")
 	}
 	outputQueueNames := strings.Split(outputQueueNamesString, ",")
 
@@ -108,11 +109,11 @@ func Create() (*Config, error) {
 			continue
 		}
 
-		return nil, fmt.Errorf("inavlid delivery type %v", delType)
+		return Config{}, fmt.Errorf("inavlid delivery type %v", delType)
 	}
 
 	if len(outputDeliveryTypes) != len(outputQueueNames) {
-		return nil, fmt.Errorf("the length of output queue names and output delivery types don't match (names: %v, types: %v)", len(outputQueueNames), len(outputDeliveryTypes))
+		return Config{}, fmt.Errorf("the length of output queue names and output delivery types don't match (names: %v, types: %v)", len(outputQueueNames), len(outputDeliveryTypes))
 	}
 
 	// OUTPUT_COPIES
@@ -122,28 +123,28 @@ func Create() (*Config, error) {
 	for i, copies := range outputCopiesPerQueueSlice {
 		n, err := strconv.Atoi(copies)
 		if err != nil {
-			return nil, fmt.Errorf("%v'nth copy quantity is not a number: %v", i, copies)
+			return Config{}, fmt.Errorf("%v'nth copy quantity is not a number: %v", i, copies)
 		}
 		outputCopies = append(outputCopies, n)
 	}
 
 	if len(outputCopies) != len(outputQueueNames) {
-		return nil, fmt.Errorf("the length of output queue names and output copies per queue don't match (names: %v, copies: %v)", len(outputQueueNames), len(outputCopiesPerQueueSlice))
+		return Config{}, fmt.Errorf("the length of output queue names and output copies per queue don't match (names: %v, copies: %v)", len(outputQueueNames), len(outputCopiesPerQueueSlice))
 	}
 
 	// RUSSIAN ROULETTE CHANCE
 	russianRouletteChance, err := strconv.ParseFloat(os.Getenv("RUSSIAN_ROULETTE_CHANCE"), 32)
 	if err != nil {
-		return nil, fmt.Errorf("the given russian roulette chance is invalid: %v", err)
+		return Config{}, fmt.Errorf("the given russian roulette chance is invalid: %v", err)
 	}
 	if !(0 <= russianRouletteChance || russianRouletteChance <= 100) {
-		return nil, fmt.Errorf("russian roulette chance must be between 0 and 100: %f", russianRouletteChance)
+		return Config{}, fmt.Errorf("russian roulette chance must be between 0 and 100: %f", russianRouletteChance)
 	}
 
 	// SELECT
 	selectString := os.Getenv("SELECT")
 	if len(selectString) == 0 {
-		return nil, fmt.Errorf("the select were not provided")
+		return Config{}, fmt.Errorf("the select were not provided")
 	}
 	selectMap := make(map[string]struct{})
 	for field := range strings.SplitSeq(selectString, ",") {
@@ -153,7 +154,13 @@ func Create() (*Config, error) {
 	// HEALTH_CHECK_PORT
 	healthCheckPort, err := strconv.ParseUint(os.Getenv("HEALTH_CHECK_PORT"), 10, 16)
 	if err != nil {
-		return nil, fmt.Errorf("the provided health check port is invalid: %v", err)
+		return Config{}, fmt.Errorf("the provided health check port is invalid: %v", err)
+	}
+
+	// KEEP_ALIVE_RETRIES
+	keepAliveRetries, err := strconv.Atoi(os.Getenv("KEEP_ALIVE_RETRIES"))
+	if err != nil {
+		return Config{}, fmt.Errorf("the provided keep alive retries value is invalid: %v", err)
 	}
 
 	// LOG_LEVEL
@@ -164,7 +171,7 @@ func Create() (*Config, error) {
 	}
 	configLog(logLevel)
 
-	return &Config{
+	return Config{
 		Id:                    id,
 		Url:                   url,
 		InputExchangeNames:    inputExchangeNames,
@@ -176,6 +183,7 @@ func Create() (*Config, error) {
 		OutputDeliveryTypes:   outputDeliveryTypes,
 		RussianRouletteChance: russianRouletteChance,
 		HealthCheckPort:       uint16(healthCheckPort),
+		KeepAliveRetries:      keepAliveRetries,
 		Select:                selectMap,
 	}, nil
 }

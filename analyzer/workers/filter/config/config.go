@@ -9,7 +9,7 @@ import (
 )
 
 type FilterConfig struct {
-	*config.Config
+	config.Config
 	Handler string
 	Key     string
 	Value   string

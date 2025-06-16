@@ -28,10 +28,10 @@ type Worker struct {
 	Log       *logging.Logger
 	Mailer    *Mailer
 	recvCases []reflect.SelectCase
-	con       *config.Config
+	con       config.Config
 }
 
-func New(con *config.Config, log *logging.Logger) (*Worker, error) {
+func New(con config.Config, log *logging.Logger) (*Worker, error) {
 	mailer, err := NewMailer(con, log)
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func (base *Worker) Run(w IWorker) error {
 	base.Log.Infof("Running...")
 	cases := base.recvCases
 
-	acker, err := checker.SpawnAcker(base.con.HealthCheckPort, base.Log)
+	acker, err := checker.SpawnAcker(base.con.HealthCheckPort, base.con.KeepAliveRetries, base.Log)
 	if err != nil {
 		return fmt.Errorf("failed to spawn acker: %v", err)
 	}

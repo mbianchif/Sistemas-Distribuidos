@@ -238,7 +238,7 @@ func (s *Server) Run() error {
 		return fmt.Errorf("failed to clean piipeline: %v", err)
 	}
 
-	acker, err := checker.SpawnAcker(s.con.HealthCheckPort, s.log)
+	acker, err := checker.SpawnAcker(s.con.HealthCheckPort, s.con.KeepAliveRetries, s.log)
 	if err != nil {
 		return fmt.Errorf("failed to spawn acker: %v", err)
 	}

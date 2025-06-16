@@ -1,6 +1,18 @@
 import json
 import sys
+import math
+import random
 from pathlib import Path
+
+PIPELINE_COMPOSE_FILE_NAME = "compose.yaml"
+CLIENTS_COMPOSE_FILE_NAME = "compose.clients.yaml"
+CHECKERS_COMPOSE_FILE_NAME = "compose.checkers.yaml"
+
+# unscalable
+GATEWAY = 1
+TOP_10_COUNT = 1
+TOP_5_BUDGET = 1
+MINMAX_RATING = 1
 
 
 def generate_pipeline_compose(
@@ -28,11 +40,6 @@ def generate_pipeline_compose(
     join_id_movieid,
     join_id_id,
 ) -> str:
-    GATEWAY = 1
-    TOP_10_COUNT = 1
-    TOP_5_BUDGET = 1
-    MINMAX_RATING = 1
-
     docker_compose = "name: moviesanalyzer"
     docker_compose += f"""
 services:
@@ -612,7 +619,7 @@ networks:
     return docker_compose
 
 
-def generate_client_compose(client) -> str:
+def generate_clients_compose(client) -> str:
     docker_compose = f"""name: clients
 services:"""
 
@@ -637,6 +644,61 @@ networks:
     return docker_compose
 
 
+def chunks(arr, r):
+    for i in range(0, len(arr), r):
+        bot = i
+        top = min(i + r, len(arr))
+        yield arr[bot:top]
+
+
+def generate_checkers_compose(config: dict[str, int]):
+    nodes = [
+        "gateway-0",
+        "top-10_count-0",
+        "top-5_budget-0",
+        "minmax-rating-0",
+    ]
+
+    for kind, replicas in config.items():
+        if kind == "clients":
+            continue
+
+        name = kind.replace("_", "-", 1)
+        for i in range(replicas):
+            nodes.append(f"{name}-{i}")
+
+    random.shuffle(nodes)
+    ncheckers = math.ceil(len(nodes) / 10)
+    partition_size = math.ceil(len(nodes) / ncheckers)
+    watch_nodes_chunks = list(chunks(nodes, partition_size))
+
+    docker_compose = f"""name: checkers
+services:"""
+    for i in range(ncheckers):
+        docker_compose += f"""
+  health-checker-{i}:
+    container_name: healt-checker-{i}
+    build:
+      dockerfile: build/checker.Dockerfile
+    networks:
+      - my-network
+    env_file: configs/checker/.env
+    environment:
+      - ID={i}
+      - N={ncheckers}
+      - CHECKER_COMPOSE_PATH={CHECKERS_COMPOSE_FILE_NAME}
+      - HOST_FMT=health-checker-%d
+      - WATCH_NODES={",".join(watch_nodes_chunks[i])}
+"""
+    docker_compose += """
+networks:
+  my-network:
+    name: moviesanalyzer_net
+    external: true
+"""
+    return docker_compose
+
+
 if __name__ == "__main__":
     # pipeline
     config_path = Path("configs/compose/config.json")
@@ -647,7 +709,7 @@ if __name__ == "__main__":
 
     with open(config_path, "r") as config_file:
         config = json.load(config_file)
-        client = config.pop("client", None)
+        clients = config.pop("clients", None)
 
     try:
         pipeline_docker_compose = generate_pipeline_compose(**config)
@@ -655,18 +717,21 @@ if __name__ == "__main__":
         print(f"Missing configuration key: {e}")
         sys.exit(1)
 
-    pipeline_compose_name = "compose.yaml"
-
-    with open(pipeline_compose_name, "w") as f:
+    with open(PIPELINE_COMPOSE_FILE_NAME, "w") as f:
         f.write(pipeline_docker_compose)
 
-    print(f"Pipeline compose file saved to {pipeline_compose_name}")
+    print(f"Pipeline compose file saved to {PIPELINE_COMPOSE_FILE_NAME}")
 
-    # client
-    clients_compose_name = "compose.clients.yaml"
-
-    docker_compose = generate_client_compose(client)
-    with open(clients_compose_name, "w") as f:
+    # clients
+    docker_compose = generate_clients_compose(clients)
+    with open(CLIENTS_COMPOSE_FILE_NAME, "w") as f:
         f.write(docker_compose)
 
-    print(f"Clients compose file saved to {clients_compose_name}")
+    print(f"Clients compose file saved to {CLIENTS_COMPOSE_FILE_NAME}")
+
+    # checkers
+    docker_compose = generate_checkers_compose(config)
+    with open(CHECKERS_COMPOSE_FILE_NAME, "w") as f:
+        f.write(docker_compose)
+
+    print(f"Checkers compose file saves to {CHECKERS_COMPOSE_FILE_NAME}")

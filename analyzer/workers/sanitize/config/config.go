@@ -9,10 +9,9 @@ import (
 )
 
 type SanitizeConfig struct {
-	*config.Config
+	config.Config
 	Handler string
 }
-
 
 func Create() (*SanitizeConfig, error) {
 	con, err := config.Create()

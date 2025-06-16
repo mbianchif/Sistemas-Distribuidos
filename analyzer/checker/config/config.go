@@ -10,32 +10,29 @@ import (
 	"github.com/op/go-logging"
 )
 
-const CHECKER_COMPOSE_FILENAME = "compose.checkers.yaml"
-const HOST_FMT = "health-checker-%d"
-
 type Config struct {
 	// .env
 	HealthCheckPort               uint16
 	DefaultSleepDuration          time.Duration
-	RespawnSleepDuration          time.Duration
+	ReviveSleepDuration           time.Duration
 	StartingKeepAliveWaitDuration time.Duration
 	KeepAliveRetries              int
-	RespawnRetries                int
+	ReviveRetries                 int
 
 	// compose
-	Id                     int
-	N                      int
-	ContainerNames         []string
-	CheckerComposeFileName string
-	HostFmt                string
+	Id                 int
+	N                  int
+	CheckerComposePath string
+	HostFmt            string
+	WatchNodes         []string
 }
 
-func configLog(logLevel logging.Level) {
+func configLog(logLevel logging.Level, name string) {
 	backend := logging.NewLogBackend(os.Stderr, "", 0)
-	format := logging.MustStringFormatter(`%{time:2006-01-02 15:04:05}	%{level:.4s}	%{message}`)
+	format := logging.MustStringFormatter(`%{time:2006-01-02 15:04:05}	%{level:.4s} [%{name}]	%{message}`)
 	backendFormatter := logging.NewBackendFormatter(backend, format)
 	backendLeveled := logging.AddModuleLevel(backendFormatter)
-	backendLeveled.SetLevel(logLevel, "log")
+	backendLeveled.SetLevel(logLevel, name)
 	logging.SetBackend(backendLeveled)
 }
 
@@ -52,17 +49,10 @@ func Create() (Config, error) {
 		return Config{}, fmt.Errorf("the given n is invalid: %v", err)
 	}
 
-	// CONTAINER_NAMES
-	ContainerNamesStr := os.Getenv("CONTAINER_NAMES")
-	ContainerNames := strings.Split(ContainerNamesStr, ",")
-	if len(ContainerNames) == 0 {
-		return Config{}, fmt.Errorf("the container names are empty")
-	}
-
-	// CHECKER_COMPOSE_FILE_NAME
-	checkerComposeFileName := os.Getenv("CHECKER_COMPOSE_FILE_NAME")
-	if len(checkerComposeFileName) == 0 {
-		return Config{}, fmt.Errorf("the checker compose file name is empty")
+	// CHECKER_COMPOSE_PATH
+	checkerComposePath := os.Getenv("CHECKER_COMPOSE_PATH")
+	if len(checkerComposePath) == 0 {
+		return Config{}, fmt.Errorf("the checker compose path is empty")
 	}
 
 	// HOST_FMT
@@ -87,15 +77,15 @@ func Create() (Config, error) {
 	}
 	defaultSleepDuration := time.Duration(defaultSleepDurationInt) * time.Second
 
-	// RESPAWN_SLEEP_DURATION
-	respawnSleepDurationInt, err := strconv.Atoi(os.Getenv("RESPAWN_SLEEP_DURATION"))
+	// REVIVE_SLEEP_DURATION
+	reviveSleepDurationInt, err := strconv.Atoi(os.Getenv("REVIVE_SLEEP_DURATION"))
 	if err != nil {
-		return Config{}, fmt.Errorf("the respawn sleep duration is invalid: %v", err)
+		return Config{}, fmt.Errorf("the revive sleep duration is invalid: %v", err)
 	}
-	if respawnSleepDurationInt < 0 {
-		return Config{}, fmt.Errorf("the respawn sleep duration must be a positive number or zero")
+	if reviveSleepDurationInt < 0 {
+		return Config{}, fmt.Errorf("the revive sleep duration must be a positive number or zero")
 	}
-	respawnSleepDuration := time.Duration(respawnSleepDurationInt) * time.Second
+	reviveSleepDuration := time.Duration(reviveSleepDurationInt) * time.Second
 
 	// STARTING_KEEP_ALIVE_WAIT_DURATION
 	startingKeepAliveWaitDurationInt, err := strconv.Atoi(os.Getenv("STARTING_KEEP_ALIVE_DURATION"))
@@ -116,13 +106,20 @@ func Create() (Config, error) {
 		return Config{}, fmt.Errorf("the keep alive retries value must be a postive number or zero")
 	}
 
-	// RESPAWN_RETRIES
-	respawnRetries, err := strconv.Atoi(os.Getenv("RESPAWN_RETRIES"))
+	// REVIVE_RETRIES
+	reviveRetries, err := strconv.Atoi(os.Getenv("REVIVE_RETRIES"))
 	if err != nil {
-		return Config{}, fmt.Errorf("the respawn retries value is invalid: %v", err)
+		return Config{}, fmt.Errorf("the revive retries value is invalid: %v", err)
 	}
-	if respawnRetries < 0 {
-		return Config{}, fmt.Errorf("the respawn retries value must be a postive number or zero")
+	if reviveRetries < 0 {
+		return Config{}, fmt.Errorf("the revive retries value must be a postive number or zero")
+	}
+
+	// WATCH_NODES
+	watchNodesStr := os.Getenv("WATCH_NODES")
+	watchNodes := strings.Split(watchNodesStr, ",")
+	if len(watchNodes) == 0 {
+		return Config{}, fmt.Errorf("the watch nodes field is empty")
 	}
 
 	// LOG_LEVEL
@@ -131,19 +128,20 @@ func Create() (Config, error) {
 	if err != nil {
 		logLevel = logging.DEBUG
 	}
-	configLog(logLevel)
+	configLog(logLevel, "acker")
+	configLog(logLevel, "next monitor")
+	configLog(logLevel, "node monitor")
 
 	return Config{
 		Id:                            id,
 		N:                             n,
-		ContainerNames:                ContainerNames,
-		CheckerComposeFileName:        checkerComposeFileName,
+		CheckerComposePath:            checkerComposePath,
 		HostFmt:                       hostFmt,
 		HealthCheckPort:               uint16(healthCheckPort),
 		DefaultSleepDuration:          defaultSleepDuration,
-		RespawnSleepDuration:          respawnSleepDuration,
+		ReviveSleepDuration:           reviveSleepDuration,
 		StartingKeepAliveWaitDuration: startingKeepAliveWaitDuration,
-		RespawnRetries:                respawnRetries,
+		ReviveRetries:                 reviveRetries,
 		KeepAliveRetries:              keepAliveRetries,
 	}, nil
 }

@@ -5,7 +5,7 @@ import (
 )
 
 type DividerConfig struct {
-	*config.Config
+	config.Config
 }
 
 func Create() (*DividerConfig, error) {
