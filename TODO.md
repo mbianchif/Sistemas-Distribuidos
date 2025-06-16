@@ -1,10 +1,6 @@
 # TODO
 
 ## Fault-Tolerance
-- (Pesado) Hacer los Health-Checkers
-  * Implementar el NodeMonitor
-  * Pasar lo que es de docker a otro archivo, estilo broker
-  * Agregar al generate_compose los healthcheckers
 
 ## Requisitos para la proxima entrega
 - (IMPORTANTE) Agregar la documentacion necesaria al informe/diagramas
