@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"syscall"
 
+	checker "analyzer/checker/impl"
 	"analyzer/comms"
 	"analyzer/comms/middleware"
 	"analyzer/workers/config"
@@ -71,6 +72,12 @@ func New(con *config.Config, log *logging.Logger) (*Worker, error) {
 func (base *Worker) Run(w IWorker) error {
 	base.Log.Infof("Running...")
 	cases := base.recvCases
+
+	acker, err := checker.SpawnAcker(base.con.HealthCheckPort, base.Log)
+	if err != nil {
+		return fmt.Errorf("failed to spawn acker: %v", err)
+	}
+	defer acker.Stop()
 
 	for {
 		qId, value, ok := reflect.Select(cases)
