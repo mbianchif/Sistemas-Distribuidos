@@ -629,6 +629,7 @@ services:"""
     container_name: client-{i}
     build:
       dockerfile: build/client.Dockerfile
+    volumes:
       - .data:/data
     networks:
       - my-network
