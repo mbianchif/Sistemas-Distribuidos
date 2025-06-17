@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"fmt"
+	"hash/fnv"
 	"strconv"
 	"strings"
 
@@ -47,13 +48,9 @@ func (s *SenderShard) nextKeySeq(i int, clientId int) (string, int) {
 }
 
 func keyHash(str string) uint64 {
-	var hash uint64 = 5381
-
-	for _, c := range str {
-		hash = ((hash << 5) + hash) + uint64(c) // hash * 33 + c
-	}
-
-	return hash
+	h := fnv.New64a()
+	h.Write([]byte(str))
+	return h.Sum64()
 }
 
 func (s *SenderShard) Batch(batch comms.Batch, filterCols map[string]struct{}, headers Table) error {
