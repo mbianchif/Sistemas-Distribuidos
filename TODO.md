@@ -5,6 +5,7 @@
 
 ## Requisitos para la proxima entrega
 - (IMPORTANTE) Agregar la documentacion necesaria al informe/diagramas
+- (comdo) Hacer un Makefile
 
 ## Cosas que estarian bien
 - (Mediano) Chequear los accesos a las variables publicas y privadas, que las clases no expongan cosas al dope

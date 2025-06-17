@@ -167,7 +167,7 @@ func DecodeLineRecv(line string) (string, int, int, []int, error) {
 	line, _ = strings.CutPrefix(line, "recv ")
 
 	parts := strings.Split(line, " ")
-	if len(parts) < 5 {
+	if len(parts) < 4 {
 		return "", 0, 0, nil, fmt.Errorf("the amount of parts is not enough: %s", line)
 	}
 
