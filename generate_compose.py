@@ -69,8 +69,6 @@ services:
       - my-network
     ports:
       - 9090:9090
-    volumes:
-      - ./volumes/gateway/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -91,8 +89,6 @@ services:
       dockerfile: build/sanitize.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/sanitizer-movies-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -113,8 +109,6 @@ services:
       dockerfile: build/sanitize.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/sanitizer-credits-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -135,8 +129,6 @@ services:
       dockerfile: build/sanitize.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/sanitizer-ratings-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -158,8 +150,6 @@ services:
       dockerfile: build/filter.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/filter-production_countries_length-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -180,8 +170,6 @@ services:
       dockerfile: build/filter.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/filter-release_date_since_2000-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -202,8 +190,6 @@ services:
       dockerfile: build/filter.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/filter-release_date_upto_2010-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -224,8 +210,6 @@ services:
       dockerfile: build/filter.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/filter-production_countries_argentina-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -246,8 +230,6 @@ services:
       dockerfile: build/filter.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/filter-production_countries_argentina_spain-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -269,8 +251,6 @@ services:
       dockerfile: build/explode.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/explode-cast-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -291,8 +271,6 @@ services:
       dockerfile: build/explode.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/explode-production_countries-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -314,9 +292,6 @@ services:
       dockerfile: build/groupby.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/groupby-id_title_mean_rating-{i}/mailer:/mailer
-      - ./volumes/groupby-id_title_mean_rating-{i}/persistor:/persistor
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -337,9 +312,6 @@ services:
       dockerfile: build/groupby.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/groupby-sentiment_mean_rate_revenue_budget-{i}/mailer:/mailer
-      - ./volumes/groupby-sentiment_mean_rate_revenue_budget-{i}/persistor:/persistor
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -360,9 +332,6 @@ services:
       dockerfile: build/groupby.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/groupby-country_sum_budget-{i}/mailer:/mailer
-      - ./volumes/groupby-country_sum_budget-{i}/persistor:/persistor
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -383,9 +352,6 @@ services:
       dockerfile: build/groupby.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/groupby-actor_count-{i}/mailer:/mailer
-      - ./volumes/groupby-actor_count-{i}/persistor:/persistor
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -407,8 +373,6 @@ services:
       dockerfile: build/divider.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/divider-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -430,8 +394,6 @@ services:
       dockerfile: build/sentiment.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/sentiment-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -453,9 +415,6 @@ services:
       dockerfile: build/top.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/top-10_count-{i}/mailer:/mailer
-      - ./volumes/top-10_count-{i}/persistor:/persistor
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -479,9 +438,6 @@ services:
         condition: service_healthy
     networks:
       - my-network
-    volumes:
-      - ./volumes/top-5_budget-{i}/mailer:/mailer
-      - ./volumes/top-5_budget-{i}/persistor:/persistor
     env_file:
       - configs/workers/.env
       - configs/workers/top/.env.5_budget
@@ -500,9 +456,6 @@ services:
       dockerfile: build/minmax.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/minmax-rating-{i}/mailer:/mailer
-      - ./volumes/minmax-rating-{i}/persistor:/persistor
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -524,10 +477,6 @@ services:
       dockerfile: build/join.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/join-id_movieid-{i}/mailer:/mailer
-      - ./volumes/join-id_movieid-{i}/left-persistor:/left-persistor
-      - ./volumes/join-id_movieid-{i}/right-persistor:/right-persistor
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -548,10 +497,6 @@ services:
       dockerfile: build/join.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/join-id_id-{i}/mailer:/mailer
-      - ./volumes/join-id_id-{i}/left-persistor:/left-persistor
-      - ./volumes/join-id_id-{i}/right-persistor:/right-persistor
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -573,8 +518,6 @@ services:
       dockerfile: build/sink.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/sink-1-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -595,8 +538,6 @@ services:
       dockerfile: build/sink.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/sink-2-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -617,8 +558,6 @@ services:
       dockerfile: build/sink.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/sink-3-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -639,8 +578,6 @@ services:
       dockerfile: build/sink.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/sink-4-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -661,8 +598,6 @@ services:
       dockerfile: build/sink.Dockerfile
     networks:
       - my-network
-    volumes:
-      - ./volumes/sink-5-{i}/mailer:/mailer
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -694,7 +629,6 @@ services:"""
     container_name: client-{i}
     build:
       dockerfile: build/client.Dockerfile
-    volumes:
       - .data:/data
     networks:
       - my-network
@@ -754,7 +688,6 @@ services:"""
       - N={ncheckers}
       - HOST_NAME={host_name}
       - WATCH_NODES={",".join(watch_nodes_chunks[i])}
-    volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 """
     docker_compose += """

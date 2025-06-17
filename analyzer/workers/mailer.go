@@ -278,7 +278,7 @@ func (m *Mailer) Dump(clientId int) error {
 	}
 
 	// 3. Atomic write
-	dirPath := fmt.Sprintf("%s/%d", PERSISTANCE_DIRNAME, clientId)
+	dirPath := fmt.Sprintf("/%s/%d", PERSISTANCE_DIRNAME, clientId)
 	return comms.AtomicWrite(dirPath, PERSISTANCE_FILENAME, buf.Bytes())
 }
 

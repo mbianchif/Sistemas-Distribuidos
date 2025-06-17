@@ -113,12 +113,14 @@ func (base *Worker) Run(w IWorker) error {
 
 		// Dump
 		switch kind {
-		case comms.BATCH | comms.EOF:
+		case comms.BATCH, comms.EOF:
 			base.Mailer.Dump(clientId)
 		case comms.FLUSH:
 			base.Mailer.Flush(clientId)
 		case comms.PURGE:
 			base.Mailer.Purge()
+		default:
+			base.Log.Errorf("received an unknown message kind %v", kind)
 		}
 
 		base.RussianRoulette("[Dump, Ack]")
