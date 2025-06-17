@@ -1,5 +1,8 @@
 # TODO
 
+## Fault-Tolerance
+- Chequear por que al momento de revivir un container, este no parece estar leyendo las colas de entrada
+
 ## Requisitos para la proxima entrega
 - (IMPORTANTE) Agregar la documentacion necesaria al informe/diagramas
 
