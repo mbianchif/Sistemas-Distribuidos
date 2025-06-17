@@ -683,13 +683,14 @@ services:"""
       dockerfile: build/checker.Dockerfile
     networks:
       - my-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     env_file: configs/checker/.env
     environment:
       - ID={i}
       - N={ncheckers}
       - HOST_NAME={host_name}
       - WATCH_NODES={",".join(watch_nodes_chunks[i])}
-      - /var/run/docker.sock:/var/run/docker.sock
 """
     docker_compose += """
 networks:
