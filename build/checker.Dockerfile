@@ -16,4 +16,5 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o binary checker/main.go
 
 FROM busybox:1.37.0
 COPY --from=builder /analyzer/binary /binary
+COPY --from=builder /usr/bin/docker  /usr/bin/docker
 ENTRYPOINT ["/binary"]

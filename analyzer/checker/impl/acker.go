@@ -61,7 +61,7 @@ func (a *Acker) run() {
 		host := peerAddr.IP.String()
 		a.log.Debugf("Received a keep-alive from %s, trying to ACK", host)
 
-		for range a.keepAliveRetries {
+		for range 1 + a.keepAliveRetries {
 			_, err = a.conn.WriteToUDP(nil, peerAddr)
 			if err == nil {
 				break
@@ -76,6 +76,6 @@ func (a *Acker) Stop() error {
 	err := a.conn.Close()
 	a.wg.Wait()
 
-	a.log.Debugf("Acker stoped")
+	a.log.Debugf("Acker stopped")
 	return err
 }

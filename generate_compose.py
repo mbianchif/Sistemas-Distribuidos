@@ -676,8 +676,8 @@ def generate_checkers_compose(config: dict[str, int]):
 services:"""
     for i in range(ncheckers):
         docker_compose += f"""
-  health-checker-{i}:
-    container_name: healt-checker-{i}
+  checker-{i}:
+    container_name: checker-{i}
     build:
       dockerfile: build/checker.Dockerfile
     networks:
@@ -686,7 +686,7 @@ services:"""
     environment:
       - ID={i}
       - N={ncheckers}
-      - HOST_FMT=health-checker-%d
+      - HOST_FMT=checker-%d
       - WATCH_NODES={",".join(watch_nodes_chunks[i])}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
