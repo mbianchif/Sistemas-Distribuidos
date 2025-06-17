@@ -33,7 +33,7 @@ func (c Checker) Run() error {
 	}
 	defer acker.Stop()
 
-	nextName := fmt.Sprintf(c.con.HostFmt, (c.con.Id+1)%c.con.N)
+	nextName := fmt.Sprintf("%s-%d", c.con.HostName, (c.con.Id+1)%c.con.N)
 	monitor, err := SpawnMonitor(c.con, c.log, append(c.con.WatchNodes, nextName))
 	if err != nil {
 		return err

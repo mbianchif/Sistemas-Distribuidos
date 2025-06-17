@@ -1,7 +1,5 @@
 # TODO
 
-## Fault-Tolerance
-
 ## Requisitos para la proxima entrega
 - (IMPORTANTE) Agregar la documentacion necesaria al informe/diagramas
 

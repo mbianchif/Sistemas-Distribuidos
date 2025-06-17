@@ -671,13 +671,14 @@ def generate_checkers_compose(config: dict[str, int]):
     ncheckers = math.ceil(len(nodes) / 10)
     partition_size = math.ceil(len(nodes) / ncheckers)
     watch_nodes_chunks = list(chunks(nodes, partition_size))
+    host_name = "checker"
 
     docker_compose = f"""name: checkers
 services:"""
     for i in range(ncheckers):
         docker_compose += f"""
-  checker-{i}:
-    container_name: checker-{i}
+  {host_name}-{i}:
+    container_name: {host_name}-{i}
     build:
       dockerfile: build/checker.Dockerfile
     networks:
@@ -686,7 +687,7 @@ services:"""
     environment:
       - ID={i}
       - N={ncheckers}
-      - HOST_FMT=checker-%d
+      - HOST_NAME={host_name}
       - WATCH_NODES={",".join(watch_nodes_chunks[i])}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

@@ -22,7 +22,7 @@ type Config struct {
 	// compose
 	Id         int
 	N          int
-	HostFmt    string
+	HostName   string
 	WatchNodes []string
 }
 
@@ -48,10 +48,10 @@ func Create() (Config, error) {
 		return Config{}, fmt.Errorf("the given n is invalid: %v", err)
 	}
 
-	// HOST_FMT
-	hostFmt := os.Getenv("HOST_FMT")
-	if len(hostFmt) == 0 {
-		return Config{}, fmt.Errorf("the host fmt is empty")
+	// HOST_NAME
+	hostName := os.Getenv("HOST_NAME")
+	if len(hostName) == 0 {
+		return Config{}, fmt.Errorf("the host name is empty")
 	}
 
 	// HEALTH_CHECK_PORT
@@ -126,7 +126,7 @@ func Create() (Config, error) {
 	return Config{
 		Id:                            id,
 		N:                             n,
-		HostFmt:                       hostFmt,
+		HostName:                      hostName,
 		HealthCheckPort:               uint16(healthCheckPort),
 		DefaultSleepDuration:          defaultSleepDuration,
 		ReviveSleepDuration:           reviveSleepDuration,

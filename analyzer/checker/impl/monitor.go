@@ -139,7 +139,7 @@ func (m *Monitor) run() {
 				return
 			}
 
-			m.log.Debugf("Waiting for ACKs...")
+			m.log.Debugf("Waiting for ACKs for %d seconds...", int(waitDur.Seconds()))
 			ok, err := m.wait(waitDur, dead)
 			if err != nil {
 				m.log.Error(err)
@@ -152,6 +152,7 @@ func (m *Monitor) run() {
 				break
 			}
 
+			m.log.Infof("%d didn't respond", len(dead))
 			waitDur <<= 1
 		}
 
