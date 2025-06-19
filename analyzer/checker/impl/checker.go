@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/op/go-logging"
 )
@@ -33,6 +34,8 @@ func (c Checker) Run() error {
 	}
 	defer acker.Stop()
 
+	time.Sleep(c.con.StartupGraceDuration)
+
 	nextName := fmt.Sprintf("%s-%d", c.con.HostName, (c.con.Id+1)%c.con.N)
 	monitor, err := SpawnMonitor(c.con, c.log, append(c.con.WatchNodes, nextName))
 	if err != nil {
@@ -40,6 +43,7 @@ func (c Checker) Run() error {
 	}
 	defer monitor.Stop()
 
+	c.log.Infof("Running...")
 	<-sigs
 	return nil
 }

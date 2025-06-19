@@ -99,7 +99,7 @@ func (s *Server) clientHandler(conn *CsvTransferStream, clientId int) error {
 			}
 
 			if msg.Kind == MSG_EOF {
-				s.log.Infof("%s was successfully received by client %d", fileName, clientId)
+				s.log.Infof("[%d] %s was successfully received", clientId, fileName)
 				mailer.PublishEof(fileName, clientId, []byte{})
 				break
 
@@ -162,7 +162,7 @@ func (s *Server) recvResults() error {
 			batch, err := comms.DecodeBatch(body)
 			if err != nil {
 				del.Ack(false)
-				return fmt.Errorf("[%d]: failed to decode batch from query %d", clientId, query)
+				return fmt.Errorf("[%d] Failed to decode batch from query %d", clientId, query)
 			}
 			result := batch.ToResult(query)
 			conn.Send(result)
@@ -172,7 +172,7 @@ func (s *Server) recvResults() error {
 			eof := comms.DecodeEof(body)
 			result := eof.ToResult(query)
 			conn.Send(result)
-			s.log.Infof("[%d]: Query %d has been successfully processed", clientId, query)
+			s.log.Infof("[%d] Query %d has been successfully processed", clientId, query)
 
 			eofsRecv[clientId] += 1
 			if eofsRecv[clientId] == 5 {

@@ -16,6 +16,7 @@ type Config struct {
 	DefaultSleepDuration          time.Duration
 	ReviveSleepDuration           time.Duration
 	StartingKeepAliveWaitDuration time.Duration
+	StartupGraceDuration          time.Duration
 	KeepAliveRetries              int
 	ReviveRetries                 int
 
@@ -90,6 +91,15 @@ func Create() (Config, error) {
 	}
 	startingKeepAliveWaitDuration := time.Duration(startingKeepAliveWaitDurationInt) * time.Second
 
+	// STARTUP_GRACE_DURATION
+	startupGraceDurationInt, err := strconv.Atoi(os.Getenv("STARTUP_GRACE_DURATION"))
+	if err != nil {
+		return Config{}, fmt.Errorf("the startup grace duration is invalid: %v", err)
+	}
+	if startupGraceDurationInt < 0 {
+		return Config{}, fmt.Errorf("the startup grace duration must be a postive number of zero")
+	}
+	startupGraceDuration := time.Duration(startingKeepAliveWaitDurationInt) * time.Second
 	// KEEP_ALIVE_RETRIES
 	keepAliveRetries, err := strconv.Atoi(os.Getenv("KEEP_ALIVE_RETRIES"))
 	if err != nil {
@@ -131,6 +141,7 @@ func Create() (Config, error) {
 		DefaultSleepDuration:          defaultSleepDuration,
 		ReviveSleepDuration:           reviveSleepDuration,
 		StartingKeepAliveWaitDuration: startingKeepAliveWaitDuration,
+		StartupGraceDuration:          startupGraceDuration,
 		ReviveRetries:                 reviveRetries,
 		WatchNodes:                    watchNodes,
 		KeepAliveRetries:              keepAliveRetries,
