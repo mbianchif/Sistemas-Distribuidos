@@ -16,3 +16,6 @@ La estructura de configuración (`Worker`) debe definir:
     - `robin`: Despachará los mensajes en estilo _round-robin_ entre las réplicas.
     - `shard:{key}`: Despachará los mensajes en estilo _shard_ utilizando la clave proveída.
 - `SELECT`: Lista de nombres de columnas que sobreviviran al procesado.
+- `RUSSIAN_ROULETTE_CHANCE`: Probabilidad de que en cada llamada a `RussianRoulette` el nodo se caiga.
+- `HEALTH_CHECK_PORT`: Puerto por el cual esperar por keep alives.
+- `KEEP_ALIVE_RETRIES`: Cantidad de veces a reintentar responder a los keep alives.
