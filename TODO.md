@@ -1,14 +1,11 @@
 # TODO
 
-## Fault-Tolerance
-- Chequear por que al momento de revivir un container, este no parece estar leyendo las colas de entrada
-
 ## Requisitos para la proxima entrega
-- (IMPORTANTE) Agregar la documentacion necesaria al informe/diagramas
-- (comdo) Hacer un Makefile
+
+## Cosas que nos dimos cuenta que no funcionarion muy bien
+- Roulette: Es muy dificil encontrar una probabilidad lo suficientemente grande para que tire algunos nodos y lo suficientemente chica para que se procesen los datos en un tiempo razonable.
 
 ## Cosas que estarian bien
-- (Mediano) Chequear los accesos a las variables publicas y privadas, que las clases no expongan cosas al dope
-- (Mediano) Cambiar la imlementación del dump y recover del mailer a que use Persistor
-- (Mediano) shardear los archivos del join para tener menos archivos, deberia ser mucho mas rapida la parte de izquierda
+- (Mediano) Shardear los archivos del join para tener menos archivos, deberia ser mucho mas rapida la parte de izquierda
+- (Mediano) Dumpear y Ackear cada n mensajes
 - (Pesado)  Hacer que los mensajes de los workers esten acotados por tamaño

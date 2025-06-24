@@ -23,6 +23,23 @@ type Monitor struct {
 	wg         sync.WaitGroup
 }
 
+func revive(containerName string, retries int, log *logging.Logger, healthCheckPort uint16) (*net.UDPAddr, error) {
+	var err error
+	for range 1 + retries {
+		cmd := exec.Command("docker", "restart", containerName)
+		if err = cmd.Run(); err == nil {
+			break
+		}
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to revive %s: %v", containerName, err)
+	}
+
+	log.Infof("Successfully revived %s", containerName)
+	return resolveAddr(containerName, healthCheckPort)
+}
+
 func resolveAddr(host string, port uint16) (*net.UDPAddr, error) {
 	addr := fmt.Sprintf("%s:%d", host, port)
 	if addr, err := net.ResolveUDPAddr("udp", addr); err != nil {
@@ -32,25 +49,33 @@ func resolveAddr(host string, port uint16) (*net.UDPAddr, error) {
 	}
 }
 
-func (m *Monitor) resolveAddr(host string) (*net.UDPAddr, error) {
-	return resolveAddr(host, m.con.HealthCheckPort)
-}
-
 func newMonitor(con config.Config, log *logging.Logger, watchNodeNames []string) (Monitor, error) {
 	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		return Monitor{}, fmt.Errorf("failed to open udp connection for keep alive: %v", err)
 	}
 
+	revived := false
 	nameToAddr := make(map[string]*net.UDPAddr, len(watchNodeNames))
 	addrToName := make(map[string]string, len(watchNodeNames))
 	for _, name := range watchNodeNames {
 		addr, err := resolveAddr(name, con.HealthCheckPort)
 		if err != nil {
-			return Monitor{}, fmt.Errorf("failed to resolve IP address of node %s: %v", name, err)
+			addr, err = revive(name, con.ReviveRetries, log, con.HealthCheckPort)
+			revived = true
 		}
+
+		if err != nil {
+			log.Errorf("Failed to resolve address for node %s after retrying", name)
+			continue
+		}
+
 		nameToAddr[name] = addr
 		addrToName[addr.String()] = name
+	}
+
+	if revived {
+		time.Sleep(con.ReviveSleepDuration)
 	}
 
 	return Monitor{
@@ -121,20 +146,7 @@ func (m *Monitor) wait(dur time.Duration, dead map[string]string) (bool, error) 
 }
 
 func (m *Monitor) revive(containerName string) (*net.UDPAddr, error) {
-	var err error
-	for range 1 + m.con.ReviveRetries {
-		cmd := exec.Command("docker", "restart", containerName)
-		if err = cmd.Run(); err == nil {
-			break
-		}
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to revive %s: %v", containerName, err)
-	}
-
-	m.log.Infof("Successfully revived %s", containerName)
-	return m.resolveAddr(containerName)
+	return revive(containerName, m.con.ReviveRetries, m.log, m.con.HealthCheckPort)
 }
 
 func (m *Monitor) sendWait(waitDur time.Duration, dead map[string]string) bool {
@@ -169,18 +181,19 @@ func (m *Monitor) run() {
 			}
 
 			waitDur <<= 1
-			m.log.Infof("[%d] %d didn't respond, retrying in %d seconds", retry+1, len(dead), int(waitDur.Seconds()))
+			m.log.Infof("[%d] %v didn't respond, retrying in %d seconds", retry+1, slices.Collect(maps.Values(dead)), int(waitDur.Seconds()))
 
 			if !m.sendWait(waitDur, dead) {
 				return
 			}
 		}
 
+		sleepDur := m.con.DefaultSleepDuration
 		if len(dead) > 0 {
 			m.log.Infof("Dead nodes: %v", slices.Collect(maps.Values(dead)))
+			sleepDur = m.con.ReviveSleepDuration
 		}
 
-		sleepDur := m.con.DefaultSleepDuration
 		for oldAddr, name := range dead {
 			newAddr, err := m.revive(name)
 			if err != nil {
@@ -191,8 +204,8 @@ func (m *Monitor) run() {
 			m.nameToAddr[name] = newAddr
 			m.addrToName[newAddr.String()] = name
 
+			delete(m.addrToName, oldAddr)
 			delete(dead, oldAddr)
-			sleepDur = m.con.ReviveSleepDuration
 		}
 
 		m.log.Debugf("Sleeping for %d seconds...", int(sleepDur.Seconds()))

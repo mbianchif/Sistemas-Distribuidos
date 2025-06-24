@@ -15,7 +15,7 @@
     "groupby_id_title_mean_rating": 5,
     "divider": 1,
     "sentiment": 1,
-    "join_id_movieid": 3,
+    "join_id_movieid": 5,
     "join_id_id": 2,
     "sink_1": 1,
     "sink_2": 1,
