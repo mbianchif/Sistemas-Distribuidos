@@ -1,0 +1,95 @@
+name: tp0
+services:
+  server:
+    container_name: server
+    image: server:latest
+    entrypoint: python3 -u /main.py
+    environment:
+      - LOGGING_LEVEL=DEBUG
+      - NCLIENTS=5
+    networks:
+      - testing_net
+    volumes:
+      - ./server/config.ini:/config.ini
+
+  client1:
+    container_name: client1
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_LOG_LEVEL=DEBUG
+      - CLI_ID=1
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml
+      - ./.data/agency-1.csv:/bets.csv
+
+  client2:
+    container_name: client2
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_LOG_LEVEL=DEBUG
+      - CLI_ID=2
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml
+      - ./.data/agency-2.csv:/bets.csv
+
+  client3:
+    container_name: client3
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_LOG_LEVEL=DEBUG
+      - CLI_ID=3
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml
+      - ./.data/agency-3.csv:/bets.csv
+
+  client4:
+    container_name: client4
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_LOG_LEVEL=DEBUG
+      - CLI_ID=4
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml
+      - ./.data/agency-4.csv:/bets.csv
+
+  client5:
+    container_name: client5
+    image: client:latest
+    entrypoint: /client
+    environment:
+      - CLI_LOG_LEVEL=DEBUG
+      - CLI_ID=5
+    networks:
+      - testing_net
+    depends_on:
+      - server
+    volumes:
+      - ./client/config.yaml:/config.yaml
+      - ./.data/agency-5.csv:/bets.csv
+
+networks:
+  testing_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.125.0/24
